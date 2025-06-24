@@ -142,10 +142,16 @@ userSchema.methods.resetLoginAttempts = function() {
 };
 
 /**
- * Static method to find user by email (including password for auth)
+ * Static method to find user by email or username (including password for auth)
  */
-userSchema.statics.findByEmailForAuth = function(email) {
-  return this.findOne({ email }).select('+password');
+userSchema.statics.findByEmailOrUsernameForAuth = function(identifier) {
+  // If identifier looks like an email, search by email, else by name
+  const isEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(identifier);
+  if (isEmail) {
+    return this.findOne({ email: identifier.toLowerCase() }).select('+password');
+  } else {
+    return this.findOne({ name: identifier }).select('+password');
+  }
 };
 
 /**
@@ -155,4 +161,4 @@ userSchema.statics.findActiveUsers = function() {
   return this.find({ isActive: true });
 };
 
-module.exports = mongoose.model('User', userSchema); 
+module.exports = mongoose.model('User', userSchema, 'Inventory'); 

@@ -35,10 +35,9 @@ const registerValidation = [
 ];
 
 const loginValidation = [
-  body('email')
-    .isEmail()
-    .normalizeEmail()
-    .withMessage('Please provide a valid email address'),
+  body('identifier')
+    .isLength({ min: 2, max: 50 })
+    .withMessage('Identifier must be between 2 and 50 characters'),
   
   body('password')
     .notEmpty()
@@ -163,10 +162,10 @@ router.post('/login', loginValidation, async (req, res) => {
       });
     }
 
-    const { email, password } = req.body;
+    const { identifier, password } = req.body;
 
-    // Find user by email (including password for comparison)
-    const user = await User.findByEmailForAuth(email);
+    // Find user by email or username (including password for comparison)
+    const user = await User.findByEmailOrUsernameForAuth(identifier);
     
     if (!user) {
       return res.status(401).json({
