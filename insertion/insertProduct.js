@@ -13,6 +13,8 @@ async function runInsertProduct() {
   } catch (err) {
     console.error("❌ Error inserting product:", err.message);
   }
+
 }
 
 runInsertProduct();
+

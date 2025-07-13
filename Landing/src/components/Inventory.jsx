@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import styles from './Inventory.module.css';
 import { 
   Package, 
@@ -8,9 +8,14 @@ import {
   ArrowLeft
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import Categories from '../views/Categories';
+import Products from '../views/Products';
+import Stores from '../views/Stores';
+import StoreProducts from '../views/StoreProducts';
 
 const Inventory = () => {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState(null);
 
   const inventoryModules = [
     {
@@ -48,21 +53,40 @@ const Inventory = () => {
   ];
 
   const handleCardClick = (moduleId) => {
-    console.log(`Navigating to ${moduleId} module`);
-    // Here you would typically navigate to the specific module page
-    // For now, we'll just log the action
+    setActiveTab(moduleId);
   };
 
   const handleBackClick = () => {
-    navigate('/dashboard');
+    if (activeTab) {
+      setActiveTab(null);
+    } else {
+      navigate('/dashboard');
+    }
   };
+
+  // Render the active tab content
+  if (activeTab === 'category') {
+    return <Categories onBack={() => setActiveTab(null)} />;
+  }
+  
+  if (activeTab === 'products') {
+    return <Products onBack={() => setActiveTab(null)} />;
+  }
+  
+  if (activeTab === 'stores') {
+    return <Stores onBack={() => setActiveTab(null)} />;
+  }
+  
+  if (activeTab === 'store-product') {
+    return <StoreProducts onBack={() => setActiveTab(null)} />;
+  }
 
   return (
     <div className={styles.inventory}>
       <div className={styles['inventory-header']}>
         <button className={styles['back-button']} onClick={handleBackClick}>
           <ArrowLeft size={20} />
-          Back to Dashboard
+          {activeTab ? 'Back to Inventory' : 'Back to Dashboard'}
         </button>
         <h1>Inventory Management</h1>
         <p>Manage your inventory, products, and store operations</p>
