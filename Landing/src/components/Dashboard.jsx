@@ -75,10 +75,18 @@ const Dashboard = () => {
 
   const handleCardClick = (moduleId) => {
     console.log(`Navigating to ${moduleId} module`);
-    // Navigate to specific module pages
     if (moduleId === 'inventory') {
       navigate('/inventory');
+    } else if (moduleId === 'transactions') {
+      navigate('/transactions');
+    } else if (moduleId === 'financial') {
+      navigate('/financial');
+    } else if (moduleId === 'stocks') {
+      navigate('/stocks');
+    }else if (moduleId === 'employees') {
+      navigate('/employees');
     }
+    
     // Add more navigation logic for other modules as needed
   };
 

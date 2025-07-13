@@ -7,6 +7,11 @@ import LoginForm from './components/LoginForm';
 import RegisterForm from './components/RegisterForm';
 import Navbar from './components/Navbar';
 import Inventory from './components/Inventory';
+import Transactions from './components/Transactions';
+import Financial from './components/Financial';
+import Stocks from './components/Stocks';
+import Employees from './components/Employees';
+import Payments from './components/Payments';
 import { fetchUserProfile } from '../../APIs/auth';
 
 function App() {
@@ -58,6 +63,46 @@ function App() {
             element={
               user && user.role === 'user'
                 ? <Inventory />
+                : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
+            }
+          />
+          <Route
+            path="/transactions"
+            element={
+              user && user.role === 'user'
+                ? <Transactions />
+                : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
+            }
+          />
+          <Route
+            path="/financial"
+            element={
+              user && user.role === 'user'
+                ? <Financial />
+                : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
+            }
+          />
+          <Route
+            path="/stocks"
+            element={
+              user && user.role === 'user'
+                ? <Stocks />
+                : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
+            }
+          />
+          <Route
+            path="/employees"
+            element={
+              user && user.role === 'user'
+                ? <Employees />
+                : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
+            }
+          />
+          <Route
+            path="/payments"
+            element={
+              user && user.role === 'user'
+                ? <Payments />
                 : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
             }
           />
