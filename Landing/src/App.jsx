@@ -6,6 +6,7 @@ import LandingPage from './components/LandingPage';
 import LoginForm from './components/LoginForm';
 import RegisterForm from './components/RegisterForm';
 import Navbar from './components/Navbar';
+import Inventory from './components/Inventory';
 import { fetchUserProfile } from '../../APIs/auth';
 
 function App() {
@@ -49,6 +50,14 @@ function App() {
             element={
               user && user.role === 'user'
                 ? <Dashboard />
+                : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
+            }
+          />
+          <Route
+            path="/inventory"
+            element={
+              user && user.role === 'user'
+                ? <Inventory />
                 : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
             }
           />

@@ -9,8 +9,11 @@ import {
   BarChart3, 
   FileText 
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const Dashboard = () => {
+  const navigate = useNavigate();
+  
   const modules = [
     {
       id: 'inventory',
@@ -72,8 +75,11 @@ const Dashboard = () => {
 
   const handleCardClick = (moduleId) => {
     console.log(`Navigating to ${moduleId} module`);
-    // Here you would typically navigate to the specific module page
-    // For now, we'll just log the action
+    // Navigate to specific module pages
+    if (moduleId === 'inventory') {
+      navigate('/inventory');
+    }
+    // Add more navigation logic for other modules as needed
   };
 
   return (
