@@ -19,6 +19,9 @@ import Salary from './views/Salary';
 import ExpenseCategory from './views/ExpenseCategory';
 import Expenses from './views/Expenses';
 import Transfer from './views/Transfer';
+import Account from './views/Account';
+import Deposit from './views/Deposit';
+import Withdrawal from './views/Withdrawal';
 import { fetchUserProfile } from '../../APIs/auth';
 
 function App() {
@@ -110,6 +113,30 @@ function App() {
             element={
               user && user.role === 'user'
                 ? <Transfer onBack={() => window.history.back()} />
+                : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
+            }
+          />
+          <Route
+            path="/financial/accounts"
+            element={
+              user && user.role === 'user'
+                ? <Account onBack={() => window.history.back()} />
+                : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
+            }
+          />
+          <Route
+            path="/financial/deposits"
+            element={
+              user && user.role === 'user'
+                ? <Deposit onBack={() => window.history.back()} />
+                : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
+            }
+          />
+          <Route
+            path="/financial/withdrawals"
+            element={
+              user && user.role === 'user'
+                ? <Withdrawal onBack={() => window.history.back()} />
                 : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
             }
           />

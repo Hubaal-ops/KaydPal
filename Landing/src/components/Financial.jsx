@@ -1,14 +1,10 @@
-import React, { useState } from 'react';
+import React from 'react';
 import styles from './Financial.module.css';
 import { Banknote, ArrowDownCircle, ArrowUpCircle, Repeat, List, FileText, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-// import Account, Deposit, Withdrawal if you have them
 
 const Financial = () => {
   const navigate = useNavigate();
-  const [showAccount, setShowAccount] = useState(false);
-  const [showDeposit, setShowDeposit] = useState(false);
-  const [showWithdrawal, setShowWithdrawal] = useState(false);
 
   const financialModules = [
     {
@@ -63,43 +59,23 @@ const Financial = () => {
 
   const handleCardClick = (moduleId) => {
     if (moduleId === 'accounts') {
-      setShowAccount(true);
+      navigate('/financial/accounts');
     } else if (moduleId === 'deposits') {
-      setShowDeposit(true);
+      navigate('/financial/deposits');
     } else if (moduleId === 'withdrawals') {
-      setShowWithdrawal(true);
+      navigate('/financial/withdrawals');
     } else if (moduleId === 'expense-category') {
       navigate('/financial/expense-category');
     } else if (moduleId === 'expenses') {
       navigate('/financial/expenses');
     } else if (moduleId === 'transfers') {
       navigate('/financial/transfers');
-    } else {
-      console.log(`Navigating to ${moduleId} module`);
     }
   };
 
   const handleBackClick = () => {
-    if (showAccount) {
-      setShowAccount(false);
-    } else if (showDeposit) {
-      setShowDeposit(false);
-    } else if (showWithdrawal) {
-      setShowWithdrawal(false);
-    } else {
-      navigate('/dashboard');
-    }
+    navigate('/dashboard');
   };
-
-  if (showAccount) {
-    return <Account onBack={() => setShowAccount(false)} />;
-  }
-  if (showDeposit) {
-    return <Deposit onBack={() => setShowDeposit(false)} />;
-  }
-  if (showWithdrawal) {
-    return <Withdrawal onBack={() => setShowWithdrawal(false)} />;
-  }
 
   return (
     <div className={styles.financial}>
