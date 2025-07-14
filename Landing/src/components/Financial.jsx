@@ -1,7 +1,7 @@
 import React from 'react';
 import styles from './Financial.module.css';
 import { Banknote, ArrowDownCircle, ArrowUpCircle, Repeat, List, FileText, ArrowLeft } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Outlet } from 'react-router-dom';
 
 const Financial = () => {
   const navigate = useNavigate();
@@ -58,8 +58,16 @@ const Financial = () => {
   ];
 
   const handleCardClick = (moduleId) => {
-    console.log(`Navigating to ${moduleId} module`);
-    // Navigation logic for each module can be added here
+    if (moduleId === 'expense-category') {
+      navigate('/financial/expense-category');
+    } else if (moduleId === 'expenses') {
+      navigate('/financial/expenses');
+    } else if (moduleId === 'transfers') {
+      navigate('/financial/transfers');
+    } else {
+      // You can add navigation for other modules here if needed
+      console.log(`Navigating to ${moduleId} module`);
+    }
   };
 
   const handleBackClick = () => {
@@ -103,6 +111,7 @@ const Financial = () => {
           })}
         </div>
       </div>
+      <Outlet />
     </div>
   );
 };

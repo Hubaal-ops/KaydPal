@@ -26,8 +26,7 @@ const Stocks = () => {
   ];
 
   const handleCardClick = (moduleId) => {
-    console.log(`Navigating to ${moduleId} module`);
-    // Navigation logic for each module can be added here
+    navigate(`/stocks/${moduleId}`);
   };
 
   const handleBackClick = () => {

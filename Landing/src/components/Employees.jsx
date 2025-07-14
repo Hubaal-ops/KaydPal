@@ -26,8 +26,11 @@ const Employees = () => {
   ];
 
   const handleCardClick = (moduleId) => {
-    console.log(`Navigating to ${moduleId} module`);
-    // Navigation logic for each module can be added here
+    if (moduleId === 'employees') {
+      navigate('/employees/employees');
+    } else if (moduleId === 'salaries') {
+      navigate('/employees/salaries');
+    }
   };
 
   const handleBackClick = () => {

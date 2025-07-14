@@ -275,7 +275,6 @@ const Products = ({ onBack }) => {
                                 onClick={() => handleEdit(product)}
                                 className={styles['icon-btn']}
                                 title="Edit"
-                                disabled={loading}
                               >
                                 <Edit size={16} />
                               </button>
@@ -283,7 +282,6 @@ const Products = ({ onBack }) => {
                                 onClick={() => handleDelete(product.product_no)}
                                 className={`${styles['icon-btn']} ${styles.delete}`}
                                 title="Delete"
-                                disabled={loading}
                               >
                                 <Trash2 size={16} />
                               </button>

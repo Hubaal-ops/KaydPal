@@ -10,8 +10,15 @@ import Inventory from './components/Inventory';
 import Transactions from './components/Transactions';
 import Financial from './components/Financial';
 import Stocks from './components/Stocks';
+import StockAdjustment from './views/StockAdjustment';
+import StockTransfer from './views/StockTransfer';
 import Employees from './components/Employees';
 import Payments from './components/Payments';
+import EmployeesView from './views/Employees';
+import Salary from './views/Salary';
+import ExpenseCategory from './views/ExpenseCategory';
+import Expenses from './views/Expenses';
+import Transfer from './views/Transfer';
 import { fetchUserProfile } from '../../APIs/auth';
 
 function App() {
@@ -83,21 +90,81 @@ function App() {
             }
           />
           <Route
-            path="/stocks"
+            path="/financial/expense-category"
             element={
               user && user.role === 'user'
-                ? <Stocks />
+                ? <ExpenseCategory onBack={() => window.history.back()} />
                 : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
             }
           />
           <Route
-            path="/employees"
+            path="/financial/expenses"
             element={
               user && user.role === 'user'
-                ? <Employees />
+                ? <Expenses onBack={() => window.history.back()} />
                 : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
             }
           />
+          <Route
+            path="/financial/transfers"
+            element={
+              user && user.role === 'user'
+                ? <Transfer onBack={() => window.history.back()} />
+                : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
+            }
+          />
+          <Route
+            path="/stocks/stock-transfer"
+            element={
+              user && user.role === 'user'
+                ? <StockTransfer onBack={() => window.history.back()} />
+                : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
+            }
+          />
+          <Route path="/stocks">
+            <Route
+              index
+              element={
+                user && user.role === 'user'
+                  ? <Stocks />
+                  : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
+              }
+            />
+            <Route
+              path="stock-adjustment"
+              element={
+                user && user.role === 'user'
+                  ? <StockAdjustment onBack={() => window.history.back()} />
+                  : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
+              }
+            />
+          </Route>
+          <Route path="/employees">
+            <Route
+              index
+              element={
+                user && user.role === 'user'
+                  ? <Employees />
+                  : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
+              }
+            />
+            <Route
+              path="employees"
+              element={
+                user && user.role === 'user'
+                  ? <EmployeesView onBack={() => window.history.back()} />
+                  : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
+              }
+            />
+            <Route
+              path="salaries"
+              element={
+                user && user.role === 'user'
+                  ? <Salary onBack={() => window.history.back()} />
+                  : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
+              }
+            />
+          </Route>
           <Route
             path="/payments"
             element={
