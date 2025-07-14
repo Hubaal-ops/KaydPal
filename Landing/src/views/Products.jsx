@@ -6,9 +6,12 @@ import {
   Edit, 
   Trash2, 
   ArrowLeft,
-  Search
+  Search,
+  Loader2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import productService from '../services/productService';
+import categoryService from '../services/categoryService';
 
 const Products = ({ onBack }) => {
   const navigate = useNavigate();
@@ -20,67 +23,35 @@ const Products = ({ onBack }) => {
   const [formData, setFormData] = useState({
     product_name: '',
     category: '',
-    storing_balance: 0
+    quantity: 0
   });
   const [editingProduct, setEditingProduct] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Mock data for demonstration
-  const mockCategories = [
-    { category_id: 1, category_name: 'Electronics' },
-    { category_id: 2, category_name: 'Clothing' },
-    { category_id: 3, category_name: 'Books' },
-    { category_id: 4, category_name: 'Home & Garden' },
-    { category_id: 5, category_name: 'Sports & Outdoors' }
-  ];
-
-  const mockProducts = [
-    {
-      product_no: 1,
-      product_name: 'Macbook Pro 14',
-      category: 'Electronics',
-      storing_balance: 5,
-      created_at: '2024-01-15T10:30:00Z'
-    },
-    {
-      product_no: 2,
-      product_name: 'Nike Running Shoes',
-      category: 'Sports & Outdoors',
-      storing_balance: 12,
-      created_at: '2024-01-16T14:20:00Z'
-    },
-    {
-      product_no: 3,
-      product_name: 'The Great Gatsby',
-      category: 'Books',
-      storing_balance: 8,
-      created_at: '2024-01-17T09:15:00Z'
-    }
-  ];
-
-  // Simulate API call for products
+  // Fetch products from API
   const fetchProducts = async () => {
     setLoading(true);
+    setError('');
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setProducts(mockProducts);
+      const data = await productService.getProducts();
+      setProducts(data);
     } catch (error) {
-      setError('Error fetching products');
+      console.error('Error fetching products:', error);
+      setError(error.message || 'Failed to fetch products');
     } finally {
       setLoading(false);
     }
   };
 
-  // Simulate API call for categories
+  // Fetch categories from API
   const fetchCategories = async () => {
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setCategories(mockCategories);
+      const data = await categoryService.getCategories();
+      setCategories(data);
     } catch (error) {
-      setError('Error fetching categories');
+      console.error('Error fetching categories:', error);
+      setError('Failed to fetch categories');
     }
   };
 
@@ -117,8 +88,8 @@ const Products = ({ onBack }) => {
     setEditingProduct(product);
     setFormData({
       product_name: product.product_name,
-      category: product.category,
-      storing_balance: product.storing_balance
+      category: product.category || '',
+      quantity: product.quantity || 0
     });
     setViewMode('form');
     setError('');
@@ -128,14 +99,12 @@ const Products = ({ onBack }) => {
   const handleDelete = async (productNo) => {
     if (window.confirm('Are you sure you want to delete this product?')) {
       try {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Remove from local state
-        setProducts(prev => prev.filter(prod => prod.product_no !== productNo));
+        await productService.deleteProduct(productNo);
+        await fetchProducts(); // Refresh the products list
         setSuccess('Product deleted successfully');
       } catch (error) {
-        setError('Error deleting product');
+        console.error('Error deleting product:', error);
+        setError(error.message || 'Failed to delete product');
       }
     }
   };
@@ -150,37 +119,28 @@ const Products = ({ onBack }) => {
       return;
     }
 
-    if (!formData.category) {
-      setError('Category is required');
-      return;
-    }
-
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      setLoading(true);
       
       if (editingProduct) {
         // Update existing product
-        setProducts(prev => prev.map(prod => 
-          prod.product_no === editingProduct.product_no 
-            ? { ...prod, ...formData }
-            : prod
-        ));
+        await productService.updateProduct(editingProduct.product_no, formData);
         setSuccess('Product updated successfully');
       } else {
         // Add new product
-        const newProduct = {
-          product_no: Math.max(...products.map(p => p.product_no)) + 1,
-          product_name: formData.product_name,
-          category: formData.category,
-          storing_balance: parseInt(formData.storing_balance) || 0,
-          created_at: new Date().toISOString()
-        };
-        setProducts(prev => [...prev, newProduct]);
-        setSuccess('Product added successfully');
+        await productService.createProduct(formData);
+        setSuccess('Product created successfully');
       }
       
-      setFormData({ product_name: '', category: '', storing_balance: 0 });
+      // Refresh products list
+      await fetchProducts();
+      
+      // Reset form and switch to table view
+      setFormData({
+        product_name: '',
+        category: '',
+        quantity: 0
+      });
       setEditingProduct(null);
       
       // Auto-switch to table view after successful submission
@@ -188,7 +148,10 @@ const Products = ({ onBack }) => {
         setViewMode('table');
       }, 1500);
     } catch (error) {
-      setError('Error saving product');
+      console.error('Error saving product:', error);
+      setError(error.message || 'Failed to save product');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -222,13 +185,19 @@ const Products = ({ onBack }) => {
           <button 
             className={`${styles['action-btn']} ${viewMode === 'table' ? styles.active : ''}`}
             onClick={handleViewTable}
+            disabled={loading}
           >
-            <Eye size={20} />
+            {loading && viewMode === 'table' ? (
+              <Loader2 className={styles.spinner} size={20} />
+            ) : (
+              <Eye size={20} />
+            )}
             View Table
           </button>
           <button 
             className={`${styles['action-btn']} ${viewMode === 'form' ? styles.active : ''}`}
             onClick={handleAddNew}
+            disabled={loading}
           >
             <Plus size={20} />
             Add New Product
@@ -251,59 +220,81 @@ const Products = ({ onBack }) => {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className={styles['search-input']}
+                  disabled={loading}
                 />
               </div>
               <div className={styles['table-info']}>
-                {filteredProducts.length} products found
+                {loading ? 'Loading...' : `${filteredProducts.length} products found`}
               </div>
             </div>
 
-            {loading ? (
-              <div className={styles.loading}>Loading products...</div>
+            {loading && products.length === 0 ? (
+              <div className={styles.loading}>
+                <Loader2 className={styles.spinner} size={24} />
+                <span>Loading products...</span>
+              </div>
             ) : (
               <div className={styles['table-wrapper']}>
                 <table className={styles.table}>
                   <thead>
                     <tr>
-                      <th>Product No</th>
                       <th>Product Name</th>
                       <th>Category</th>
                       <th>Storing Balance</th>
-                      <th>Created At</th>
+                      <th>Date</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredProducts.map((product) => (
-                      <tr key={product.product_no}>
-                        <td>{product.product_no}</td>
-                        <td>{product.product_name}</td>
-                        <td>{product.category}</td>
-                        <td>{product.storing_balance}</td>
-                        <td>{new Date(product.created_at).toLocaleDateString()}</td>
-                        <td>
-                          <div className={styles['action-icons']}>
-                            <button
-                              onClick={() => handleEdit(product)}
-                              className={styles['icon-btn']}
-                              title="Edit"
-                            >
-                              <Edit size={16} />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(product.product_no)}
-                              className={`${styles['icon-btn']} ${styles.delete}`}
-                              title="Delete"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                    {filteredProducts.map((product) => {
+                      // Format the date to a readable format
+                      const formattedDate = product.created_at 
+                        ? new Date(product.created_at).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                          })
+                        : '-';
+                        
+                      return (
+                        <tr key={product.product_no}>
+                          <td>
+                            <div className={styles['product-name']}>
+                              {product.product_name}
+                              {product.sku && (
+                                <span className={styles['product-sku']}>{product.sku}</span>
+                              )}
+                            </div>
+                          </td>
+                          <td>{product.category || '-'}</td>
+                          <td>{product.quantity || 0}</td>
+                          <td>{formattedDate}</td>
+                          <td>
+                            <div className={styles['action-icons']}>
+                              <button
+                                onClick={() => handleEdit(product)}
+                                className={styles['icon-btn']}
+                                title="Edit"
+                                disabled={loading}
+                              >
+                                <Edit size={16} />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(product.product_no)}
+                                className={`${styles['icon-btn']} ${styles.delete}`}
+                                title="Delete"
+                                disabled={loading}
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
-                {filteredProducts.length === 0 && (
+                {filteredProducts.length === 0 && !loading && (
                   <div className={styles['no-data']}>
                     {searchTerm ? 'No products found matching your search' : 'No products found'}
                   </div>
@@ -317,7 +308,7 @@ const Products = ({ onBack }) => {
         {viewMode === 'form' && (
           <div className={styles['form-container']}>
             <h2>{editingProduct ? 'Edit Product' : 'Add New Product'}</h2>
-            <form onSubmit={handleSubmit} className={styles.form}>
+            <form onSubmit={handleSubmit}>
               <div className={styles['form-group']}>
                 <label htmlFor="product_name">Product Name *</label>
                 <input
@@ -326,9 +317,9 @@ const Products = ({ onBack }) => {
                   name="product_name"
                   value={formData.product_name}
                   onChange={handleInputChange}
-                  placeholder="Enter product name"
                   required
-                  className={styles['form-input']}
+                  disabled={loading}
+                  placeholder="Enter product name"
                 />
               </div>
 
@@ -340,10 +331,10 @@ const Products = ({ onBack }) => {
                   value={formData.category}
                   onChange={handleInputChange}
                   required
-                  className={styles['form-select']}
+                  disabled={loading}
                 >
                   <option value="">Select a category</option>
-                  {categories.map((category) => (
+                  {categories.map(category => (
                     <option key={category.category_id} value={category.category_name}>
                       {category.category_name}
                     </option>
@@ -352,25 +343,44 @@ const Products = ({ onBack }) => {
               </div>
 
               <div className={styles['form-group']}>
-                <label htmlFor="storing_balance">Storing Balance</label>
+                <label htmlFor="quantity">Storing Balance *</label>
                 <input
                   type="number"
-                  id="storing_balance"
-                  name="storing_balance"
-                  value={formData.storing_balance}
+                  id="quantity"
+                  name="quantity"
+                  value={formData.quantity || ''}
                   onChange={handleInputChange}
-                  placeholder="Enter storing balance"
                   min="0"
-                  className={styles['form-input']}
+                  required
+                  disabled={loading}
+                  placeholder="Enter storing balance"
                 />
               </div>
 
               <div className={styles['form-actions']}>
-                <button type="button" onClick={handleViewTable} className={styles['cancel-btn']}>
+                <button
+                  type="button"
+                  className={styles['cancel-btn']}
+                  onClick={handleViewTable}
+                  disabled={loading}
+                >
                   Cancel
                 </button>
-                <button type="submit" className={styles['submit-btn']}>
-                  {editingProduct ? 'Update Product' : 'Add Product'}
+                <button
+                  type="submit"
+                  className={styles['save-btn']}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className={styles.spinner} size={18} />
+                      {editingProduct ? 'Updating...' : 'Creating...'}
+                    </>
+                  ) : editingProduct ? (
+                    'Update Product'
+                  ) : (
+                    'Create Product'
+                  )}
                 </button>
               </div>
             </form>
@@ -381,4 +391,4 @@ const Products = ({ onBack }) => {
   );
 };
 
-export default Products; 
+export default Products;

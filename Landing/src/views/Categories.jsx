@@ -9,6 +9,13 @@ import {
   Search
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { 
+  getCategories, 
+  getCategory, 
+  createCategory, 
+  updateCategory, 
+  deleteCategory 
+} from '../services/categoryService';
 
 const Categories = ({ onBack }) => {
   const navigate = useNavigate();
@@ -24,37 +31,14 @@ const Categories = ({ onBack }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Mock data for demonstration
-  const mockCategories = [
-    {
-      category_id: 1,
-      category_name: 'Electronics',
-      description: 'Electronic devices and gadgets',
-      created_at: '2024-01-15T10:30:00Z'
-    },
-    {
-      category_id: 2,
-      category_name: 'Clothing',
-      description: 'Apparel and fashion items',
-      created_at: '2024-01-16T14:20:00Z'
-    },
-    {
-      category_id: 3,
-      category_name: 'Books',
-      description: 'Books and publications',
-      created_at: '2024-01-17T09:15:00Z'
-    }
-  ];
-
-  // Simulate API call
+  // Fetch categories from API
   const fetchCategories = async () => {
     setLoading(true);
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setCategories(mockCategories);
+      const data = await getCategories();
+      setCategories(data);
     } catch (error) {
-      setError('Error fetching categories');
+      setError(error.response?.data?.message || 'Error fetching categories');
     } finally {
       setLoading(false);
     }
@@ -89,11 +73,12 @@ const Categories = ({ onBack }) => {
     setSuccess('');
   };
 
-  const handleEdit = (category) => {
+  const handleEdit = async (category) => {
     setEditingCategory(category);
+    const data = await getCategory(category.category_id);
     setFormData({
-      category_name: category.category_name,
-      description: category.description || ''
+      category_name: data.category_name,
+      description: data.description || ''
     });
     setViewMode('form');
     setError('');
@@ -103,14 +88,12 @@ const Categories = ({ onBack }) => {
   const handleDelete = async (categoryId) => {
     if (window.confirm('Are you sure you want to delete this category?')) {
       try {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Remove from local state
-        setCategories(prev => prev.filter(cat => cat.category_id !== categoryId));
+        await deleteCategory(categoryId);
+        // Refresh the categories list
+        await fetchCategories();
         setSuccess('Category deleted successfully');
       } catch (error) {
-        setError('Error deleting category');
+        setError(error.response?.data?.message || 'Error deleting category');
       }
     }
   };
@@ -126,29 +109,20 @@ const Categories = ({ onBack }) => {
     }
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
       if (editingCategory) {
         // Update existing category
-        setCategories(prev => prev.map(cat => 
-          cat.category_id === editingCategory.category_id 
-            ? { ...cat, ...formData }
-            : cat
-        ));
+        await updateCategory(editingCategory.category_id, formData);
         setSuccess('Category updated successfully');
       } else {
         // Add new category
-        const newCategory = {
-          category_id: Math.max(...categories.map(c => c.category_id)) + 1,
-          category_name: formData.category_name,
-          description: formData.description,
-          created_at: new Date().toISOString()
-        };
-        setCategories(prev => [...prev, newCategory]);
+        await createCategory(formData);
         setSuccess('Category added successfully');
       }
       
+      // Refresh the categories list
+      await fetchCategories();
+      
+      // Reset form and switch to table view
       setFormData({ category_name: '', description: '' });
       setEditingCategory(null);
       
@@ -156,8 +130,9 @@ const Categories = ({ onBack }) => {
       setTimeout(() => {
         setViewMode('table');
       }, 1500);
+      
     } catch (error) {
-      setError('Error saving category');
+      setError(error.response?.data?.message || 'Error saving category');
     }
   };
 
