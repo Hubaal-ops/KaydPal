@@ -9,6 +9,8 @@ require('dotenv').config({ path: './config.env' });
 // Import routes
 const authRoutes = require('./routes/auth');
 const protectedRoutes = require('./routes/protected');
+const categoryRoutes = require('./routes/categories');
+const productRoutes = require('./routes/products');
 
 const app = express();
 
@@ -82,6 +84,8 @@ connectDB();
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/protected', protectedRoutes);
+app.use('/api/categories', categoryRoutes);
+app.use('/api/products', productRoutes);
 
 // Health check endpoint for tests
 app.get('/api/auth/health', (req, res) => {
