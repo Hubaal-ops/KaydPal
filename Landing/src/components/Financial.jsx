@@ -1,10 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import styles from './Financial.module.css';
 import { Banknote, ArrowDownCircle, ArrowUpCircle, Repeat, List, FileText, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import Account from '../views/Account.jsx';
+import Deposit from '../views/Deposit.jsx';
+import Withdrawal from '../views/Withdrawal.jsx';
 
 const Financial = () => {
   const navigate = useNavigate();
+  const [showAccount, setShowAccount] = useState(false);
+  const [showDeposit, setShowDeposit] = useState(false);
+  const [showWithdrawal, setShowWithdrawal] = useState(false);
 
   const financialModules = [
     {
@@ -58,13 +64,39 @@ const Financial = () => {
   ];
 
   const handleCardClick = (moduleId) => {
-    console.log(`Navigating to ${moduleId} module`);
-    // Navigation logic for each module can be added here
+    if (moduleId === 'accounts') {
+      setShowAccount(true);
+    } else if (moduleId === 'deposits') {
+      setShowDeposit(true);
+    } else if (moduleId === 'withdrawals') {
+      setShowWithdrawal(true);
+    } else {
+      // Add navigation for other modules as needed
+      console.log(`Navigating to ${moduleId} module`);
+    }
   };
 
   const handleBackClick = () => {
-    navigate('/dashboard');
+    if (showAccount) {
+      setShowAccount(false);
+    } else if (showDeposit) {
+      setShowDeposit(false);
+    } else if (showWithdrawal) {
+      setShowWithdrawal(false);
+    } else {
+      navigate('/dashboard');
+    }
   };
+
+  if (showAccount) {
+    return <Account onBack={() => setShowAccount(false)} />;
+  }
+  if (showDeposit) {
+    return <Deposit onBack={() => setShowDeposit(false)} />;
+  }
+  if (showWithdrawal) {
+    return <Withdrawal onBack={() => setShowWithdrawal(false)} />;
+  }
 
   return (
     <div className={styles.financial}>
