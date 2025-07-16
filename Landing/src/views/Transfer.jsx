@@ -1,29 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styles from './Stores.module.css';
 import { Plus, Eye, Edit, Trash2, ArrowLeft, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import {
+  getTransfers,
+  getTransferById,
+  createTransfer,
+  updateTransfer,
+  deleteTransfer
+} from '../services/transferService';
+import { getAccounts } from '../services/accountService';
 
 const Transfer = ({ onBack }) => {
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState('table');
-  const [transfers, setTransfers] = useState([
-    {
-      transfer_id: 1,
-      from_account: 'Main Account',
-      to_account: 'Savings Account',
-      amount: 500,
-      description: 'Monthly savings',
-      date: '2024-06-01T10:00:00Z'
-    },
-    {
-      transfer_id: 2,
-      from_account: 'Main Account',
-      to_account: 'Petty Cash',
-      amount: 100,
-      description: 'Office petty cash',
-      date: '2024-06-02T12:30:00Z'
-    }
-  ]);
+  const [transfers, setTransfers] = useState([]);
+  const [accounts, setAccounts] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
     from_account: '',
@@ -34,6 +27,34 @@ const Transfer = ({ onBack }) => {
   const [editingTransfer, setEditingTransfer] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // Fetch transfers and accounts from backend
+  const fetchTransfers = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await getTransfers();
+      setTransfers(data);
+    } catch (err) {
+      setError('Error fetching transfers');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchAccounts = async () => {
+    try {
+      const data = await getAccounts();
+      setAccounts(data);
+    } catch (err) {
+      setError('Error fetching accounts');
+    }
+  };
+
+  useEffect(() => {
+    fetchTransfers();
+    fetchAccounts();
+  }, []);
 
   const handleBackClick = () => {
     if (onBack) {
@@ -59,63 +80,100 @@ const Transfer = ({ onBack }) => {
     setSuccess('');
   };
 
-  const handleEdit = (tr) => {
-    setEditingTransfer(tr);
+  const handleEdit = (transfer) => {
+    setEditingTransfer(transfer);
     setFormData({
-      from_account: tr.from_account,
-      to_account: tr.to_account,
-      amount: tr.amount,
-      description: tr.description
+      from_account: transfer.from_account?._id || '',
+      to_account: transfer.to_account?._id || '',
+      amount: transfer.amount,
+      description: transfer.description || ''
     });
     setViewMode('form');
     setError('');
     setSuccess('');
   };
 
-  const handleDelete = (transfer_id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this transfer?')) {
-      setTransfers(prev => prev.filter(tr => tr.transfer_id !== transfer_id));
-      setSuccess('Transfer deleted successfully');
+      setLoading(true);
+      setError('');
+      try {
+        await deleteTransfer(id);
+        setSuccess('Transfer deleted successfully');
+        fetchTransfers();
+      } catch (err) {
+        setError('Error deleting transfer');
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
-    if (!formData.from_account.trim() || !formData.to_account.trim() || !formData.amount) {
-      setError('All fields are required');
+    if (!formData.from_account || !formData.to_account || !formData.amount || isNaN(formData.amount) || Number(formData.amount) <= 0) {
+      setError('All fields except description are required and must be valid');
       return;
     }
-    if (editingTransfer) {
-      setTransfers(prev => prev.map(tr =>
-        tr.transfer_id === editingTransfer.transfer_id ? { ...tr, ...formData } : tr
-      ));
-      setSuccess('Transfer updated successfully');
-    } else {
-      const newTr = {
-        transfer_id: Math.max(...transfers.map(t => t.transfer_id), 0) + 1,
-        ...formData,
-        date: new Date().toISOString()
-      };
-      setTransfers(prev => [...prev, newTr]);
-      setSuccess('Transfer added successfully');
+    if (formData.from_account === formData.to_account) {
+      setError('Cannot transfer to the same account');
+      return;
     }
-    setFormData({ from_account: '', to_account: '', amount: '', description: '' });
-    setEditingTransfer(null);
-    setTimeout(() => setViewMode('table'), 1500);
+    setLoading(true);
+    try {
+      if (editingTransfer) {
+        await updateTransfer(editingTransfer._id, {
+          from_account: formData.from_account,
+          to_account: formData.to_account,
+          amount: Number(formData.amount),
+          description: formData.description
+        });
+        setSuccess('Transfer updated successfully');
+      } else {
+        await createTransfer({
+          from_account: formData.from_account,
+          to_account: formData.to_account,
+          amount: Number(formData.amount),
+          description: formData.description
+        });
+        setSuccess('Transfer added successfully');
+      }
+      setFormData({ from_account: '', to_account: '', amount: '', description: '' });
+      setEditingTransfer(null);
+      fetchTransfers();
+      setTimeout(() => {
+        setViewMode('table');
+      }, 1200);
+    } catch (err) {
+      setError('Error saving transfer');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
-  const filteredTransfers = transfers.filter(tr =>
-    tr.from_account.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    tr.to_account.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    tr.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredTransfers = transfers.filter(transfer => {
+    const fromName = transfer.from_account?.name || '';
+    const toName = transfer.to_account?.name || '';
+    const fromBank = transfer.from_account?.bank || '';
+    const toBank = transfer.to_account?.bank || '';
+    return (
+      fromName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      toName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      fromBank.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      toBank.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (transfer.description || '').toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  });
 
   return (
     <div className={styles.stores}>
@@ -157,93 +215,108 @@ const Transfer = ({ onBack }) => {
                 {filteredTransfers.length} transfers found
               </div>
             </div>
-            <div className={styles['table-wrapper']}>
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th>Transfer ID</th>
-                    <th>From Account</th>
-                    <th>To Account</th>
-                    <th>Amount</th>
-                    <th>Description</th>
-                    <th>Date</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredTransfers.map(tr => (
-                    <tr key={tr.transfer_id}>
-                      <td>{tr.transfer_id}</td>
-                      <td>{tr.from_account}</td>
-                      <td>{tr.to_account}</td>
-                      <td>{tr.amount}</td>
-                      <td>{tr.description}</td>
-                      <td>{new Date(tr.date).toLocaleDateString()}</td>
-                      <td>
-                        <div className={styles['action-icons']}>
-                          <button onClick={() => handleEdit(tr)} className={styles['icon-btn']} title="Edit">
-                            <Edit size={16} />
-                          </button>
-                          <button onClick={() => handleDelete(tr.transfer_id)} className={`${styles['icon-btn']} ${styles.delete}`} title="Delete">
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </td>
+            {loading ? (
+              <div className={styles.loading}>Loading transfers...</div>
+            ) : (
+              <div className={styles['table-wrapper']}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>From Account</th>
+                      <th>From Bank</th>
+                      <th>To Account</th>
+                      <th>To Bank</th>
+                      <th>Amount</th>
+                      <th>Description</th>
+                      <th>Date</th>
+                      <th>Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-              {filteredTransfers.length === 0 && (
-                <div className={styles['no-data']}>
-                  {searchTerm ? 'No transfers found matching your search' : 'No transfers found'}
-                </div>
-              )}
-            </div>
+                  </thead>
+                  <tbody>
+                    {filteredTransfers.map((transfer) => (
+                      <tr key={transfer._id}>
+                        <td>{transfer.from_account?.name || ''}</td>
+                        <td>{transfer.from_account?.bank || ''}</td>
+                        <td>{transfer.to_account?.name || ''}</td>
+                        <td>{transfer.to_account?.bank || ''}</td>
+                        <td>{transfer.amount}</td>
+                        <td>{transfer.description}</td>
+                        <td>{transfer.transfer_date ? new Date(transfer.transfer_date).toLocaleDateString() : ''}</td>
+                        <td>
+                          <div className={styles['action-icons']}>
+                            <button className={styles['icon-btn']} onClick={() => handleEdit(transfer)}>
+                              <Edit size={18} />
+                            </button>
+                            <button className={`${styles['icon-btn']} ${styles.delete}`} onClick={() => handleDelete(transfer._id)}>
+                              <Trash2 size={18} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {filteredTransfers.length === 0 && !loading && (
+                  <div className={styles['no-data']}>
+                    No transfers found.
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
         {viewMode === 'form' && (
           <div className={styles['form-container']}>
             <h2>{editingTransfer ? 'Edit Transfer' : 'Add New Transfer'}</h2>
-            <form onSubmit={handleSubmit} className={styles.form}>
+            <form className={styles.form} onSubmit={handleSubmit}>
               <div className={styles['form-group']}>
-                <label htmlFor="from_account">From Account *</label>
-                <input
-                  type="text"
+                <label htmlFor="from_account">From Account</label>
+                <select
                   id="from_account"
                   name="from_account"
+                  className={styles['form-input']}
                   value={formData.from_account}
                   onChange={handleInputChange}
-                  placeholder="Enter source account"
                   required
-                  className={styles['form-input']}
-                />
+                >
+                  <option value="">Select Account</option>
+                  {accounts.map((acc) => (
+                    <option key={acc._id} value={acc._id}>
+                      {acc.name} ({acc.bank})
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className={styles['form-group']}>
-                <label htmlFor="to_account">To Account *</label>
-                <input
-                  type="text"
+                <label htmlFor="to_account">To Account</label>
+                <select
                   id="to_account"
                   name="to_account"
+                  className={styles['form-input']}
                   value={formData.to_account}
                   onChange={handleInputChange}
-                  placeholder="Enter destination account"
                   required
-                  className={styles['form-input']}
-                />
+                >
+                  <option value="">Select Account</option>
+                  {accounts.map((acc) => (
+                    <option key={acc._id} value={acc._id}>
+                      {acc.name} ({acc.bank})
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className={styles['form-group']}>
-                <label htmlFor="amount">Amount *</label>
+                <label htmlFor="amount">Amount</label>
                 <input
                   type="number"
                   id="amount"
                   name="amount"
+                  className={styles['form-input']}
                   value={formData.amount}
                   onChange={handleInputChange}
-                  placeholder="Enter amount"
-                  required
-                  className={styles['form-input']}
                   min="0.01"
                   step="0.01"
+                  required
                 />
               </div>
               <div className={styles['form-group']}>
@@ -252,18 +325,18 @@ const Transfer = ({ onBack }) => {
                   type="text"
                   id="description"
                   name="description"
+                  className={styles['form-input']}
                   value={formData.description}
                   onChange={handleInputChange}
-                  placeholder="Enter description"
-                  className={styles['form-input']}
+                  maxLength={200}
                 />
               </div>
               <div className={styles['form-actions']}>
-                <button type="button" onClick={handleViewTable} className={styles['cancel-btn']}>
+                <button type="button" className={styles['cancel-btn']} onClick={handleViewTable}>
                   Cancel
                 </button>
                 <button type="submit" className={styles['submit-btn']}>
-                  {editingTransfer ? 'Update Transfer' : 'Add Transfer'}
+                  {editingTransfer ? 'Update' : 'Add'}
                 </button>
               </div>
             </form>

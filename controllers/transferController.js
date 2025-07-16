@@ -1,37 +1,106 @@
-const connectDB = require('../db');
+const Transfer = require('../models/Transfer');
+const Account = require('../models/Account');
 
-async function insertTransfer(transferData) {
-  const db = await connectDB();
-  const accounts = db.collection('Accounts');
-  const transfers = db.collection('Transfers');
-
-  const { from_account_id, to_account_id, amount } = transferData;
-
-  // 1. Basic validation
-  if (!from_account_id || !to_account_id || amount <= 0) {
-    throw new Error('❌ Invalid transfer data');
+// Get all transfers
+exports.getAllTransfers = async (req, res) => {
+  try {
+    const transfers = await Transfer.find()
+      .populate('from_account', 'name bank')
+      .populate('to_account', 'name bank');
+    res.json(transfers);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
+};
 
-  if (from_account_id === to_account_id) {
-    throw new Error('❌ Cannot transfer to the same account');
+// Get transfer by ID
+exports.getTransferById = async (req, res) => {
+  try {
+    const transfer = await Transfer.findById(req.params.id)
+      .populate('from_account', 'name bank')
+      .populate('to_account', 'name bank');
+    if (!transfer) return res.status(404).json({ error: 'Transfer not found' });
+    res.json(transfer);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
+};
 
-  // 2. Check account existence
-  const from = await accounts.findOne({ id: from_account_id });
-  const to = await accounts.findOne({ id: to_account_id });
+// Create new transfer
+exports.createTransfer = async (req, res) => {
+  try {
+    const { from_account, to_account, amount, description } = req.body;
+    if (from_account === to_account) return res.status(400).json({ error: 'Cannot transfer to the same account' });
+    if (amount <= 0) return res.status(400).json({ error: 'Amount must be greater than zero' });
+    const fromAcc = await Account.findById(from_account);
+    const toAcc = await Account.findById(to_account);
+    if (!fromAcc || !toAcc) return res.status(404).json({ error: 'One or both accounts do not exist' });
+    if (fromAcc.balance < amount) return res.status(400).json({ error: 'Insufficient balance in source account' });
+    const transfer = new Transfer({ from_account, to_account, amount, description });
+    await transfer.save();
+    // Update balances
+    fromAcc.balance -= amount;
+    toAcc.balance += amount;
+    await fromAcc.save();
+    await toAcc.save();
+    res.status(201).json(transfer);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
 
-  if (!from || !to) throw new Error('❌ One or both accounts do not exist');
-  if (from.balance < amount) throw new Error('❌ Insufficient balance');
+// Update transfer
+exports.updateTransfer = async (req, res) => {
+  try {
+    const { from_account, to_account, amount, description } = req.body;
+    const transfer = await Transfer.findById(req.params.id);
+    if (!transfer) return res.status(404).json({ error: 'Transfer not found' });
+    // Reverse old transfer
+    const oldFrom = await Account.findById(transfer.from_account);
+    const oldTo = await Account.findById(transfer.to_account);
+    if (oldFrom && oldTo) {
+      oldFrom.balance += transfer.amount;
+      oldTo.balance -= transfer.amount;
+      await oldFrom.save();
+      await oldTo.save();
+    }
+    // Apply new transfer
+    if (from_account === to_account) return res.status(400).json({ error: 'Cannot transfer to the same account' });
+    const newFrom = await Account.findById(from_account);
+    const newTo = await Account.findById(to_account);
+    if (!newFrom || !newTo) return res.status(404).json({ error: 'One or both accounts do not exist' });
+    if (newFrom.balance < amount) return res.status(400).json({ error: 'Insufficient balance in source account' });
+    newFrom.balance -= amount;
+    newTo.balance += amount;
+    await newFrom.save();
+    await newTo.save();
+    transfer.from_account = from_account;
+    transfer.to_account = to_account;
+    transfer.amount = amount;
+    transfer.description = description;
+    await transfer.save();
+    res.json(transfer);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
 
-  // 3. Insert transfer
-  transferData.transfer_date = new Date();
-  await transfers.insertOne(transferData);
-
-  // 4. Update balances
-  await accounts.updateOne({ id: from_account_id }, { $inc: { balance: -amount } });
-  await accounts.updateOne({ id: to_account_id }, { $inc: { balance: +amount } });
-
-  return { message: '✅ Transfer completed successfully' };
-}
-
-module.exports = { insertTransfer };
+// Delete transfer
+exports.deleteTransfer = async (req, res) => {
+  try {
+    const transfer = await Transfer.findByIdAndDelete(req.params.id);
+    if (!transfer) return res.status(404).json({ error: 'Transfer not found' });
+    // Reverse transfer
+    const fromAcc = await Account.findById(transfer.from_account);
+    const toAcc = await Account.findById(transfer.to_account);
+    if (fromAcc && toAcc) {
+      fromAcc.balance += transfer.amount;
+      toAcc.balance -= transfer.amount;
+      await fromAcc.save();
+      await toAcc.save();
+    }
+    res.json({ message: 'Transfer deleted' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};

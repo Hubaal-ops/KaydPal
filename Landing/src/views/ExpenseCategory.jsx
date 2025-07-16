@@ -1,25 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styles from './Stores.module.css';
 import { Plus, Eye, Edit, Trash2, ArrowLeft, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import {
+  getExpenseCategories,
+  getExpenseCategoryById,
+  createExpenseCategory,
+  updateExpenseCategory,
+  deleteExpenseCategory
+} from '../services/expenseCategoryService';
 
 const ExpenseCategory = ({ onBack }) => {
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState('table');
-  const [categories, setCategories] = useState([
-    {
-      category_id: 1,
-      name: 'Utilities',
-      description: 'Electricity, water, internet',
-      created_at: '2024-06-01T10:00:00Z'
-    },
-    {
-      category_id: 2,
-      name: 'Office Supplies',
-      description: 'Stationery, printer ink',
-      created_at: '2024-06-02T12:30:00Z'
-    }
-  ]);
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
     name: '',
@@ -28,6 +23,24 @@ const ExpenseCategory = ({ onBack }) => {
   const [editingCategory, setEditingCategory] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // Fetch categories from backend
+  const fetchCategories = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await getExpenseCategories();
+      setCategories(data);
+    } catch (err) {
+      setError('Error fetching categories');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCategories();
+  }, []);
 
   const handleBackClick = () => {
     if (onBack) {
@@ -57,21 +70,30 @@ const ExpenseCategory = ({ onBack }) => {
     setEditingCategory(cat);
     setFormData({
       name: cat.name,
-      description: cat.description
+      description: cat.description || ''
     });
     setViewMode('form');
     setError('');
     setSuccess('');
   };
 
-  const handleDelete = (category_id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this category?')) {
-      setCategories(prev => prev.filter(cat => cat.category_id !== category_id));
-      setSuccess('Category deleted successfully');
+      setLoading(true);
+      setError('');
+      try {
+        await deleteExpenseCategory(id);
+        setSuccess('Category deleted successfully');
+        fetchCategories();
+      } catch (err) {
+        setError('Error deleting category');
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
@@ -79,33 +101,39 @@ const ExpenseCategory = ({ onBack }) => {
       setError('Name is required');
       return;
     }
-    if (editingCategory) {
-      setCategories(prev => prev.map(cat =>
-        cat.category_id === editingCategory.category_id ? { ...cat, ...formData } : cat
-      ));
-      setSuccess('Category updated successfully');
-    } else {
-      const newCat = {
-        category_id: Math.max(...categories.map(c => c.category_id), 0) + 1,
-        ...formData,
-        created_at: new Date().toISOString()
-      };
-      setCategories(prev => [...prev, newCat]);
-      setSuccess('Category added successfully');
+    setLoading(true);
+    try {
+      if (editingCategory) {
+        await updateExpenseCategory(editingCategory._id, formData);
+        setSuccess('Category updated successfully');
+      } else {
+        await createExpenseCategory(formData);
+        setSuccess('Category added successfully');
+      }
+      setFormData({ name: '', description: '' });
+      setEditingCategory(null);
+      fetchCategories();
+      setTimeout(() => {
+        setViewMode('table');
+      }, 1200);
+    } catch (err) {
+      setError('Error saving category');
+    } finally {
+      setLoading(false);
     }
-    setFormData({ name: '', description: '' });
-    setEditingCategory(null);
-    setTimeout(() => setViewMode('table'), 1500);
   };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
   const filteredCategories = categories.filter(cat =>
     cat.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    cat.description.toLowerCase().includes(searchTerm.toLowerCase())
+    (cat.description || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -148,44 +176,46 @@ const ExpenseCategory = ({ onBack }) => {
                 {filteredCategories.length} categories found
               </div>
             </div>
-            <div className={styles['table-wrapper']}>
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th>Category ID</th>
-                    <th>Name</th>
-                    <th>Description</th>
-                    <th>Date Created</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredCategories.map(cat => (
-                    <tr key={cat.category_id}>
-                      <td>{cat.category_id}</td>
-                      <td>{cat.name}</td>
-                      <td>{cat.description}</td>
-                      <td>{new Date(cat.created_at).toLocaleDateString()}</td>
-                      <td>
-                        <div className={styles['action-icons']}>
-                          <button onClick={() => handleEdit(cat)} className={styles['icon-btn']} title="Edit">
-                            <Edit size={16} />
-                          </button>
-                          <button onClick={() => handleDelete(cat.category_id)} className={`${styles['icon-btn']} ${styles.delete}`} title="Delete">
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </td>
+            {loading ? (
+              <div className={styles.loading}>Loading categories...</div>
+            ) : (
+              <div className={styles['table-wrapper']}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Description</th>
+                      <th>Date Created</th>
+                      <th>Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-              {filteredCategories.length === 0 && (
-                <div className={styles['no-data']}>
-                  {searchTerm ? 'No categories found matching your search' : 'No categories found'}
-                </div>
-              )}
-            </div>
+                  </thead>
+                  <tbody>
+                    {filteredCategories.map(cat => (
+                      <tr key={cat._id}>
+                        <td>{cat.name}</td>
+                        <td>{cat.description}</td>
+                        <td>{cat.createdAt ? new Date(cat.createdAt).toLocaleDateString() : ''}</td>
+                        <td>
+                          <div className={styles['action-icons']}>
+                            <button onClick={() => handleEdit(cat)} className={styles['icon-btn']} title="Edit">
+                              <Edit size={16} />
+                            </button>
+                            <button onClick={() => handleDelete(cat._id)} className={`${styles['icon-btn']} ${styles.delete}`} title="Delete">
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {filteredCategories.length === 0 && !loading && (
+                  <div className={styles['no-data']}>
+                    {searchTerm ? 'No categories found matching your search' : 'No categories found'}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
         {viewMode === 'form' && (
@@ -198,11 +228,10 @@ const ExpenseCategory = ({ onBack }) => {
                   type="text"
                   id="name"
                   name="name"
+                  className={styles['form-input']}
                   value={formData.name}
                   onChange={handleInputChange}
-                  placeholder="Enter category name"
                   required
-                  className={styles['form-input']}
                 />
               </div>
               <div className={styles['form-group']}>
@@ -211,18 +240,18 @@ const ExpenseCategory = ({ onBack }) => {
                   type="text"
                   id="description"
                   name="description"
+                  className={styles['form-input']}
                   value={formData.description}
                   onChange={handleInputChange}
-                  placeholder="Enter description"
-                  className={styles['form-input']}
+                  maxLength={200}
                 />
               </div>
               <div className={styles['form-actions']}>
-                <button type="button" onClick={handleViewTable} className={styles['cancel-btn']}>
+                <button type="button" className={styles['cancel-btn']} onClick={handleViewTable}>
                   Cancel
                 </button>
                 <button type="submit" className={styles['submit-btn']}>
-                  {editingCategory ? 'Update Category' : 'Add Category'}
+                  {editingCategory ? 'Update' : 'Add'}
                 </button>
               </div>
             </form>

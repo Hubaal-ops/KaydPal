@@ -1,50 +1,61 @@
-// controllers/accountController.js
-// In-memory accounts array
-const accounts = [];
-
-// Create a new account
-exports.createAccount = (req, res) => {
-  const { account_id, name } = req.body;
-  if (!account_id || !name) {
-    return res.status(400).json({ error: 'account_id and name are required' });
-  }
-  if (accounts.find(acc => acc.account_id === account_id)) {
-    return res.status(409).json({ error: 'Account with this account_id already exists' });
-  }
-  const account = {
-    account_id,
-    name,
-    createdAt: new Date()
-  };
-  accounts.push(account);
-  res.status(201).json(account);
-};
+const Account = require('../models/Account');
 
 // Get all accounts
-exports.getAccounts = (req, res) => {
-  res.status(200).json(accounts);
+exports.getAllAccounts = async (req, res) => {
+  try {
+    const accounts = await Account.find();
+    res.json(accounts);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };
 
-// Get a single account by account_id
-exports.getAccountById = (req, res) => {
-  const account = accounts.find(acc => acc.account_id === req.params.account_id);
-  if (!account) return res.status(404).json({ error: 'Account not found' });
-  res.status(200).json(account);
+// Get account by ID
+exports.getAccountById = async (req, res) => {
+  try {
+    const account = await Account.findById(req.params.id);
+    if (!account) return res.status(404).json({ error: 'Account not found' });
+    res.json(account);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };
 
-// Update an account
-exports.updateAccount = (req, res) => {
-  const account = accounts.find(acc => acc.account_id === req.params.account_id);
-  if (!account) return res.status(404).json({ error: 'Account not found' });
-  const { name } = req.body;
-  if (name) account.name = name;
-  res.status(200).json(account);
+// Create new account
+exports.createAccount = async (req, res) => {
+  try {
+    const { name, bank, balance } = req.body;
+    const newAccount = new Account({ name, bank, balance });
+    const savedAccount = await newAccount.save();
+    res.status(201).json(savedAccount);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 };
 
-// Delete an account
-exports.deleteAccount = (req, res) => {
-  const index = accounts.findIndex(acc => acc.account_id === req.params.account_id);
-  if (index === -1) return res.status(404).json({ error: 'Account not found' });
-  accounts.splice(index, 1);
-  res.status(200).json({ message: 'Account deleted' });
+// Update account
+exports.updateAccount = async (req, res) => {
+  try {
+    const { name, bank, balance } = req.body;
+    const updatedAccount = await Account.findByIdAndUpdate(
+      req.params.id,
+      { name, bank, balance },
+      { new: true, runValidators: true }
+    );
+    if (!updatedAccount) return res.status(404).json({ error: 'Account not found' });
+    res.json(updatedAccount);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+// Delete account
+exports.deleteAccount = async (req, res) => {
+  try {
+    const deletedAccount = await Account.findByIdAndDelete(req.params.id);
+    if (!deletedAccount) return res.status(404).json({ error: 'Account not found' });
+    res.json({ message: 'Account deleted' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 }; 

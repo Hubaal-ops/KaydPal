@@ -1,36 +1,73 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styles from './Stores.module.css';
 import { Plus, Eye, Edit, Trash2, ArrowLeft, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import {
+  getExpenses,
+  getExpenseById,
+  createExpense,
+  updateExpense,
+  deleteExpense
+} from '../services/expenseService';
+import { getExpenseCategories } from '../services/expenseCategoryService';
+import { getAccounts } from '../services/accountService';
 
 const Expenses = ({ onBack }) => {
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState('table');
-  const [expenses, setExpenses] = useState([
-    {
-      expense_id: 1,
-      category: 'Utilities',
-      amount: 120.5,
-      description: 'Electricity bill',
-      date: '2024-06-01T10:00:00Z'
-    },
-    {
-      expense_id: 2,
-      category: 'Office Supplies',
-      amount: 45.0,
-      description: 'Printer ink',
-      date: '2024-06-02T12:30:00Z'
-    }
-  ]);
+  const [expenses, setExpenses] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [accounts, setAccounts] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
     category: '',
+    account: '',
     amount: '',
-    description: ''
+    description: '',
+    expense_date: ''
   });
   const [editingExpense, setEditingExpense] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // Fetch expenses, categories, and accounts from backend
+  const fetchExpenses = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await getExpenses();
+      setExpenses(data);
+    } catch (err) {
+      setError('Error fetching expenses');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const data = await getExpenseCategories();
+      setCategories(data);
+    } catch (err) {
+      setError('Error fetching categories');
+    }
+  };
+
+  const fetchAccounts = async () => {
+    try {
+      const data = await getAccounts();
+      setAccounts(data);
+    } catch (err) {
+      setError('Error fetching accounts');
+    }
+  };
+
+  useEffect(() => {
+    fetchExpenses();
+    fetchCategories();
+    fetchAccounts();
+  }, []);
 
   const handleBackClick = () => {
     if (onBack) {
@@ -43,7 +80,7 @@ const Expenses = ({ onBack }) => {
   const handleViewTable = () => {
     setViewMode('table');
     setEditingExpense(null);
-    setFormData({ category: '', amount: '', description: '' });
+    setFormData({ category: '', account: '', amount: '', description: '', expense_date: '' });
     setError('');
     setSuccess('');
   };
@@ -51,7 +88,7 @@ const Expenses = ({ onBack }) => {
   const handleAddNew = () => {
     setViewMode('form');
     setEditingExpense(null);
-    setFormData({ category: '', amount: '', description: '' });
+    setFormData({ category: '', account: '', amount: '', description: '', expense_date: '' });
     setError('');
     setSuccess('');
   };
@@ -59,58 +96,88 @@ const Expenses = ({ onBack }) => {
   const handleEdit = (exp) => {
     setEditingExpense(exp);
     setFormData({
-      category: exp.category,
+      category: exp.category?._id || '',
+      account: exp.account?._id || '',
       amount: exp.amount,
-      description: exp.description
+      description: exp.description || '',
+      expense_date: exp.expense_date ? exp.expense_date.slice(0, 10) : ''
     });
     setViewMode('form');
     setError('');
     setSuccess('');
   };
 
-  const handleDelete = (expense_id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this expense?')) {
-      setExpenses(prev => prev.filter(exp => exp.expense_id !== expense_id));
-      setSuccess('Expense deleted successfully');
+      setLoading(true);
+      setError('');
+      try {
+        await deleteExpense(id);
+        setSuccess('Expense deleted successfully');
+        fetchExpenses();
+      } catch (err) {
+        setError('Error deleting expense');
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
-    if (!formData.category.trim() || !formData.amount) {
-      setError('All fields are required');
+    if (!formData.category || !formData.account || !formData.amount || isNaN(formData.amount) || Number(formData.amount) <= 0) {
+      setError('All fields except description are required and must be valid');
       return;
     }
-    if (editingExpense) {
-      setExpenses(prev => prev.map(exp =>
-        exp.expense_id === editingExpense.expense_id ? { ...exp, ...formData } : exp
-      ));
-      setSuccess('Expense updated successfully');
-    } else {
-      const newExp = {
-        expense_id: Math.max(...expenses.map(e => e.expense_id), 0) + 1,
-        ...formData,
-        date: new Date().toISOString()
-      };
-      setExpenses(prev => [...prev, newExp]);
-      setSuccess('Expense added successfully');
+    setLoading(true);
+    try {
+      if (editingExpense) {
+        await updateExpense(editingExpense._id, {
+          ...formData,
+          amount: Number(formData.amount)
+        });
+        setSuccess('Expense updated successfully');
+      } else {
+        await createExpense({
+          ...formData,
+          amount: Number(formData.amount)
+        });
+        setSuccess('Expense added successfully');
+      }
+      setFormData({ category: '', account: '', amount: '', description: '', expense_date: '' });
+      setEditingExpense(null);
+      fetchExpenses();
+      setTimeout(() => {
+        setViewMode('table');
+      }, 1200);
+    } catch (err) {
+      setError('Error saving expense');
+    } finally {
+      setLoading(false);
     }
-    setFormData({ category: '', amount: '', description: '' });
-    setEditingExpense(null);
-    setTimeout(() => setViewMode('table'), 1500);
   };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
-  const filteredExpenses = expenses.filter(exp =>
-    exp.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    exp.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredExpenses = expenses.filter(exp => {
+    const catName = exp.category?.name || '';
+    const accName = exp.account?.name || '';
+    const accBank = exp.account?.bank || '';
+    return (
+      catName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      accName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      accBank.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (exp.description || '').toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  });
 
   return (
     <div className={styles.stores}>
@@ -152,46 +219,52 @@ const Expenses = ({ onBack }) => {
                 {filteredExpenses.length} expenses found
               </div>
             </div>
-            <div className={styles['table-wrapper']}>
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th>Expense ID</th>
-                    <th>Category</th>
-                    <th>Amount</th>
-                    <th>Description</th>
-                    <th>Date</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredExpenses.map(exp => (
-                    <tr key={exp.expense_id}>
-                      <td>{exp.expense_id}</td>
-                      <td>{exp.category}</td>
-                      <td>{exp.amount}</td>
-                      <td>{exp.description}</td>
-                      <td>{new Date(exp.date).toLocaleDateString()}</td>
-                      <td>
-                        <div className={styles['action-icons']}>
-                          <button onClick={() => handleEdit(exp)} className={styles['icon-btn']} title="Edit">
-                            <Edit size={16} />
-                          </button>
-                          <button onClick={() => handleDelete(exp.expense_id)} className={`${styles['icon-btn']} ${styles.delete}`} title="Delete">
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </td>
+            {loading ? (
+              <div className={styles.loading}>Loading expenses...</div>
+            ) : (
+              <div className={styles['table-wrapper']}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>Category</th>
+                      <th>Account</th>
+                      <th>Bank</th>
+                      <th>Amount</th>
+                      <th>Description</th>
+                      <th>Date</th>
+                      <th>Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-              {filteredExpenses.length === 0 && (
-                <div className={styles['no-data']}>
-                  {searchTerm ? 'No expenses found matching your search' : 'No expenses found'}
-                </div>
-              )}
-            </div>
+                  </thead>
+                  <tbody>
+                    {filteredExpenses.map(exp => (
+                      <tr key={exp._id}>
+                        <td>{exp.category?.name || ''}</td>
+                        <td>{exp.account?.name || ''}</td>
+                        <td>{exp.account?.bank || ''}</td>
+                        <td>{exp.amount}</td>
+                        <td>{exp.description}</td>
+                        <td>{exp.expense_date ? new Date(exp.expense_date).toLocaleDateString() : ''}</td>
+                        <td>
+                          <div className={styles['action-icons']}>
+                            <button onClick={() => handleEdit(exp)} className={styles['icon-btn']} title="Edit">
+                              <Edit size={16} />
+                            </button>
+                            <button onClick={() => handleDelete(exp._id)} className={`${styles['icon-btn']} ${styles.delete}`} title="Delete">
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {filteredExpenses.length === 0 && !loading && (
+                  <div className={styles['no-data']}>
+                    {searchTerm ? 'No expenses found matching your search' : 'No expenses found'}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
         {viewMode === 'form' && (
@@ -199,33 +272,49 @@ const Expenses = ({ onBack }) => {
             <h2>{editingExpense ? 'Edit Expense' : 'Add New Expense'}</h2>
             <form onSubmit={handleSubmit} className={styles.form}>
               <div className={styles['form-group']}>
-                <label htmlFor="category">Category *</label>
+                <label htmlFor="category">Category</label>
                 <select
                   id="category"
                   name="category"
+                  className={styles['form-input']}
                   value={formData.category}
                   onChange={handleInputChange}
                   required
-                  className={styles['form-input']}
                 >
                   <option value="">Select Category</option>
-                  <option value="Utilities">Utilities</option>
-                  <option value="Office Supplies">Office Supplies</option>
+                  {categories.map((cat) => (
+                    <option key={cat._id} value={cat._id}>{cat.name}</option>
+                  ))}
                 </select>
               </div>
               <div className={styles['form-group']}>
-                <label htmlFor="amount">Amount *</label>
+                <label htmlFor="account">Account</label>
+                <select
+                  id="account"
+                  name="account"
+                  className={styles['form-input']}
+                  value={formData.account}
+                  onChange={handleInputChange}
+                  required
+                >
+                  <option value="">Select Account</option>
+                  {accounts.map((acc) => (
+                    <option key={acc._id} value={acc._id}>{acc.name} ({acc.bank})</option>
+                  ))}
+                </select>
+              </div>
+              <div className={styles['form-group']}>
+                <label htmlFor="amount">Amount</label>
                 <input
                   type="number"
                   id="amount"
                   name="amount"
+                  className={styles['form-input']}
                   value={formData.amount}
                   onChange={handleInputChange}
-                  placeholder="Enter amount"
-                  required
-                  className={styles['form-input']}
                   min="0.01"
                   step="0.01"
+                  required
                 />
               </div>
               <div className={styles['form-group']}>
@@ -234,18 +323,29 @@ const Expenses = ({ onBack }) => {
                   type="text"
                   id="description"
                   name="description"
+                  className={styles['form-input']}
                   value={formData.description}
                   onChange={handleInputChange}
-                  placeholder="Enter description"
+                  maxLength={200}
+                />
+              </div>
+              <div className={styles['form-group']}>
+                <label htmlFor="expense_date">Expense Date</label>
+                <input
+                  type="date"
+                  id="expense_date"
+                  name="expense_date"
                   className={styles['form-input']}
+                  value={formData.expense_date}
+                  onChange={handleInputChange}
                 />
               </div>
               <div className={styles['form-actions']}>
-                <button type="button" onClick={handleViewTable} className={styles['cancel-btn']}>
+                <button type="button" className={styles['cancel-btn']} onClick={handleViewTable}>
                   Cancel
                 </button>
                 <button type="submit" className={styles['submit-btn']}>
-                  {editingExpense ? 'Update Expense' : 'Add Expense'}
+                  {editingExpense ? 'Update' : 'Add'}
                 </button>
               </div>
             </form>

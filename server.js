@@ -11,6 +11,12 @@ const authRoutes = require('./routes/auth');
 const protectedRoutes = require('./routes/protected');
 const categoryRoutes = require('./routes/categories');
 const productRoutes = require('./routes/products');
+const accountRoutes = require('./routes/accounts');
+const depositRoutes = require('./routes/deposits');
+const withdrawalRoutes = require('./routes/withdrawals');
+const transferRoutes = require('./routes/transfers');
+const expenseCategoryRoutes = require('./routes/expenseCategories');
+const expenseRoutes = require('./routes/expenses');
 
 const app = express();
 
@@ -86,6 +92,12 @@ app.use('/api/auth', authRoutes);
 app.use('/api/protected', protectedRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/products', productRoutes);
+app.use('/api/accounts', accountRoutes);
+app.use('/api/deposits', depositRoutes);
+app.use('/api/withdrawals', withdrawalRoutes);
+app.use('/api/transfers', transferRoutes);
+app.use('/api/expense-categories', expenseCategoryRoutes);
+app.use('/api/expenses', expenseRoutes);
 
 // Health check endpoint for tests
 app.get('/api/auth/health', (req, res) => {

@@ -1,43 +1,87 @@
 // controllers/depositController.js
-const { ObjectId } = require('mongodb');
-const connectDB = require('../db');
+const Deposit = require('../models/Deposit');
+const Account = require('../models/Account');
 
-async function insertDeposit(depositData) {
-  const db = await connectDB();
-  const accounts = db.collection('Accounts');
-  const deposits = db.collection('Deposits');
-
-  const accountId = new ObjectId(depositData.account_id);
-
-  // ✅ 1. Validate account exists
-  const account = await accounts.findOne({ _id: accountId });
-  if (!account) {
-    throw new Error("❌ Account does not exist.");
+// Get all deposits
+exports.getAllDeposits = async (req, res) => {
+  try {
+    const deposits = await Deposit.find().populate('account', 'name bank');
+    res.json(deposits);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
+};
 
-  // ✅ 2. Validate positive amount
-  if (depositData.amount <= 0) {
-    throw new Error("❌ Deposit amount must be greater than zero.");
+// Get deposit by ID
+exports.getDepositById = async (req, res) => {
+  try {
+    const deposit = await Deposit.findById(req.params.id).populate('account', 'name bank');
+    if (!deposit) return res.status(404).json({ error: 'Deposit not found' });
+    res.json(deposit);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
+};
 
-  // ✅ 3. Insert deposit
-  const depositDoc = {
-    account_id: accountId,
-    amount: depositData.amount,
-    deposit_date: new Date()
-  };
+// Create new deposit
+exports.createDeposit = async (req, res) => {
+  try {
+    const { account, amount } = req.body;
+    if (amount <= 0) return res.status(400).json({ error: 'Amount must be greater than zero' });
+    const accountDoc = await Account.findById(account);
+    if (!accountDoc) return res.status(404).json({ error: 'Account does not exist' });
+    const deposit = new Deposit({ account, amount });
+    await deposit.save();
+    // Update account balance
+    accountDoc.balance += amount;
+    await accountDoc.save();
+    res.status(201).json(deposit);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
 
-  await deposits.insertOne(depositDoc);
+// Update deposit
+exports.updateDeposit = async (req, res) => {
+  try {
+    const { account, amount } = req.body;
+    const deposit = await Deposit.findById(req.params.id);
+    if (!deposit) return res.status(404).json({ error: 'Deposit not found' });
+    // Adjust account balance if amount or account changes
+    if (amount !== undefined && amount !== deposit.amount) {
+      const oldAccount = await Account.findById(deposit.account);
+      if (oldAccount) {
+        oldAccount.balance -= deposit.amount;
+        await oldAccount.save();
+      }
+      const newAccount = await Account.findById(account);
+      if (newAccount) {
+        newAccount.balance += amount;
+        await newAccount.save();
+      }
+    }
+    deposit.account = account;
+    deposit.amount = amount;
+    await deposit.save();
+    res.json(deposit);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
 
-  // ✅ 4. Update account balance
-  await accounts.updateOne(
-    { _id: accountId },
-    { $inc: { balance: depositData.amount } }
-  );
-
-  return { message: "✅ Deposit successful and balance updated." };
-}
-
-module.exports = {
-  insertDeposit
+// Delete deposit
+exports.deleteDeposit = async (req, res) => {
+  try {
+    const deposit = await Deposit.findByIdAndDelete(req.params.id);
+    if (!deposit) return res.status(404).json({ error: 'Deposit not found' });
+    // Adjust account balance
+    const account = await Account.findById(deposit.account);
+    if (account) {
+      account.balance -= deposit.amount;
+      await account.save();
+    }
+    res.json({ message: 'Deposit deleted' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };
