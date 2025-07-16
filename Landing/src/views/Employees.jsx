@@ -1,29 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styles from './Stores.module.css';
 import { Plus, Eye, Edit, Trash2, ArrowLeft, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import {
+  getEmployees,
+  getEmployeeById,
+  createEmployee,
+  updateEmployee,
+  deleteEmployee
+} from '../services/employeeService';
 
 const Employees = ({ onBack }) => {
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState('table');
-  const [employees, setEmployees] = useState([
-    {
-      emp_id: 1,
-      name: 'John Doe',
-      position: 'Manager',
-      store: 'Main Street Store',
-      contact: '555-1234',
-      date_hired: '2023-05-10T09:00:00Z'
-    },
-    {
-      emp_id: 2,
-      name: 'Jane Smith',
-      position: 'Cashier',
-      store: 'Downtown Branch',
-      contact: '555-5678',
-      date_hired: '2023-06-15T10:30:00Z'
-    }
-  ]);
+  const [employees, setEmployees] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
     name: '',
@@ -35,6 +26,24 @@ const Employees = ({ onBack }) => {
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // Fetch employees from backend
+  const fetchEmployees = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await getEmployees();
+      setEmployees(data);
+    } catch (err) {
+      setError('Error fetching employees');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchEmployees();
+  }, []);
 
   const handleBackClick = () => {
     if (onBack) {
@@ -67,21 +76,30 @@ const Employees = ({ onBack }) => {
       position: emp.position,
       store: emp.store,
       contact: emp.contact,
-      date_hired: emp.date_hired.split('T')[0]
+      date_hired: emp.date_hired ? emp.date_hired.slice(0, 10) : ''
     });
     setViewMode('form');
     setError('');
     setSuccess('');
   };
 
-  const handleDelete = (emp_id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this employee?')) {
-      setEmployees(prev => prev.filter(emp => emp.emp_id !== emp_id));
-      setSuccess('Employee deleted successfully');
+      setLoading(true);
+      setError('');
+      try {
+        await deleteEmployee(id);
+        setSuccess('Employee deleted successfully');
+        fetchEmployees();
+      } catch (err) {
+        setError('Error deleting employee');
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
@@ -89,28 +107,40 @@ const Employees = ({ onBack }) => {
       setError('All fields are required');
       return;
     }
-    if (editingEmployee) {
-      setEmployees(prev => prev.map(emp =>
-        emp.emp_id === editingEmployee.emp_id ? { ...emp, ...formData, date_hired: new Date(formData.date_hired).toISOString() } : emp
-      ));
-      setSuccess('Employee updated successfully');
-    } else {
-      const newEmp = {
-        emp_id: Math.max(...employees.map(e => e.emp_id), 0) + 1,
-        ...formData,
-        date_hired: new Date(formData.date_hired).toISOString()
-      };
-      setEmployees(prev => [...prev, newEmp]);
-      setSuccess('Employee added successfully');
+    setLoading(true);
+    try {
+      if (editingEmployee) {
+        await updateEmployee(editingEmployee._id, {
+          ...formData,
+          date_hired: new Date(formData.date_hired).toISOString()
+        });
+        setSuccess('Employee updated successfully');
+      } else {
+        await createEmployee({
+          ...formData,
+          date_hired: new Date(formData.date_hired).toISOString()
+        });
+        setSuccess('Employee added successfully');
+      }
+      setFormData({ name: '', position: '', store: '', contact: '', date_hired: '' });
+      setEditingEmployee(null);
+      fetchEmployees();
+      setTimeout(() => {
+        setViewMode('table');
+      }, 1200);
+    } catch (err) {
+      setError('Error saving employee');
+    } finally {
+      setLoading(false);
     }
-    setFormData({ name: '', position: '', store: '', contact: '', date_hired: '' });
-    setEditingEmployee(null);
-    setTimeout(() => setViewMode('table'), 1500);
   };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
   const filteredEmployees = employees.filter(emp =>
@@ -160,48 +190,50 @@ const Employees = ({ onBack }) => {
                 {filteredEmployees.length} employees found
               </div>
             </div>
-            <div className={styles['table-wrapper']}>
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th>Employee ID</th>
-                    <th>Name</th>
-                    <th>Position</th>
-                    <th>Store</th>
-                    <th>Contact</th>
-                    <th>Date Hired</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredEmployees.map(emp => (
-                    <tr key={emp.emp_id}>
-                      <td>{emp.emp_id}</td>
-                      <td>{emp.name}</td>
-                      <td>{emp.position}</td>
-                      <td>{emp.store}</td>
-                      <td>{emp.contact}</td>
-                      <td>{new Date(emp.date_hired).toLocaleDateString()}</td>
-                      <td>
-                        <div className={styles['action-icons']}>
-                          <button onClick={() => handleEdit(emp)} className={styles['icon-btn']} title="Edit">
-                            <Edit size={16} />
-                          </button>
-                          <button onClick={() => handleDelete(emp.emp_id)} className={`${styles['icon-btn']} ${styles.delete}`} title="Delete">
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </td>
+            {loading ? (
+              <div className={styles.loading}>Loading employees...</div>
+            ) : (
+              <div className={styles['table-wrapper']}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Position</th>
+                      <th>Store</th>
+                      <th>Contact</th>
+                      <th>Date Hired</th>
+                      <th>Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-              {filteredEmployees.length === 0 && (
-                <div className={styles['no-data']}>
-                  {searchTerm ? 'No employees found matching your search' : 'No employees found'}
-                </div>
-              )}
-            </div>
+                  </thead>
+                  <tbody>
+                    {filteredEmployees.map(emp => (
+                      <tr key={emp._id}>
+                        <td>{emp.name}</td>
+                        <td>{emp.position}</td>
+                        <td>{emp.store}</td>
+                        <td>{emp.contact}</td>
+                        <td>{emp.date_hired ? new Date(emp.date_hired).toLocaleDateString() : ''}</td>
+                        <td>
+                          <div className={styles['action-icons']}>
+                            <button onClick={() => handleEdit(emp)} className={styles['icon-btn']} title="Edit">
+                              <Edit size={16} />
+                            </button>
+                            <button onClick={() => handleDelete(emp._id)} className={`${styles['icon-btn']} ${styles.delete}`} title="Delete">
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {filteredEmployees.length === 0 && !loading && (
+                  <div className={styles['no-data']}>
+                    {searchTerm ? 'No employees found matching your search' : 'No employees found'}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
         {viewMode === 'form' && (
@@ -209,75 +241,71 @@ const Employees = ({ onBack }) => {
             <h2>{editingEmployee ? 'Edit Employee' : 'Add New Employee'}</h2>
             <form onSubmit={handleSubmit} className={styles.form}>
               <div className={styles['form-group']}>
-                <label htmlFor="name">Name *</label>
+                <label htmlFor="name">Name</label>
                 <input
                   type="text"
                   id="name"
                   name="name"
+                  className={styles['form-input']}
                   value={formData.name}
                   onChange={handleInputChange}
-                  placeholder="Enter employee name"
                   required
-                  className={styles['form-input']}
                 />
               </div>
               <div className={styles['form-group']}>
-                <label htmlFor="position">Position *</label>
+                <label htmlFor="position">Position</label>
                 <input
                   type="text"
                   id="position"
                   name="position"
+                  className={styles['form-input']}
                   value={formData.position}
                   onChange={handleInputChange}
-                  placeholder="Enter position"
                   required
-                  className={styles['form-input']}
                 />
               </div>
               <div className={styles['form-group']}>
-                <label htmlFor="store">Store *</label>
+                <label htmlFor="store">Store</label>
                 <input
                   type="text"
                   id="store"
                   name="store"
+                  className={styles['form-input']}
                   value={formData.store}
                   onChange={handleInputChange}
-                  placeholder="Enter store name"
                   required
-                  className={styles['form-input']}
                 />
               </div>
               <div className={styles['form-group']}>
-                <label htmlFor="contact">Contact *</label>
+                <label htmlFor="contact">Contact</label>
                 <input
                   type="text"
                   id="contact"
                   name="contact"
+                  className={styles['form-input']}
                   value={formData.contact}
                   onChange={handleInputChange}
-                  placeholder="Enter contact number"
                   required
-                  className={styles['form-input']}
                 />
               </div>
               <div className={styles['form-group']}>
-                <label htmlFor="date_hired">Date Hired *</label>
+                <label htmlFor="date_hired">Date Hired</label>
                 <input
                   type="date"
                   id="date_hired"
                   name="date_hired"
+                  className={styles['form-input']}
                   value={formData.date_hired}
                   onChange={handleInputChange}
                   required
-                  className={styles['form-input']}
                 />
               </div>
               <div className={styles['form-actions']}>
-                <button type="button" onClick={handleViewTable} className={styles['cancel-btn']}>
+                <button type="button" className={styles['cancel-btn']} onClick={handleViewTable}>
                   Cancel
                 </button>
                 <button type="submit" className={styles['submit-btn']}>
-                  {editingEmployee ? 'Update Employee' : 'Add Employee'}
+                  {editingEmployee ? 'Update' : 'Add'}
                 </button>
               </div>
             </form>

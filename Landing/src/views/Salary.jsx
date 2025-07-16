@@ -1,43 +1,73 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styles from './Stores.module.css';
 import { Plus, Eye, Edit, Trash2, ArrowLeft, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import {
+  getSalaries,
+  getSalaryById,
+  createSalary,
+  updateSalary,
+  deleteSalary
+} from '../services/salaryService';
+import { getEmployees } from '../services/employeeService';
+import { getAccounts } from '../services/accountService';
 
 const Salary = ({ onBack }) => {
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState('table');
-  const [salaries, setSalaries] = useState([
-    {
-      salary_id: 1,
-      employee: 'John Doe',
-      store: 'Main Street Store',
-      amount: 2000,
-      month: 'May 2024',
-      status: 'Paid',
-      date_paid: '2024-05-31T10:00:00Z'
-    },
-    {
-      salary_id: 2,
-      employee: 'Jane Smith',
-      store: 'Downtown Branch',
-      amount: 1800,
-      month: 'May 2024',
-      status: 'Pending',
-      date_paid: ''
-    }
-  ]);
+  const [salaries, setSalaries] = useState([]);
+  const [employees, setEmployees] = useState([]);
+  const [accounts, setAccounts] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
     employee: '',
-    store: '',
+    account: '',
     amount: '',
-    month: '',
-    status: 'Pending',
-    date_paid: ''
+    pay_date: '',
+    description: ''
   });
   const [editingSalary, setEditingSalary] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // Fetch salaries, employees, and accounts from backend
+  const fetchSalaries = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await getSalaries();
+      setSalaries(data);
+    } catch (err) {
+      setError('Error fetching salaries');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchEmployees = async () => {
+    try {
+      const data = await getEmployees();
+      setEmployees(data);
+    } catch (err) {
+      setError('Error fetching employees');
+    }
+  };
+
+  const fetchAccounts = async () => {
+    try {
+      const data = await getAccounts();
+      setAccounts(data);
+    } catch (err) {
+      setError('Error fetching accounts');
+    }
+  };
+
+  useEffect(() => {
+    fetchSalaries();
+    fetchEmployees();
+    fetchAccounts();
+  }, []);
 
   const handleBackClick = () => {
     if (onBack) {
@@ -50,7 +80,7 @@ const Salary = ({ onBack }) => {
   const handleViewTable = () => {
     setViewMode('table');
     setEditingSalary(null);
-    setFormData({ employee: '', store: '', amount: '', month: '', status: 'Pending', date_paid: '' });
+    setFormData({ employee: '', account: '', amount: '', pay_date: '', description: '' });
     setError('');
     setSuccess('');
   };
@@ -58,7 +88,7 @@ const Salary = ({ onBack }) => {
   const handleAddNew = () => {
     setViewMode('form');
     setEditingSalary(null);
-    setFormData({ employee: '', store: '', amount: '', month: '', status: 'Pending', date_paid: '' });
+    setFormData({ employee: '', account: '', amount: '', pay_date: '', description: '' });
     setError('');
     setSuccess('');
   };
@@ -66,63 +96,88 @@ const Salary = ({ onBack }) => {
   const handleEdit = (sal) => {
     setEditingSalary(sal);
     setFormData({
-      employee: sal.employee,
-      store: sal.store,
+      employee: sal.employee?._id || '',
+      account: sal.account?._id || '',
       amount: sal.amount,
-      month: sal.month,
-      status: sal.status,
-      date_paid: sal.date_paid ? sal.date_paid.split('T')[0] : ''
+      pay_date: sal.pay_date ? sal.pay_date.slice(0, 10) : '',
+      description: sal.description || ''
     });
     setViewMode('form');
     setError('');
     setSuccess('');
   };
 
-  const handleDelete = (salary_id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this salary record?')) {
-      setSalaries(prev => prev.filter(sal => sal.salary_id !== salary_id));
-      setSuccess('Salary record deleted successfully');
+      setLoading(true);
+      setError('');
+      try {
+        await deleteSalary(id);
+        setSuccess('Salary record deleted successfully');
+        fetchSalaries();
+      } catch (err) {
+        setError('Error deleting salary record');
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
-    if (!formData.employee.trim() || !formData.store.trim() || !formData.amount || !formData.month.trim()) {
-      setError('All fields except Date Paid are required');
+    if (!formData.employee || !formData.account || !formData.amount || isNaN(formData.amount) || Number(formData.amount) <= 0 || !formData.pay_date) {
+      setError('All fields except description are required and must be valid');
       return;
     }
-    if (editingSalary) {
-      setSalaries(prev => prev.map(sal =>
-        sal.salary_id === editingSalary.salary_id ? { ...sal, ...formData, date_paid: formData.date_paid ? new Date(formData.date_paid).toISOString() : '' } : sal
-      ));
-      setSuccess('Salary record updated successfully');
-    } else {
-      const newSal = {
-        salary_id: Math.max(...salaries.map(s => s.salary_id), 0) + 1,
-        ...formData,
-        date_paid: formData.date_paid ? new Date(formData.date_paid).toISOString() : ''
-      };
-      setSalaries(prev => [...prev, newSal]);
-      setSuccess('Salary record added successfully');
+    setLoading(true);
+    try {
+      if (editingSalary) {
+        await updateSalary(editingSalary._id, {
+          ...formData,
+          amount: Number(formData.amount)
+        });
+        setSuccess('Salary record updated successfully');
+      } else {
+        await createSalary({
+          ...formData,
+          amount: Number(formData.amount)
+        });
+        setSuccess('Salary record added successfully');
+      }
+      setFormData({ employee: '', account: '', amount: '', pay_date: '', description: '' });
+      setEditingSalary(null);
+      fetchSalaries();
+      setTimeout(() => {
+        setViewMode('table');
+      }, 1200);
+    } catch (err) {
+      setError('Error saving salary record');
+    } finally {
+      setLoading(false);
     }
-    setFormData({ employee: '', store: '', amount: '', month: '', status: 'Pending', date_paid: '' });
-    setEditingSalary(null);
-    setTimeout(() => setViewMode('table'), 1500);
   };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
-  const filteredSalaries = salaries.filter(sal =>
-    sal.employee.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    sal.store.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    sal.month.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    sal.status.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredSalaries = salaries.filter(sal => {
+    const empName = sal.employee?.name || '';
+    const accName = sal.account?.name || '';
+    const accBank = sal.account?.bank || '';
+    return (
+      empName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      accName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      accBank.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (sal.description || '').toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  });
 
   return (
     <div className={styles.stores}>
@@ -164,50 +219,52 @@ const Salary = ({ onBack }) => {
                 {filteredSalaries.length} salary records found
               </div>
             </div>
-            <div className={styles['table-wrapper']}>
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th>Salary ID</th>
-                    <th>Employee Name</th>
-                    <th>Store</th>
-                    <th>Amount</th>
-                    <th>Month</th>
-                    <th>Status</th>
-                    <th>Date Paid</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredSalaries.map(sal => (
-                    <tr key={sal.salary_id}>
-                      <td>{sal.salary_id}</td>
-                      <td>{sal.employee}</td>
-                      <td>{sal.store}</td>
-                      <td>{sal.amount}</td>
-                      <td>{sal.month}</td>
-                      <td>{sal.status}</td>
-                      <td>{sal.date_paid ? new Date(sal.date_paid).toLocaleDateString() : '-'}</td>
-                      <td>
-                        <div className={styles['action-icons']}>
-                          <button onClick={() => handleEdit(sal)} className={styles['icon-btn']} title="Edit">
-                            <Edit size={16} />
-                          </button>
-                          <button onClick={() => handleDelete(sal.salary_id)} className={`${styles['icon-btn']} ${styles.delete}`} title="Delete">
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </td>
+            {loading ? (
+              <div className={styles.loading}>Loading salaries...</div>
+            ) : (
+              <div className={styles['table-wrapper']}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>Employee</th>
+                      <th>Account</th>
+                      <th>Bank</th>
+                      <th>Amount</th>
+                      <th>Pay Date</th>
+                      <th>Description</th>
+                      <th>Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-              {filteredSalaries.length === 0 && (
-                <div className={styles['no-data']}>
-                  {searchTerm ? 'No salary records found matching your search' : 'No salary records found'}
-                </div>
-              )}
-            </div>
+                  </thead>
+                  <tbody>
+                    {filteredSalaries.map(sal => (
+                      <tr key={sal._id}>
+                        <td>{sal.employee?.name || ''}</td>
+                        <td>{sal.account?.name || ''}</td>
+                        <td>{sal.account?.bank || ''}</td>
+                        <td>{sal.amount}</td>
+                        <td>{sal.pay_date ? new Date(sal.pay_date).toLocaleDateString() : ''}</td>
+                        <td>{sal.description}</td>
+                        <td>
+                          <div className={styles['action-icons']}>
+                            <button onClick={() => handleEdit(sal)} className={styles['icon-btn']} title="Edit">
+                              <Edit size={16} />
+                            </button>
+                            <button onClick={() => handleDelete(sal._id)} className={`${styles['icon-btn']} ${styles.delete}`} title="Delete">
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {filteredSalaries.length === 0 && !loading && (
+                  <div className={styles['no-data']}>
+                    {searchTerm ? 'No salary records found matching your search' : 'No salary records found'}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
         {viewMode === 'form' && (
@@ -215,89 +272,81 @@ const Salary = ({ onBack }) => {
             <h2>{editingSalary ? 'Edit Salary' : 'Add New Salary'}</h2>
             <form onSubmit={handleSubmit} className={styles.form}>
               <div className={styles['form-group']}>
-                <label htmlFor="employee">Employee Name *</label>
-                <input
-                  type="text"
+                <label htmlFor="employee">Employee</label>
+                <select
                   id="employee"
                   name="employee"
+                  className={styles['form-input']}
                   value={formData.employee}
                   onChange={handleInputChange}
-                  placeholder="Enter employee name"
                   required
-                  className={styles['form-input']}
-                />
+                >
+                  <option value="">Select Employee</option>
+                  {employees.map((emp) => (
+                    <option key={emp._id} value={emp._id}>{emp.name} ({emp.position})</option>
+                  ))}
+                </select>
               </div>
               <div className={styles['form-group']}>
-                <label htmlFor="store">Store *</label>
-                <input
-                  type="text"
-                  id="store"
-                  name="store"
-                  value={formData.store}
+                <label htmlFor="account">Account</label>
+                <select
+                  id="account"
+                  name="account"
+                  className={styles['form-input']}
+                  value={formData.account}
                   onChange={handleInputChange}
-                  placeholder="Enter store name"
                   required
-                  className={styles['form-input']}
-                />
+                >
+                  <option value="">Select Account</option>
+                  {accounts.map((acc) => (
+                    <option key={acc._id} value={acc._id}>{acc.name} ({acc.bank})</option>
+                  ))}
+                </select>
               </div>
               <div className={styles['form-group']}>
-                <label htmlFor="amount">Amount *</label>
+                <label htmlFor="amount">Amount</label>
                 <input
                   type="number"
                   id="amount"
                   name="amount"
+                  className={styles['form-input']}
                   value={formData.amount}
                   onChange={handleInputChange}
-                  placeholder="Enter amount"
+                  min="0.01"
+                  step="0.01"
                   required
-                  className={styles['form-input']}
-                  min="1"
                 />
               </div>
               <div className={styles['form-group']}>
-                <label htmlFor="month">Month *</label>
-                <input
-                  type="text"
-                  id="month"
-                  name="month"
-                  value={formData.month}
-                  onChange={handleInputChange}
-                  placeholder="e.g. May 2024"
-                  required
-                  className={styles['form-input']}
-                />
-              </div>
-              <div className={styles['form-group']}>
-                <label htmlFor="status">Status *</label>
-                <select
-                  id="status"
-                  name="status"
-                  value={formData.status}
-                  onChange={handleInputChange}
-                  className={styles['form-input']}
-                  required
-                >
-                  <option value="Paid">Paid</option>
-                  <option value="Pending">Pending</option>
-                </select>
-              </div>
-              <div className={styles['form-group']}>
-                <label htmlFor="date_paid">Date Paid</label>
+                <label htmlFor="pay_date">Pay Date</label>
                 <input
                   type="date"
-                  id="date_paid"
-                  name="date_paid"
-                  value={formData.date_paid}
-                  onChange={handleInputChange}
+                  id="pay_date"
+                  name="pay_date"
                   className={styles['form-input']}
+                  value={formData.pay_date}
+                  onChange={handleInputChange}
+                  required
+                />
+              </div>
+              <div className={styles['form-group']}>
+                <label htmlFor="description">Description</label>
+                <input
+                  type="text"
+                  id="description"
+                  name="description"
+                  className={styles['form-input']}
+                  value={formData.description}
+                  onChange={handleInputChange}
+                  maxLength={200}
                 />
               </div>
               <div className={styles['form-actions']}>
-                <button type="button" onClick={handleViewTable} className={styles['cancel-btn']}>
+                <button type="button" className={styles['cancel-btn']} onClick={handleViewTable}>
                   Cancel
                 </button>
                 <button type="submit" className={styles['submit-btn']}>
-                  {editingSalary ? 'Update Salary' : 'Add Salary'}
+                  {editingSalary ? 'Update' : 'Add'}
                 </button>
               </div>
             </form>

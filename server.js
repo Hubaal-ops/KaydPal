@@ -17,6 +17,8 @@ const withdrawalRoutes = require('./routes/withdrawals');
 const transferRoutes = require('./routes/transfers');
 const expenseCategoryRoutes = require('./routes/expenseCategories');
 const expenseRoutes = require('./routes/expenses');
+const employeeRoutes = require('./routes/employees');
+const salaryRoutes = require('./routes/salaries');
 
 const app = express();
 
@@ -98,6 +100,8 @@ app.use('/api/withdrawals', withdrawalRoutes);
 app.use('/api/transfers', transferRoutes);
 app.use('/api/expense-categories', expenseCategoryRoutes);
 app.use('/api/expenses', expenseRoutes);
+app.use('/api/employees', employeeRoutes);
+app.use('/api/salaries', salaryRoutes);
 
 // Health check endpoint for tests
 app.get('/api/auth/health', (req, res) => {
