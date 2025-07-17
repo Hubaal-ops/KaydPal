@@ -9,6 +9,7 @@ import {
   Search
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { getStores, getStore, createStore, updateStore, deleteStore } from '../services/storeService';
 
 const Stores = ({ onBack }) => {
   const navigate = useNavigate();
@@ -25,41 +26,13 @@ const Stores = ({ onBack }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Mock data for demonstration
-  const mockStores = [
-    {
-      store_no: 1,
-      store_name: 'Main Street Store',
-      location: '123 Main St, Springfield',
-      manager: 'John Doe',
-      total_items: 45,
-      created_at: '2024-01-15T10:30:00Z'
-    },
-    {
-      store_no: 2,
-      store_name: 'Downtown Branch',
-      location: '456 Oak Ave, Downtown',
-      manager: 'Jane Smith',
-      total_items: 32,
-      created_at: '2024-01-16T14:20:00Z'
-    },
-    {
-      store_no: 3,
-      store_name: 'Mall Location',
-      location: '789 Shopping Mall, Westside',
-      manager: 'Mike Johnson',
-      total_items: 28,
-      created_at: '2024-01-17T09:15:00Z'
-    }
-  ];
-
-  // Simulate API call for stores
+  // Fetch stores from API
   const fetchStores = async () => {
     setLoading(true);
+    setError('');
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setStores(mockStores);
+      const data = await getStores();
+      setStores(data);
     } catch (error) {
       setError('Error fetching stores');
     } finally {
@@ -107,14 +80,11 @@ const Stores = ({ onBack }) => {
     setSuccess('');
   };
 
-  const handleDelete = async (storeNo) => {
+  const handleDelete = async (storeId) => {
     if (window.confirm('Are you sure you want to delete this store?')) {
       try {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Remove from local state
-        setStores(prev => prev.filter(store => store.store_no !== storeNo));
+        await deleteStore(storeId);
+        await fetchStores();
         setSuccess('Store deleted successfully');
       } catch (error) {
         setError('Error deleting store');
@@ -131,52 +101,33 @@ const Stores = ({ onBack }) => {
       setError('Store name is required');
       return;
     }
-
     if (!formData.location.trim()) {
       setError('Location is required');
       return;
     }
-
     if (!formData.manager.trim()) {
       setError('Manager is required');
       return;
     }
-
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      setLoading(true);
       if (editingStore) {
-        // Update existing store
-        setStores(prev => prev.map(store => 
-          store.store_no === editingStore.store_no 
-            ? { ...store, ...formData }
-            : store
-        ));
+        await updateStore(editingStore._id, formData);
         setSuccess('Store updated successfully');
       } else {
-        // Add new store
-        const newStore = {
-          store_no: Math.max(...stores.map(s => s.store_no)) + 1,
-          store_name: formData.store_name,
-          location: formData.location,
-          manager: formData.manager,
-          total_items: 0,
-          created_at: new Date().toISOString()
-        };
-        setStores(prev => [...prev, newStore]);
+        await createStore(formData);
         setSuccess('Store added successfully');
       }
-      
+      await fetchStores();
       setFormData({ store_name: '', location: '', manager: '' });
       setEditingStore(null);
-      
-      // Auto-switch to table view after successful submission
       setTimeout(() => {
         setViewMode('table');
       }, 1500);
     } catch (error) {
       setError('Error saving store');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -254,38 +205,26 @@ const Stores = ({ onBack }) => {
                 <table className={styles.table}>
                   <thead>
                     <tr>
-                      <th>Store No</th>
-                      <th>Store Name</th>
+                      <th>Name</th>
                       <th>Location</th>
                       <th>Manager</th>
-                      <th>Total Items</th>
                       <th>Created At</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredStores.map((store) => (
-                      <tr key={store.store_no}>
-                        <td>{store.store_no}</td>
+                      <tr key={store._id}>
                         <td>{store.store_name}</td>
                         <td>{store.location}</td>
                         <td>{store.manager}</td>
-                        <td>{store.total_items}</td>
-                        <td>{new Date(store.created_at).toLocaleDateString()}</td>
+                        <td>{store.created_at ? new Date(store.created_at).toLocaleDateString() : ''}</td>
                         <td>
                           <div className={styles['action-icons']}>
-                            <button
-                              onClick={() => handleEdit(store)}
-                              className={styles['icon-btn']}
-                              title="Edit"
-                            >
+                            <button onClick={() => handleEdit(store)} className={styles['icon-btn']} title="Edit">
                               <Edit size={16} />
                             </button>
-                            <button
-                              onClick={() => handleDelete(store.store_no)}
-                              className={`${styles['icon-btn']} ${styles.delete}`}
-                              title="Delete"
-                            >
+                            <button onClick={() => handleDelete(store._id)} className={`${styles['icon-btn']} ${styles.delete}`} title="Delete">
                               <Trash2 size={16} />
                             </button>
                           </div>

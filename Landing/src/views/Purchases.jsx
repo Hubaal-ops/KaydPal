@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import styles from './Sales.module.css';
+import styles from './Purchases.module.css';
 import { Plus, Eye, Edit, Trash2, ArrowLeft, Search } from 'lucide-react';
+import { getPurchases, addPurchase, updatePurchase, deletePurchase } from '../services/purchaseService';
+import { getProducts } from '../services/productService';
+import { getSuppliers } from '../services/supplierService';
+import { getStores } from '../services/storeService';
+import { getAccounts } from '../services/accountService';
 
 const Purchases = ({ onBack }) => {
   const [viewMode, setViewMode] = useState('table');
@@ -27,90 +32,37 @@ const Purchases = ({ onBack }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Mock data
-  const mockProducts = [
-    { product_no: 1, product_name: 'Macbook Pro 14' },
-    { product_no: 2, product_name: 'Nike Running Shoes' },
-    { product_no: 3, product_name: 'The Great Gatsby' }
-  ];
-  const mockSuppliers = [
-    { supplier_no: 1, supplier_name: 'Tech Supplies Inc.' },
-    { supplier_no: 2, supplier_name: 'Global Footwear' },
-    { supplier_no: 3, supplier_name: 'Book Distributors' }
-  ];
-  const mockStores = [
-    { store_no: 1, store_name: 'Main Street Store' },
-    { store_no: 2, store_name: 'Downtown Branch' },
-    { store_no: 3, store_name: 'Mall Location' }
-  ];
-  const mockAccounts = [
-    { account_id: 1, account_name: 'Cash' },
-    { account_id: 2, account_name: 'Bank' },
-    { account_id: 3, account_name: 'Credit Card' }
-  ];
-  const mockPurchases = [
-    {
-      purchase_no: 'PUR-00001',
-      product_no: 1,
-      supplier_no: 1,
-      store_no: 1,
-      qty: 5,
-      price: 1800,
-      discount: 50,
-      tax: 90,
-      amount: 9040,
-      paid: 5000,
-      account_id: 1,
-      created_at: '2024-07-13T10:30:00Z',
-      product_name: 'Macbook Pro 14',
-      supplier_name: 'Tech Supplies Inc.',
-      store_name: 'Main Street Store',
-      account_name: 'Cash'
-    },
-    {
-      purchase_no: 'PUR-00002',
-      product_no: 2,
-      supplier_no: 2,
-      store_no: 2,
-      qty: 10,
-      price: 100,
-      discount: 0,
-      tax: 20,
-      amount: 1020,
-      paid: 1020,
-      account_id: 2,
-      created_at: '2024-07-13T11:00:00Z',
-      product_name: 'Nike Running Shoes',
-      supplier_name: 'Global Footwear',
-      store_name: 'Downtown Branch',
-      account_name: 'Bank'
-    }
-  ];
-
-  // Simulate API calls
-  const fetchPurchases = async () => {
+  const fetchAll = async () => {
     setLoading(true);
+    setError('');
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setPurchases(mockPurchases);
-    } catch (error) {
-      setError('Error fetching purchases');
+      const [purchasesData, productsData, suppliersData, storesData, accountsData] = await Promise.all([
+        getPurchases(),
+        getProducts(),
+        getSuppliers(),
+        getStores(),
+        getAccounts()
+      ]);
+      setPurchases(purchasesData);
+      setProducts(productsData.data || productsData); // handle both {data:[]} and []
+      setSuppliers(suppliersData);
+      setStores(Array.isArray(storesData) ? storesData : (storesData.data || []));
+      setAccounts(accountsData);
+    } catch (err) {
+      setError(err.message || 'Error fetching purchase data');
     } finally {
       setLoading(false);
     }
   };
-  const fetchProducts = async () => setProducts(mockProducts);
-  const fetchSuppliers = async () => setSuppliers(mockSuppliers);
-  const fetchStores = async () => setStores(mockStores);
-  const fetchAccounts = async () => setAccounts(mockAccounts);
 
   useEffect(() => {
-    fetchPurchases();
-    fetchProducts();
-    fetchSuppliers();
-    fetchStores();
-    fetchAccounts();
+    fetchAll();
   }, []);
+
+  // Debug: log stores array
+  useEffect(() => {
+    console.log('Stores:', stores);
+  }, [stores]);
 
   const handleViewTable = () => {
     setViewMode('table');
@@ -169,14 +121,19 @@ const Purchases = ({ onBack }) => {
     setSuccess('');
   };
 
-  const handleDelete = async (purchaseNo) => {
+  const handleDelete = async (purchase_no) => {
     if (window.confirm('Are you sure you want to delete this purchase?')) {
+      setError('');
+      setSuccess('');
+      setLoading(true);
       try {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        setPurchases(prev => prev.filter(p => p.purchase_no !== purchaseNo));
+        await deletePurchase(purchase_no);
+        await fetchAll(); // Re-fetch all data to update dropdowns
         setSuccess('Purchase deleted successfully');
-      } catch (error) {
-        setError('Error deleting purchase');
+      } catch (err) {
+        setError(err.message || 'Error deleting purchase');
+      } finally {
+        setLoading(false);
       }
     }
   };
@@ -185,8 +142,13 @@ const Purchases = ({ onBack }) => {
     e.preventDefault();
     setError('');
     setSuccess('');
+    console.log('Store dropdown value:', formData.store_no, typeof formData.store_no);
     if (!formData.product_no || !formData.supplier_no || !formData.store_no || !formData.account_id) {
       setError('All dropdowns are required');
+      return;
+    }
+    if (isNaN(Number(formData.store_no))) {
+      setError('Store is required');
       return;
     }
     if (formData.qty <= 0) {
@@ -206,49 +168,25 @@ const Purchases = ({ onBack }) => {
       setError('Paid amount cannot exceed total amount');
       return;
     }
+    setLoading(true);
+    // Convert all IDs to numbers before sending
+    const payload = {
+      ...formData,
+      product_no: Number(formData.product_no),
+      supplier_no: Number(formData.supplier_no),
+      store_no: Number(formData.store_no),
+      account_id: Number(formData.account_id)
+    };
+    console.log('Submitting purchase payload:', payload);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      const selectedProduct = products.find(p => p.product_no === parseInt(formData.product_no));
-      const selectedSupplier = suppliers.find(s => s.supplier_no === parseInt(formData.supplier_no));
-      const selectedStore = stores.find(s => s.store_no === parseInt(formData.store_no));
-      const selectedAccount = accounts.find(a => a.account_id === parseInt(formData.account_id));
       if (editingPurchase) {
-        setPurchases(prev => prev.map(purchase =>
-          purchase.purchase_no === editingPurchase.purchase_no
-            ? {
-                ...purchase,
-                ...formData,
-                product_no: parseInt(formData.product_no),
-                supplier_no: parseInt(formData.supplier_no),
-                store_no: parseInt(formData.store_no),
-                account_id: parseInt(formData.account_id),
-                product_name: selectedProduct.product_name,
-                supplier_name: selectedSupplier.supplier_name,
-                store_name: selectedStore.store_name,
-                account_name: selectedAccount.account_name,
-                created_at: purchase.created_at
-              }
-            : purchase
-        ));
+        await updatePurchase(editingPurchase.purchase_no, payload);
         setSuccess('Purchase updated successfully');
       } else {
-        const newNo = `PUR-${String(Math.max(0, ...purchases.map(p => parseInt(p.purchase_no?.split('-')[1]) || 0)) + 1).padStart(5, '0')}`;
-        const newPurchase = {
-          purchase_no: newNo,
-          ...formData,
-          product_no: parseInt(formData.product_no),
-          supplier_no: parseInt(formData.supplier_no),
-          store_no: parseInt(formData.store_no),
-          account_id: parseInt(formData.account_id),
-          product_name: selectedProduct.product_name,
-          supplier_name: selectedSupplier.supplier_name,
-          store_name: selectedStore.store_name,
-          account_name: selectedAccount.account_name,
-          created_at: new Date().toISOString()
-        };
-        setPurchases(prev => [...prev, newPurchase]);
+        await addPurchase(payload);
         setSuccess('Purchase added successfully');
       }
+      await fetchAll();
       setFormData({
         product_no: '',
         supplier_no: '',
@@ -265,8 +203,10 @@ const Purchases = ({ onBack }) => {
       setTimeout(() => {
         setViewMode('table');
       }, 1500);
-    } catch (error) {
-      setError('Error saving purchase');
+    } catch (err) {
+      setError(err.message || 'Error saving purchase');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -292,7 +232,7 @@ const Purchases = ({ onBack }) => {
   );
 
   return (
-    <div className={styles.sales}>
+    <div className={styles.purchases}>
       <div className={styles['sales-header']}>
         <button className={styles['back-button']} onClick={onBack}>
           <ArrowLeft size={20} />
@@ -420,7 +360,7 @@ const Purchases = ({ onBack }) => {
                   className={styles['form-select']}
                 >
                   <option value="">Select a product</option>
-                  {products.map((product) => (
+                  {products.map(product => (
                     <option key={product.product_no} value={product.product_no}>
                       {product.product_name}
                     </option>
@@ -438,9 +378,9 @@ const Purchases = ({ onBack }) => {
                   className={styles['form-select']}
                 >
                   <option value="">Select a supplier</option>
-                  {suppliers.map((supplier) => (
+                  {suppliers.map(supplier => (
                     <option key={supplier.supplier_no} value={supplier.supplier_no}>
-                      {supplier.supplier_name}
+                      {supplier.name}
                     </option>
                   ))}
                 </select>
@@ -456,9 +396,9 @@ const Purchases = ({ onBack }) => {
                   className={styles['form-select']}
                 >
                   <option value="">Select a store</option>
-                  {stores.map((store) => (
+                  {stores.map(store => (
                     <option key={store.store_no} value={store.store_no}>
-                      {store.store_name}
+                      {store.store_name || 'Unnamed Store'}
                     </option>
                   ))}
                 </select>
@@ -550,9 +490,9 @@ const Purchases = ({ onBack }) => {
                   className={styles['form-select']}
                 >
                   <option value="">Select an account</option>
-                  {accounts.map((account) => (
+                  {accounts.map(account => (
                     <option key={account.account_id} value={account.account_id}>
-                      {account.account_name}
+                      {account.name || account.account_name}
                     </option>
                   ))}
                 </select>

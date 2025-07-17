@@ -2,9 +2,8 @@ import React from 'react';
 import styles from './Transactions.module.css';
 import { ShoppingCart, FileText, CreditCard, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import Sales from '../views/Sales';
-import salesStyles from '../views/Sales.module.css';
 import Purchases from '../views/Purchases';
+import Sales from '../views/Sales';
 
 const Transactions = () => {
   const navigate = useNavigate();
@@ -70,12 +69,11 @@ const Transactions = () => {
       </div>
       <div className={styles['transactions-content']}>
         {activeModule === 'sales' ? (
-          <div className={salesStyles.sales} style={{ background: 'none', boxShadow: 'none', padding: 0 }}>
-            {/* Removed the description above the table/form */}
+          <div className={styles.sales} style={{ background: 'none', boxShadow: 'none', padding: 0 }}>
             <Sales onBack={handleBackClick} />
           </div>
         ) : activeModule === 'purchases' ? (
-          <div className={salesStyles.sales} style={{ background: 'none', boxShadow: 'none', padding: 0 }}>
+          <div className={styles.sales} style={{ background: 'none', boxShadow: 'none', padding: 0 }}>
             <Purchases onBack={handleBackClick} />
           </div>
         ) : (

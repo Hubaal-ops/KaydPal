@@ -5,13 +5,15 @@ import {
   Tags, 
   Store, 
   PackageCheck,
-  ArrowLeft
+  ArrowLeft,
+  UserPlus
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Categories from '../views/Categories';
 import Products from '../views/Products';
 import Stores from '../views/Stores';
 import StoreProducts from '../views/StoreProducts';
+import Registration from './Registration';
 
 const Inventory = () => {
   const navigate = useNavigate();
@@ -49,6 +51,14 @@ const Inventory = () => {
       icon: PackageCheck,
       color: '#f59e0b',
       gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
+    },
+    {
+      id: 'registration',
+      title: 'Registration',
+      description: 'Register and manage customers and suppliers',
+      icon: UserPlus,
+      color: '#8b5cf6',
+      gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)'
     }
   ];
 
@@ -79,6 +89,10 @@ const Inventory = () => {
   
   if (activeTab === 'store-product') {
     return <StoreProducts onBack={() => setActiveTab(null)} />;
+  }
+
+  if (activeTab === 'registration') {
+    return <Registration onBack={() => setActiveTab(null)} />;
   }
 
   return (

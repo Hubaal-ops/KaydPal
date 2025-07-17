@@ -1,4 +1,5 @@
 // db.js
+// This file connects ONLY to the Inventory database. Do not use for other databases.
 const { MongoClient } = require('mongodb');
 
 const uri = 'mongodb://127.0.0.1:27017';
@@ -10,7 +11,7 @@ async function connectDB() {
     await client.connect();
     db = client.db('Inventory');
     db.client = client; // Attach client for access to startSession()
-    console.log('✅ MongoDB connected');
+    console.log('\u2705 MongoDB connected to Inventory');
   }
   return db;
 }

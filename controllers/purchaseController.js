@@ -1,4 +1,5 @@
 const connectDB = require('../db');
+const Purchase = require('../models/Purchase');
 
 // 🔧 Fix for getNextSequence function
 async function getNextSequence(name) {
@@ -30,12 +31,16 @@ async function getNextSequence(name) {
 // 🔁 Insert Purchase
 async function insertPurchase(purchase) {
   const db = await connectDB();
-
-  const {
-    product_no, supplier_no, store_no,
-    qty, price, discount = 0, tax = 0,
-    paid = 0, account_id
-  } = purchase;
+  // Convert all IDs to numbers to avoid type mismatch
+  const product_no = Number(purchase.product_no);
+  const supplier_no = Number(purchase.supplier_no);
+  const store_no = Number(purchase.store_no);
+  const account_id = Number(purchase.account_id);
+  const qty = Number(purchase.qty);
+  const price = Number(purchase.price);
+  const discount = Number(purchase.discount || 0);
+  const tax = Number(purchase.tax || 0);
+  const paid = Number(purchase.paid || 0);
 
   if (qty <= 0 || price <= 0) throw new Error('❌ Invalid quantity or price.');
 
@@ -57,7 +62,8 @@ async function insertPurchase(purchase) {
   const sequence = await getNextSequence('purchase_no');
   const purchase_no = `PUR-${String(sequence).padStart(5, '0')}`;
 
-  await db.collection('Purchases').insertOne({
+  // Use Mongoose model to create the purchase
+  await Purchase.create({
     purchase_no, product_no, supplier_no, store_no,
     qty, price, discount, tax,
     amount, paid, account_id,
@@ -99,11 +105,16 @@ async function insertPurchase(purchase) {
   return { message: '✅ Purchase inserted successfully.', purchase_no };
 }
 
-// 🔁 Update Purchase
+// Get all purchases
+async function getAllPurchases() {
+  // Use Mongoose to get all purchases
+  return await Purchase.find().sort({ created_at: -1 });
+}
+
+// Update Purchase
 async function updatePurchase(purchase_no, updated) {
   const db = await connectDB();
-
-  const oldPurchase = await db.collection('Purchases').findOne({purchase_no});
+  const oldPurchase = await Purchase.findOne({ purchase_no });
   if (!oldPurchase) throw new Error('❌ Purchase not found.');
 
   const {
@@ -116,7 +127,7 @@ async function updatePurchase(purchase_no, updated) {
     tax = oldPurchase.tax,
     paid = oldPurchase.paid,
     account_id = oldPurchase.account_id
-  } = { ...oldPurchase, ...updated };
+  } = { ...oldPurchase.toObject(), ...updated };
 
   if (qty <= 0 || price <= 0) throw new Error('❌ Invalid quantity or price.');
 
@@ -149,14 +160,12 @@ async function updatePurchase(purchase_no, updated) {
     )
   ]);
 
-  await db.collection('Purchases').updateOne(
+  await Purchase.findOneAndUpdate(
     { purchase_no },
     {
-      $set: {
-        product_no, supplier_no, store_no, qty, price, discount, tax,
-        amount: newAmount, paid, account_id,
-        updated_at: new Date()
-      }
+      product_no, supplier_no, store_no, qty, price, discount, tax,
+      amount: newAmount, paid, account_id,
+      updated_at: new Date()
     }
   );
 
@@ -187,7 +196,42 @@ async function updatePurchase(purchase_no, updated) {
   return { message: '✅ Purchase updated successfully.' };
 }
 
+// Delete Purchase
+async function deletePurchase(purchase_no) {
+  const db = await connectDB();
+  const oldPurchase = await Purchase.findOne({ purchase_no });
+  if (!oldPurchase) throw new Error('❌ Purchase not found.');
+  const oldAmount = oldPurchase.qty * oldPurchase.price - oldPurchase.discount + oldPurchase.tax;
+  const oldDebt = oldAmount - oldPurchase.paid;
+  await Promise.all([
+    db.collection('Stores_Product').updateOne(
+      { pro_no: oldPurchase.product_no, store_no: oldPurchase.store_no },
+      { $inc: { qty: -oldPurchase.qty }, $set: { updated_at: new Date() } }
+    ),
+    db.collection('Products').updateOne(
+      { product_no: oldPurchase.product_no },
+      { $inc: { storing_balance: -oldPurchase.qty } }
+    ),
+    db.collection('Stores').updateOne(
+      { store_no: oldPurchase.store_no },
+      { $inc: { total_items: -oldPurchase.qty } }
+    ),
+    db.collection('Suppliers').updateOne(
+      { supplier_no: oldPurchase.supplier_no },
+      { $inc: { bal: -oldDebt } }
+    ),
+    db.collection('Accounts').updateOne(
+      { account_id: oldPurchase.account_id },
+      { $inc: { balance: oldPurchase.paid } }
+    )
+  ]);
+  await Purchase.deleteOne({ purchase_no });
+  return { message: '✅ Purchase deleted successfully.' };
+}
+
 module.exports = {
   insertPurchase,
-  updatePurchase
+  getAllPurchases,
+  updatePurchase,
+  deletePurchase
 };

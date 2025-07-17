@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import styles from './Sales.module.css';
 import { Plus, Eye, Edit, Trash2, ArrowLeft, Search } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { getSales, addSale, updateSale, deleteSale } from '../services/salesService';
+import { getProducts } from '../services/productService';
+import { getStores } from '../services/storeService';
+import { getAccounts } from '../services/accountService';
+import { getCustomers } from '../services/customerService';
 
 const Sales = ({ onBack }) => {
-  const navigate = useNavigate();
-  const [viewMode, setViewMode] = useState('table'); // 'table' or 'form'
+  const [viewMode, setViewMode] = useState('table');
   const [sales, setSales] = useState([]);
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -28,100 +31,34 @@ const Sales = ({ onBack }) => {
   const [editingSale, setEditingSale] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  // Remove formStep state and all stepper logic
 
-  // Mock data for demonstration
-  const mockProducts = [
-    { product_no: 1, product_name: 'Macbook Pro 14' },
-    { product_no: 2, product_name: 'Nike Running Shoes' },
-    { product_no: 3, product_name: 'The Great Gatsby' }
-  ];
-  const mockCustomers = [
-    { customer_no: 1, customer_name: 'Alice Smith' },
-    { customer_no: 2, customer_name: 'Bob Johnson' },
-    { customer_no: 3, customer_name: 'Charlie Brown' }
-  ];
-  const mockStores = [
-    { store_no: 1, store_name: 'Main Street Store' },
-    { store_no: 2, store_name: 'Downtown Branch' },
-    { store_no: 3, store_name: 'Mall Location' }
-  ];
-  const mockAccounts = [
-    { account_id: 1, account_name: 'Cash' },
-    { account_id: 2, account_name: 'Bank' },
-    { account_id: 3, account_name: 'Credit Card' }
-  ];
-  const mockSales = [
-    {
-      sel_no: 1,
-      product_no: 1,
-      customer_no: 1,
-      store_no: 1,
-      qty: 2,
-      price: 2000,
-      discount: 100,
-      tax: 50,
-      amount: 3950,
-      paid: 2000,
-      account_id: 1,
-      sel_date: '2024-07-13T10:30:00Z',
-      product_name: 'Macbook Pro 14',
-      customer_name: 'Alice Smith',
-      store_name: 'Main Street Store',
-      account_name: 'Cash'
-    },
-    {
-      sel_no: 2,
-      product_no: 2,
-      customer_no: 2,
-      store_no: 2,
-      qty: 1,
-      price: 120,
-      discount: 0,
-      tax: 10,
-      amount: 130,
-      paid: 130,
-      account_id: 2,
-      sel_date: '2024-07-13T11:00:00Z',
-      product_name: 'Nike Running Shoes',
-      customer_name: 'Bob Johnson',
-      store_name: 'Downtown Branch',
-      account_name: 'Bank'
-    }
-  ];
-
-  // Simulate API calls
-  const fetchSales = async () => {
+  // Fetch all data from backend
+  const fetchAll = async () => {
     setLoading(true);
+    setError('');
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setSales(mockSales);
-    } catch (error) {
-      setError('Error fetching sales');
+      const [salesData, productsData, storesData, accountsData, customersData] = await Promise.all([
+        getSales(),
+        getProducts(),
+        getStores(),
+        getAccounts(),
+        getCustomers()
+      ]);
+      setSales(salesData);
+      setProducts(productsData);
+      setStores(storesData);
+      setAccounts(accountsData);
+      setCustomers(customersData);
+    } catch (err) {
+      setError(err.message || 'Error fetching sales data');
     } finally {
       setLoading(false);
     }
   };
-  const fetchProducts = async () => setProducts(mockProducts);
-  const fetchCustomers = async () => setCustomers(mockCustomers);
-  const fetchStores = async () => setStores(mockStores);
-  const fetchAccounts = async () => setAccounts(mockAccounts);
 
   useEffect(() => {
-    fetchSales();
-    fetchProducts();
-    fetchCustomers();
-    fetchStores();
-    fetchAccounts();
+    fetchAll();
   }, []);
-
-  const handleBackClick = () => {
-    if (onBack) {
-      onBack();
-    } else {
-      navigate('/inventory');
-    }
-  };
 
   const handleViewTable = () => {
     setViewMode('table');
@@ -138,7 +75,6 @@ const Sales = ({ onBack }) => {
       paid: 0,
       account_id: ''
     });
-    // setFormStep(1); // Removed
     setError('');
     setSuccess('');
   };
@@ -158,7 +94,6 @@ const Sales = ({ onBack }) => {
       paid: 0,
       account_id: ''
     });
-    // setFormStep(1); // Removed
     setError('');
     setSuccess('');
   };
@@ -177,20 +112,24 @@ const Sales = ({ onBack }) => {
       paid: sale.paid,
       account_id: sale.account_id
     });
-    // setFormStep(1); // Removed
     setViewMode('form');
     setError('');
     setSuccess('');
   };
 
-  const handleDelete = async (selNo) => {
+  const handleDelete = async (sel_no) => {
     if (window.confirm('Are you sure you want to delete this sale?')) {
+      setError('');
+      setSuccess('');
+      setLoading(true);
       try {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        setSales(prev => prev.filter(sale => sale.sel_no !== selNo));
+        await deleteSale(sel_no);
+        await fetchAll();
         setSuccess('Sale deleted successfully');
-      } catch (error) {
-        setError('Error deleting sale');
+      } catch (err) {
+        setError(err.message || 'Error deleting sale');
+      } finally {
+        setLoading(false);
       }
     }
   };
@@ -199,8 +138,6 @@ const Sales = ({ onBack }) => {
     e.preventDefault();
     setError('');
     setSuccess('');
-
-    // Validation
     if (!formData.product_no || !formData.customer_no || !formData.store_no || !formData.account_id) {
       setError('All dropdowns are required');
       return;
@@ -222,50 +159,16 @@ const Sales = ({ onBack }) => {
       setError('Paid amount cannot exceed total amount');
       return;
     }
-
+    setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      const selectedProduct = products.find(p => p.product_no === parseInt(formData.product_no));
-      const selectedCustomer = customers.find(c => c.customer_no === parseInt(formData.customer_no));
-      const selectedStore = stores.find(s => s.store_no === parseInt(formData.store_no));
-      const selectedAccount = accounts.find(a => a.account_id === parseInt(formData.account_id));
       if (editingSale) {
-        setSales(prev => prev.map(sale =>
-          sale.sel_no === editingSale.sel_no
-            ? {
-                ...sale,
-                ...formData,
-                product_no: parseInt(formData.product_no),
-                customer_no: parseInt(formData.customer_no),
-                store_no: parseInt(formData.store_no),
-                account_id: parseInt(formData.account_id),
-                product_name: selectedProduct.product_name,
-                customer_name: selectedCustomer.customer_name,
-                store_name: selectedStore.store_name,
-                account_name: selectedAccount.account_name,
-                sel_date: sale.sel_date
-              }
-            : sale
-        ));
+        await updateSale(editingSale.sel_no, formData);
         setSuccess('Sale updated successfully');
       } else {
-        const newSelNo = Math.max(0, ...sales.map(s => s.sel_no)) + 1;
-        const newSale = {
-          sel_no: newSelNo,
-          ...formData,
-          product_no: parseInt(formData.product_no),
-          customer_no: parseInt(formData.customer_no),
-          store_no: parseInt(formData.store_no),
-          account_id: parseInt(formData.account_id),
-          product_name: selectedProduct.product_name,
-          customer_name: selectedCustomer.customer_name,
-          store_name: selectedStore.store_name,
-          account_name: selectedAccount.account_name,
-          sel_date: new Date().toISOString()
-        };
-        setSales(prev => [...prev, newSale]);
+        await addSale(formData);
         setSuccess('Sale added successfully');
       }
+      await fetchAll();
       setFormData({
         product_no: '',
         customer_no: '',
@@ -282,8 +185,10 @@ const Sales = ({ onBack }) => {
       setTimeout(() => {
         setViewMode('table');
       }, 1500);
-    } catch (error) {
-      setError('Error saving sale');
+    } catch (err) {
+      setError(err.message || 'Error saving sale');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -291,7 +196,6 @@ const Sales = ({ onBack }) => {
     const { name, value } = e.target;
     setFormData(prev => {
       const updated = { ...prev, [name]: value };
-      // Auto-calculate amount
       if (["qty", "price", "discount", "tax"].includes(name)) {
         const qty = parseInt(updated.qty) || 0;
         const price = parseFloat(updated.price) || 0;
@@ -312,15 +216,14 @@ const Sales = ({ onBack }) => {
   return (
     <div className={styles.sales}>
       <div className={styles['sales-header']}>
-        <button className={styles['back-button']} onClick={handleBackClick}>
+        <button className={styles['back-button']} onClick={onBack}>
           <ArrowLeft size={20} />
-          Back to Inventory
+          Back to Transactions
         </button>
         <h1>Sales Management</h1>
         <p>Manage and record product sales</p>
       </div>
       <div className={styles['sales-content']}>
-        {/* Action Buttons */}
         <div className={styles['action-buttons']}>
           <button
             className={`${styles['action-btn']} ${viewMode === 'table' ? styles.active : ''}`}
@@ -337,10 +240,8 @@ const Sales = ({ onBack }) => {
             Add New Sale
           </button>
         </div>
-        {/* Error and Success Messages */}
         {error && <div className={styles.error}>{error}</div>}
         {success && <div className={styles.success}>{success}</div>}
-        {/* Table View */}
         {viewMode === 'table' && (
           <div className={styles['table-container']}>
             <div className={styles['table-header']}>
@@ -394,7 +295,7 @@ const Sales = ({ onBack }) => {
                         <td>{sale.amount}</td>
                         <td>{sale.paid}</td>
                         <td>{sale.account_name}</td>
-                        <td>{new Date(sale.sel_date).toLocaleDateString()}</td>
+                        <td>{sale.sel_date ? new Date(sale.sel_date).toLocaleDateString() : ''}</td>
                         <td>
                           <div className={styles['action-icons']}>
                             <button
@@ -426,7 +327,6 @@ const Sales = ({ onBack }) => {
             )}
           </div>
         )}
-        {/* Form View */}
         {viewMode === 'form' && (
           <div className={styles['form-container']}>
             <h2>{editingSale ? 'Edit Sale' : 'Add New Sale'}</h2>
@@ -462,7 +362,7 @@ const Sales = ({ onBack }) => {
                   <option value="">Select a customer</option>
                   {customers.map((customer) => (
                     <option key={customer.customer_no} value={customer.customer_no}>
-                      {customer.customer_name}
+                      {customer.name || customer.customer_name}
                     </option>
                   ))}
                 </select>
@@ -574,7 +474,7 @@ const Sales = ({ onBack }) => {
                   <option value="">Select an account</option>
                   {accounts.map((account) => (
                     <option key={account.account_id} value={account.account_id}>
-                      {account.account_name}
+                      {account.name || account.account_name}
                     </option>
                   ))}
                 </select>

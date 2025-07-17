@@ -161,4 +161,4 @@ userSchema.statics.findActiveUsers = function() {
   return this.find({ isActive: true });
 };
 
-module.exports = mongoose.model('User', userSchema, 'Inventory'); 
+module.exports = mongoose.model('Inventory', userSchema); 

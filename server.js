@@ -6,6 +6,9 @@ const rateLimit = require('express-rate-limit');
 const morgan = require('morgan');
 require('dotenv').config({ path: './config.env' });
 
+// Force MongoDB URI to use Inventory database
+process.env.MONGODB_URI = 'mongodb://127.0.0.1:27017/Inventory';
+
 // Import routes
 const authRoutes = require('./routes/auth');
 const protectedRoutes = require('./routes/protected');
@@ -19,6 +22,11 @@ const expenseCategoryRoutes = require('./routes/expenseCategories');
 const expenseRoutes = require('./routes/expenses');
 const employeeRoutes = require('./routes/employees');
 const salaryRoutes = require('./routes/salaries');
+const storeRoutes = require('./routes/stores');
+const salesRoutes = require('./routes/sales');
+const customersRoutes = require('./routes/customers');
+const suppliersRoutes = require('./routes/suppliers');
+const purchasesRoutes = require('./routes/purchases');
 
 const app = express();
 
@@ -102,6 +110,11 @@ app.use('/api/expense-categories', expenseCategoryRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/salaries', salaryRoutes);
+app.use('/api/stores', storeRoutes);
+app.use('/api/sales', salesRoutes);
+app.use('/api/customers', customersRoutes);
+app.use('/api/suppliers', suppliersRoutes);
+app.use('/api/purchases', purchasesRoutes);
 
 // Health check endpoint for tests
 app.get('/api/auth/health', (req, res) => {

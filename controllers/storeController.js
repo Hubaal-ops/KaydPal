@@ -1,30 +1,61 @@
-// controllers/storeController.js
-const connectDB = require('../db');
+const Store = require('../models/Store');
 const getNextSequence = require('../getNextSequence');
 
-async function insertStore(storeData) {
-  const db = await connectDB();
-  const stores = db.collection('Stores');
+// Get all stores
+exports.getAllStores = async (req, res) => {
+  try {
+    const stores = await Store.find();
+    res.json(stores);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch stores' });
+  }
+};
 
-  const nextStoreNo = await getNextSequence('store_no');
+// Get a single store by ID
+exports.getStoreById = async (req, res) => {
+  try {
+    const store = await Store.findById(req.params.id);
+    if (!store) return res.status(404).json({ error: 'Store not found' });
+    res.json(store);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch store' });
+  }
+};
 
-  const storeDoc = {
-    store_no: nextStoreNo,
-    store_name: storeData.store_name,
-    location: storeData.location,
-    manager: storeData.manager,
-    total_items: 0,
-    created_at: new Date()
-  };
+// Create a new store
+exports.createStore = async (req, res) => {
+  try {
+    // Generate next store_no
+    const store_no = await getNextSequence('store_no');
+    const newStore = new Store({
+      ...req.body,
+      store_no
+    });
+    await newStore.save();
+    res.status(201).json(newStore);
+  } catch (err) {
+    res.status(400).json({ error: 'Failed to create store' });
+  }
+};
 
-  await stores.insertOne(storeDoc);
+// Update a store
+exports.updateStore = async (req, res) => {
+  try {
+    const updated = await Store.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!updated) return res.status(404).json({ error: 'Store not found' });
+    res.json(updated);
+  } catch (err) {
+    res.status(400).json({ error: 'Failed to update store' });
+  }
+};
 
-  return {
-    message: '✅ Store inserted successfully.',
-    store_no: nextStoreNo
-  };
-}
-
-module.exports = {
-  insertStore
+// Delete a store
+exports.deleteStore = async (req, res) => {
+  try {
+    const deleted = await Store.findByIdAndDelete(req.params.id);
+    if (!deleted) return res.status(404).json({ error: 'Store not found' });
+    res.json({ message: 'Store deleted' });
+  } catch (err) {
+    res.status(400).json({ error: 'Failed to delete store' });
+  }
 };
