@@ -1,6 +1,11 @@
 const mongoose = require('mongoose');
 
 const depositSchema = new mongoose.Schema({
+  deposit_id: {
+    type: Number,
+    unique: true,
+    required: true
+  },
   account: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Account',

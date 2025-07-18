@@ -212,6 +212,7 @@ const Deposit = ({ onBack }) => {
                 <table className={styles.table}>
                   <thead>
                     <tr>
+                      <th>ID</th>
                       <th>Account Name</th>
                       <th>Bank</th>
                       <th>Amount</th>
@@ -222,6 +223,7 @@ const Deposit = ({ onBack }) => {
                   <tbody>
                     {filteredDeposits.map((deposit) => (
                       <tr key={deposit._id}>
+                        <td>{deposit.deposit_id}</td>
                         <td>{deposit.account?.name || ''}</td>
                         <td>{deposit.account?.bank || ''}</td>
                         <td>{deposit.amount}</td>

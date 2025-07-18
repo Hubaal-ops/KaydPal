@@ -1,5 +1,6 @@
 const Transfer = require('../models/Transfer');
 const Account = require('../models/Account');
+const getNextSequence = require('../getNextSequence');
 
 // Get all transfers
 exports.getAllTransfers = async (req, res) => {
@@ -36,7 +37,11 @@ exports.createTransfer = async (req, res) => {
     const toAcc = await Account.findById(to_account);
     if (!fromAcc || !toAcc) return res.status(404).json({ error: 'One or both accounts do not exist' });
     if (fromAcc.balance < amount) return res.status(400).json({ error: 'Insufficient balance in source account' });
-    const transfer = new Transfer({ from_account, to_account, amount, description });
+    const transfer_id = await getNextSequence('transfer_id');
+    if (!transfer_id) {
+      return res.status(500).json({ error: 'Failed to generate transfer ID' });
+    }
+    const transfer = new Transfer({ transfer_id, from_account, to_account, amount, description });
     await transfer.save();
     // Update balances
     fromAcc.balance -= amount;

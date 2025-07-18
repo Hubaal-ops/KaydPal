@@ -1,5 +1,6 @@
 const Withdrawal = require('../models/Withdrawal');
 const Account = require('../models/Account');
+const getNextSequence = require('../getNextSequence');
 
 // Get all withdrawals
 exports.getAllWithdrawals = async (req, res) => {
@@ -30,7 +31,11 @@ exports.createWithdrawal = async (req, res) => {
     const accountDoc = await Account.findById(account);
     if (!accountDoc) return res.status(404).json({ error: 'Account does not exist' });
     if (accountDoc.balance < amount) return res.status(400).json({ error: 'Insufficient account balance' });
-    const withdrawal = new Withdrawal({ account, amount });
+    const withdrawal_id = await getNextSequence('withdrawal_id');
+    if (!withdrawal_id) {
+      return res.status(500).json({ error: 'Failed to generate withdrawal ID' });
+    }
+    const withdrawal = new Withdrawal({ withdrawal_id, account, amount });
     await withdrawal.save();
     // Update account balance
     accountDoc.balance -= amount;

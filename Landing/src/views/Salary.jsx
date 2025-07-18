@@ -226,6 +226,7 @@ const Salary = ({ onBack }) => {
                 <table className={styles.table}>
                   <thead>
                     <tr>
+                      <th>ID</th>
                       <th>Employee</th>
                       <th>Account</th>
                       <th>Bank</th>
@@ -238,6 +239,7 @@ const Salary = ({ onBack }) => {
                   <tbody>
                     {filteredSalaries.map(sal => (
                       <tr key={sal._id}>
+                        <td>{sal.salary_id}</td>
                         <td>{sal.employee?.name || ''}</td>
                         <td>{sal.account?.name || ''}</td>
                         <td>{sal.account?.bank || ''}</td>

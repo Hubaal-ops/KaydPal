@@ -12,7 +12,8 @@ const Customer = ({ onBack }) => {
     name: '',
     email: '',
     phone: '',
-    address: ''
+    address: '',
+    bal: 0
   });
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [error, setError] = useState('');
@@ -38,7 +39,7 @@ const Customer = ({ onBack }) => {
   const handleViewTable = () => {
     setViewMode('table');
     setEditingCustomer(null);
-    setFormData({ name: '', email: '', phone: '', address: '' });
+    setFormData({ name: '', email: '', phone: '', address: '', bal: 0 });
     setError('');
     setSuccess('');
   };
@@ -46,7 +47,7 @@ const Customer = ({ onBack }) => {
   const handleAddNew = () => {
     setViewMode('form');
     setEditingCustomer(null);
-    setFormData({ name: '', email: '', phone: '', address: '' });
+    setFormData({ name: '', email: '', phone: '', address: '', bal: 0 });
     setError('');
     setSuccess('');
   };
@@ -57,7 +58,8 @@ const Customer = ({ onBack }) => {
       name: customer.name || '',
       email: customer.email || '',
       phone: customer.phone || '',
-      address: customer.address || ''
+      address: customer.address || '',
+      bal: customer.bal || 0
     });
     setViewMode('form');
     setError('');
@@ -99,7 +101,7 @@ const Customer = ({ onBack }) => {
         setSuccess('Customer added successfully');
       }
       await fetchCustomers();
-      setFormData({ name: '', email: '', phone: '', address: '' });
+      setFormData({ name: '', email: '', phone: '', address: '', bal: 0 });
       setEditingCustomer(null);
       setTimeout(() => {
         setViewMode('table');
@@ -181,6 +183,7 @@ const Customer = ({ onBack }) => {
                       <th>Email</th>
                       <th>Phone</th>
                       <th>Address</th>
+                      <th>Balance</th>
                       <th>Date</th>
                       <th>Actions</th>
                     </tr>
@@ -193,6 +196,7 @@ const Customer = ({ onBack }) => {
                         <td>{customer.email}</td>
                         <td>{customer.phone}</td>
                         <td>{customer.address}</td>
+                        <td>{customer.bal}</td>
                         <td>{customer.created_at ? new Date(customer.created_at).toLocaleDateString() : ''}</td>
                         <td>
                           <div className={styles['action-icons']}>
@@ -270,6 +274,17 @@ const Customer = ({ onBack }) => {
                   name="address"
                   value={formData.address}
                   onChange={handleInputChange}
+                  className={styles['form-input']}
+                />
+              </div>
+              <div className={styles['form-group']}>
+                <label>Balance</label>
+                <input
+                  type="number"
+                  name="bal"
+                  value={formData.bal !== undefined ? formData.bal : ''}
+                  onChange={e => setFormData(prev => ({ ...prev, bal: Number(e.target.value) }))}
+                  min="0"
                   className={styles['form-input']}
                 />
               </div>

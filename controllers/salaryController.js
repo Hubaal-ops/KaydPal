@@ -1,6 +1,7 @@
 const Salary = require('../models/Salary');
 const Account = require('../models/Account');
 const Employee = require('../models/Employee');
+const getNextSequence = require('../getNextSequence');
 
 // Get all salaries
 exports.getAllSalaries = async (req, res) => {
@@ -37,7 +38,11 @@ exports.createSalary = async (req, res) => {
     const employeeDoc = await Employee.findById(employee);
     if (!employeeDoc) return res.status(404).json({ error: 'Employee does not exist' });
     if (accountDoc.balance < amount) return res.status(400).json({ error: 'Insufficient account balance' });
-    const salary = new Salary({ employee, account, amount, pay_date, description });
+    const salary_id = await getNextSequence('salary_id');
+    if (!salary_id) {
+      return res.status(500).json({ error: 'Failed to generate salary ID' });
+    }
+    const salary = new Salary({ salary_id, employee, account, amount, pay_date, description });
     await salary.save();
     // Update account balance
     accountDoc.balance -= amount;

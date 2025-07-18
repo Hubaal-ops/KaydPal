@@ -1,6 +1,7 @@
 const Expense = require('../models/Expense');
 const Account = require('../models/Account');
 const ExpenseCategory = require('../models/ExpenseCategory');
+const getNextSequence = require('../getNextSequence');
 
 // Get all expenses
 exports.getAllExpenses = async (req, res) => {
@@ -37,7 +38,11 @@ exports.createExpense = async (req, res) => {
     const categoryDoc = await ExpenseCategory.findById(category);
     if (!categoryDoc) return res.status(404).json({ error: 'Category does not exist' });
     if (accountDoc.balance < amount) return res.status(400).json({ error: 'Insufficient account balance' });
-    const expense = new Expense({ category, account, amount, description, expense_date });
+    const expense_id = await getNextSequence('expense_id');
+    if (!expense_id) {
+      return res.status(500).json({ error: 'Failed to generate expense ID' });
+    }
+    const expense = new Expense({ expense_id, category, account, amount, description, expense_date });
     await expense.save();
     // Update account balance
     accountDoc.balance -= amount;

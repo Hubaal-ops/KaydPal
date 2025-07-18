@@ -59,12 +59,16 @@ async function insertPurchase(purchase) {
   const amount = qty * price - discount + tax;
   if (paid > amount) throw new Error('❌ Paid amount exceeds total.');
 
+  // Get next numeric purchase_id
+  const purchase_id = await getNextSequence('purchase_id');
+  if (!purchase_id) throw new Error('❌ Failed to get a valid purchase ID.');
+  // Keep purchase_no for display
   const sequence = await getNextSequence('purchase_no');
   const purchase_no = `PUR-${String(sequence).padStart(5, '0')}`;
 
   // Use Mongoose model to create the purchase
   await Purchase.create({
-    purchase_no, product_no, supplier_no, store_no,
+    purchase_id, purchase_no, product_no, supplier_no, store_no,
     qty, price, discount, tax,
     amount, paid, account_id,
     created_at: new Date()

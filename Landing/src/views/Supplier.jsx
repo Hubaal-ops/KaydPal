@@ -11,7 +11,8 @@ const Supplier = ({ onBack }) => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    phone: ''
+    phone: '',
+    balance: 0
   });
   const [editingSupplier, setEditingSupplier] = useState(null);
   const [error, setError] = useState('');
@@ -37,7 +38,7 @@ const Supplier = ({ onBack }) => {
   const handleViewTable = () => {
     setViewMode('table');
     setEditingSupplier(null);
-    setFormData({ name: '', email: '', phone: '' });
+    setFormData({ name: '', email: '', phone: '', balance: 0 });
     setError('');
     setSuccess('');
   };
@@ -45,7 +46,7 @@ const Supplier = ({ onBack }) => {
   const handleAddNew = () => {
     setViewMode('form');
     setEditingSupplier(null);
-    setFormData({ name: '', email: '', phone: '' });
+    setFormData({ name: '', email: '', phone: '', balance: 0 });
     setError('');
     setSuccess('');
   };
@@ -55,7 +56,8 @@ const Supplier = ({ onBack }) => {
     setFormData({
       name: supplier.name || '',
       email: supplier.email || '',
-      phone: supplier.phone || ''
+      phone: supplier.phone || '',
+      balance: supplier.balance || 0
     });
     setViewMode('form');
     setError('');
@@ -97,7 +99,7 @@ const Supplier = ({ onBack }) => {
         setSuccess('Supplier added successfully');
       }
       await fetchSuppliers();
-      setFormData({ name: '', email: '', phone: '' });
+      setFormData({ name: '', email: '', phone: '', balance: 0 });
       setEditingSupplier(null);
       setTimeout(() => {
         setViewMode('table');
@@ -256,6 +258,17 @@ const Supplier = ({ onBack }) => {
                   name="phone"
                   value={formData.phone}
                   onChange={handleInputChange}
+                  className={styles['form-input']}
+                />
+              </div>
+              <div className={styles['form-group']}>
+                <label>Balance</label>
+                <input
+                  type="number"
+                  name="balance"
+                  value={formData.balance !== undefined ? formData.balance : ''}
+                  onChange={e => setFormData(prev => ({ ...prev, balance: Number(e.target.value) }))}
+                  min="0"
                   className={styles['form-input']}
                 />
               </div>

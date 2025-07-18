@@ -1,6 +1,11 @@
 const mongoose = require('mongoose');
 
 const transferSchema = new mongoose.Schema({
+  transfer_id: {
+    type: Number,
+    unique: true,
+    required: true
+  },
   from_account: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Account',

@@ -12,7 +12,7 @@ async function insertSupplier(supplierData) {
     name: supplierData.name,
     email: supplierData.email,
     phone: supplierData.phone,
-    balance: 0,
+    balance: typeof supplierData.balance === 'number' ? supplierData.balance : 0,
     created_at: new Date()
   };
   await Supplier.create(newSupplier);
@@ -27,13 +27,17 @@ async function getAllSuppliers() {
 }
 
 async function updateSupplier(supplier_no, updateData) {
+  const updateFields = {
+    name: updateData.name,
+    email: updateData.email,
+    phone: updateData.phone
+  };
+  if (typeof updateData.balance === 'number') {
+    updateFields.balance = updateData.balance;
+  }
   const result = await Supplier.findOneAndUpdate(
     { supplier_no: Number(supplier_no) },
-    {
-      name: updateData.name,
-      email: updateData.email,
-      phone: updateData.phone
-    },
+    updateFields,
     { new: true }
   );
   if (!result) {

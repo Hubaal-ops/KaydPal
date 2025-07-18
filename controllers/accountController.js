@@ -1,4 +1,5 @@
 const Account = require('../models/Account');
+const getNextSequence = require('../getNextSequence');
 
 // Get all accounts
 exports.getAllAccounts = async (req, res) => {
@@ -13,7 +14,7 @@ exports.getAllAccounts = async (req, res) => {
 // Get account by ID
 exports.getAccountById = async (req, res) => {
   try {
-    const account = await Account.findById(req.params.id);
+    const account = await Account.findOne({ account_id: Number(req.params.id) });
     if (!account) return res.status(404).json({ error: 'Account not found' });
     res.json(account);
   } catch (err) {
@@ -25,7 +26,11 @@ exports.getAccountById = async (req, res) => {
 exports.createAccount = async (req, res) => {
   try {
     const { name, bank, balance } = req.body;
-    const newAccount = new Account({ name, bank, balance });
+    const account_id = await getNextSequence('account_id');
+    if (!account_id) {
+      return res.status(500).json({ error: 'Failed to generate account ID' });
+    }
+    const newAccount = new Account({ account_id, name, bank, balance });
     const savedAccount = await newAccount.save();
     res.status(201).json(savedAccount);
   } catch (err) {
@@ -37,8 +42,8 @@ exports.createAccount = async (req, res) => {
 exports.updateAccount = async (req, res) => {
   try {
     const { name, bank, balance } = req.body;
-    const updatedAccount = await Account.findByIdAndUpdate(
-      req.params.id,
+    const updatedAccount = await Account.findOneAndUpdate(
+      { account_id: Number(req.params.id) },
       { name, bank, balance },
       { new: true, runValidators: true }
     );
@@ -52,7 +57,7 @@ exports.updateAccount = async (req, res) => {
 // Delete account
 exports.deleteAccount = async (req, res) => {
   try {
-    const deletedAccount = await Account.findByIdAndDelete(req.params.id);
+    const deletedAccount = await Account.findOneAndDelete({ account_id: Number(req.params.id) });
     if (!deletedAccount) return res.status(404).json({ error: 'Account not found' });
     res.json({ message: 'Account deleted' });
   } catch (err) {

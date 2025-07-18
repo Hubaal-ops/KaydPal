@@ -1,4 +1,5 @@
 const Employee = require('../models/Employee');
+const getNextSequence = require('../getNextSequence');
 
 // Get all employees
 exports.getAllEmployees = async (req, res) => {
@@ -13,7 +14,7 @@ exports.getAllEmployees = async (req, res) => {
 // Get employee by ID
 exports.getEmployeeById = async (req, res) => {
   try {
-    const employee = await Employee.findById(req.params.id);
+    const employee = await Employee.findOne({ employee_id: Number(req.params.id) });
     if (!employee) return res.status(404).json({ error: 'Employee not found' });
     res.json(employee);
   } catch (err) {
@@ -25,7 +26,11 @@ exports.getEmployeeById = async (req, res) => {
 exports.createEmployee = async (req, res) => {
   try {
     const { name, position, store, contact, date_hired } = req.body;
-    const newEmployee = new Employee({ name, position, store, contact, date_hired });
+    const employee_id = await getNextSequence('employee_id');
+    if (!employee_id) {
+      return res.status(500).json({ error: 'Failed to generate employee ID' });
+    }
+    const newEmployee = new Employee({ employee_id, name, position, store, contact, date_hired });
     const savedEmployee = await newEmployee.save();
     res.status(201).json(savedEmployee);
   } catch (err) {
@@ -37,8 +42,8 @@ exports.createEmployee = async (req, res) => {
 exports.updateEmployee = async (req, res) => {
   try {
     const { name, position, store, contact, date_hired } = req.body;
-    const updatedEmployee = await Employee.findByIdAndUpdate(
-      req.params.id,
+    const updatedEmployee = await Employee.findOneAndUpdate(
+      { employee_id: Number(req.params.id) },
       { name, position, store, contact, date_hired },
       { new: true, runValidators: true }
     );
@@ -52,7 +57,7 @@ exports.updateEmployee = async (req, res) => {
 // Delete employee
 exports.deleteEmployee = async (req, res) => {
   try {
-    const deletedEmployee = await Employee.findByIdAndDelete(req.params.id);
+    const deletedEmployee = await Employee.findOneAndDelete({ employee_id: Number(req.params.id) });
     if (!deletedEmployee) return res.status(404).json({ error: 'Employee not found' });
     res.json({ message: 'Employee deleted' });
   } catch (err) {

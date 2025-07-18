@@ -222,6 +222,7 @@ const Transfer = ({ onBack }) => {
                 <table className={styles.table}>
                   <thead>
                     <tr>
+                      <th>ID</th>
                       <th>From Account</th>
                       <th>From Bank</th>
                       <th>To Account</th>
@@ -235,6 +236,7 @@ const Transfer = ({ onBack }) => {
                   <tbody>
                     {filteredTransfers.map((transfer) => (
                       <tr key={transfer._id}>
+                        <td>{transfer.transfer_id}</td>
                         <td>{transfer.from_account?.name || ''}</td>
                         <td>{transfer.from_account?.bank || ''}</td>
                         <td>{transfer.to_account?.name || ''}</td>
