@@ -13,24 +13,26 @@ export async function getAccountById(id) {
 }
 
 export async function createAccount(account) {
-  // Only send name, bank, balance
-  const { name, bank, balance } = account;
+  // Send name, bank, balance, and account_id if present
+  const { name, bank, balance, account_id } = account;
+  const body = account_id !== undefined ? { name, bank, balance, account_id } : { name, bank, balance };
   const res = await fetch(API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, bank, balance })
+    body: JSON.stringify(body)
   });
   if (!res.ok) throw new Error('Failed to create account');
   return res.json();
 }
 
 export async function updateAccount(id, account) {
-  // Only send name, bank, balance
-  const { name, bank, balance } = account;
+  // Send name, bank, balance, and account_id if present
+  const { name, bank, balance, account_id } = account;
+  const body = account_id !== undefined ? { name, bank, balance, account_id } : { name, bank, balance };
   const res = await fetch(`${API_URL}/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, bank, balance })
+    body: JSON.stringify(body)
   });
   if (!res.ok) throw new Error('Failed to update account');
   return res.json();

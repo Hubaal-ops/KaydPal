@@ -1,4 +1,5 @@
 const Account = require('../models/Account');
+const getNextSequence = require('../getNextSequence');
 
 // Get all accounts
 exports.getAllAccounts = async (req, res) => {
@@ -25,7 +26,8 @@ exports.getAccountById = async (req, res) => {
 exports.createAccount = async (req, res) => {
   try {
     const { name, bank, balance } = req.body;
-    const newAccount = new Account({ name, bank, balance });
+    const account_id = await getNextSequence('account_id');
+    const newAccount = new Account({ account_id, name, bank, balance });
     const savedAccount = await newAccount.save();
     res.status(201).json(savedAccount);
   } catch (err) {
@@ -36,10 +38,12 @@ exports.createAccount = async (req, res) => {
 // Update account
 exports.updateAccount = async (req, res) => {
   try {
-    const { name, bank, balance } = req.body;
+    const { name, bank, balance, account_id } = req.body;
+    const updateFields = { name, bank, balance };
+    if (account_id !== undefined) updateFields.account_id = account_id;
     const updatedAccount = await Account.findByIdAndUpdate(
       req.params.id,
-      { name, bank, balance },
+      updateFields,
       { new: true, runValidators: true }
     );
     if (!updatedAccount) return res.status(404).json({ error: 'Account not found' });

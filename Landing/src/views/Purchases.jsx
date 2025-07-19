@@ -142,11 +142,6 @@ const Purchases = ({ onBack }) => {
     e.preventDefault();
     setError('');
     setSuccess('');
-    console.log('Store dropdown value:', formData.store_no, typeof formData.store_no);
-    if (!formData.product_no || !formData.supplier_no || !formData.store_no || !formData.account_id) {
-      setError('All dropdowns are required');
-      return;
-    }
     if (isNaN(Number(formData.store_no))) {
       setError('Store is required');
       return;
@@ -159,25 +154,23 @@ const Purchases = ({ onBack }) => {
       setError('Price must be greater than 0');
       return;
     }
+    // Always recalculate amount before submit
     const calcAmount = formData.qty * formData.price - (formData.discount || 0) + (formData.tax || 0);
-    if (formData.amount !== calcAmount) {
-      setError('Amount does not match calculation');
-      return;
-    }
-    if (formData.paid > formData.amount) {
-      setError('Paid amount cannot exceed total amount');
-      return;
-    }
-    setLoading(true);
-    // Convert all IDs to numbers before sending
+    // Remove the strict check: if (formData.amount !== calcAmount) { ... }
+    // Instead, always use the calculated amount
     const payload = {
       ...formData,
+      amount: calcAmount,
       product_no: Number(formData.product_no),
       supplier_no: Number(formData.supplier_no),
       store_no: Number(formData.store_no),
       account_id: Number(formData.account_id)
     };
-    console.log('Submitting purchase payload:', payload);
+    if (formData.paid > calcAmount) {
+      setError('Paid amount cannot exceed total amount');
+      return;
+    }
+    setLoading(true);
     try {
       if (editingPurchase) {
         await updatePurchase(editingPurchase.purchase_no, payload);
