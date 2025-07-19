@@ -29,6 +29,7 @@ const suppliersRoutes = require('./routes/suppliers');
 const purchasesRoutes = require('./routes/purchases');
 const paymentsRoutes = require('./routes/payments');
 const paymentOutsRoutes = require('./routes/paymentouts');
+const stockAdjustmentsRoute = require('./routes/stockAdjustments');
 
 const app = express();
 
@@ -119,6 +120,7 @@ app.use('/api/suppliers', suppliersRoutes);
 app.use('/api/purchases', purchasesRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/paymentouts', paymentOutsRoutes);
+app.use('/api/stock-adjustments', stockAdjustmentsRoute);
 
 // Health check endpoint for tests
 app.get('/api/auth/health', (req, res) => {

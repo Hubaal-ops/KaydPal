@@ -141,4 +141,10 @@ async function insertStockAdjustment(adjustmentData) {
   }
 }
 
-module.exports = { insertStockAdjustment }; 
+async function getAllStockAdjustments() {
+  const db = await connectDB();
+  const adjustments = await db.collection('Stock_Adjustments').find({}).sort({ created_at: -1 }).toArray();
+  return adjustments;
+}
+
+module.exports = { insertStockAdjustment, getAllStockAdjustments }; 

@@ -1,35 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styles from './Stores.module.css';
 import { Plus, Eye, Edit, Trash2, ArrowLeft, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { getAllStockAdjustments, addStockAdjustment } from '../services/stockAdjustmentService';
+import { getProducts } from '../services/productService';
+import { getStores } from '../services/storeService';
 
 const StockAdjustment = ({ onBack }) => {
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState('table');
-  const [adjustments, setAdjustments] = useState([
-    {
-      adj_no: 1,
-      product: 'Product A',
-      store: 'Main Street Store',
-      qty: 10,
-      adj_type: 'add',
-      adj_desc: 'Initial stock',
-      created_at: '2024-06-01T10:00:00Z'
-    },
-    {
-      adj_no: 2,
-      product: 'Product B',
-      store: 'Downtown Branch',
-      qty: 5,
-      adj_type: 'subtract',
-      adj_desc: 'Damaged items',
-      created_at: '2024-06-02T12:30:00Z'
-    }
-  ]);
+  const [adjustments, setAdjustments] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [stores, setStores] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
-    product: '',
-    store: '',
+    pro_no: '',
+    store_no: '',
     qty: '',
     adj_type: 'add',
     adj_desc: ''
@@ -37,6 +23,29 @@ const StockAdjustment = ({ onBack }) => {
   const [editingAdjustment, setEditingAdjustment] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const [prods, strs, adjs] = await Promise.all([
+          getProducts(),
+          getStores(),
+          getAllStockAdjustments()
+        ]);
+        setProducts(prods);
+        setStores(Array.isArray(strs) ? strs : (strs.data || []));
+        setAdjustments(adjs);
+      } catch (err) {
+        setError('Error loading data');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
 
   const handleBackClick = () => {
     if (onBack) {
@@ -49,7 +58,7 @@ const StockAdjustment = ({ onBack }) => {
   const handleViewTable = () => {
     setViewMode('table');
     setEditingAdjustment(null);
-    setFormData({ product: '', store: '', qty: '', adj_type: 'add', adj_desc: '' });
+    setFormData({ pro_no: '', store_no: '', qty: '', adj_type: 'add', adj_desc: '' });
     setError('');
     setSuccess('');
   };
@@ -57,7 +66,7 @@ const StockAdjustment = ({ onBack }) => {
   const handleAddNew = () => {
     setViewMode('form');
     setEditingAdjustment(null);
-    setFormData({ product: '', store: '', qty: '', adj_type: 'add', adj_desc: '' });
+    setFormData({ pro_no: '', store_no: '', qty: '', adj_type: 'add', adj_desc: '' });
     setError('');
     setSuccess('');
   };
@@ -65,8 +74,8 @@ const StockAdjustment = ({ onBack }) => {
   const handleEdit = (adj) => {
     setEditingAdjustment(adj);
     setFormData({
-      product: adj.product,
-      store: adj.store,
+      pro_no: adj.pro_no,
+      store_no: adj.store_no,
       qty: adj.qty,
       adj_type: adj.adj_type,
       adj_desc: adj.adj_desc
@@ -76,38 +85,47 @@ const StockAdjustment = ({ onBack }) => {
     setSuccess('');
   };
 
+  // No backend delete yet, just UI
   const handleDelete = (adj_no) => {
     if (window.confirm('Are you sure you want to delete this adjustment?')) {
       setAdjustments(prev => prev.filter(adj => adj.adj_no !== adj_no));
-      setSuccess('Adjustment deleted successfully');
+      setSuccess('Adjustment deleted successfully (UI only)');
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
-    if (!formData.product.trim() || !formData.store.trim() || !formData.qty) {
+    if (!formData.pro_no || !formData.store_no || !formData.qty) {
       setError('All fields are required');
       return;
     }
-    if (editingAdjustment) {
-      setAdjustments(prev => prev.map(adj =>
-        adj.adj_no === editingAdjustment.adj_no ? { ...adj, ...formData } : adj
-      ));
-      setSuccess('Adjustment updated successfully');
-    } else {
-      const newAdj = {
-        adj_no: Math.max(...adjustments.map(a => a.adj_no), 0) + 1,
-        ...formData,
-        created_at: new Date().toISOString()
-      };
-      setAdjustments(prev => [...prev, newAdj]);
-      setSuccess('Adjustment added successfully');
+    if (Number(formData.qty) <= 0) {
+      setError('Quantity must be greater than 0');
+      return;
     }
-    setFormData({ product: '', store: '', qty: '', adj_type: 'add', adj_desc: '' });
-    setEditingAdjustment(null);
-    setTimeout(() => setViewMode('table'), 1500);
+    setLoading(true);
+    try {
+      await addStockAdjustment({
+        pro_no: Number(formData.pro_no),
+        store_no: Number(formData.store_no),
+        qty: Number(formData.qty),
+        adj_type: formData.adj_type,
+        adj_desc: formData.adj_desc
+      });
+      setSuccess('Adjustment added successfully');
+      // Refresh adjustments
+      const adjs = await getAllStockAdjustments();
+      setAdjustments(adjs);
+      setFormData({ pro_no: '', store_no: '', qty: '', adj_type: 'add', adj_desc: '' });
+      setEditingAdjustment(null);
+      setTimeout(() => setViewMode('table'), 1500);
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || 'Error adding adjustment');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleInputChange = (e) => {
@@ -115,11 +133,21 @@ const StockAdjustment = ({ onBack }) => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // Map product/store numbers to names for display
+  const getProductName = (pro_no) => {
+    const prod = products.find(p => p.product_no === pro_no);
+    return prod ? prod.product_name : pro_no;
+  };
+  const getStoreName = (store_no) => {
+    const store = stores.find(s => s.store_no === store_no);
+    return store ? store.store_name : store_no;
+  };
+
   const filteredAdjustments = adjustments.filter(adj =>
-    adj.product.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    adj.store.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    adj.adj_type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    adj.adj_desc.toLowerCase().includes(searchTerm.toLowerCase())
+    getProductName(adj.pro_no).toLowerCase().includes(searchTerm.toLowerCase()) ||
+    getStoreName(adj.store_no).toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (adj.adj_type || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (adj.adj_desc || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -145,7 +173,8 @@ const StockAdjustment = ({ onBack }) => {
         </div>
         {error && <div className={styles.error}>{error}</div>}
         {success && <div className={styles.success}>{success}</div>}
-        {viewMode === 'table' && (
+        {loading && <div className={styles.loading}>Loading...</div>}
+        {viewMode === 'table' && !loading && (
           <div className={styles['table-container']}>
             <div className={styles['table-header']}>
               <div className={styles['search-container']}>
@@ -180,8 +209,8 @@ const StockAdjustment = ({ onBack }) => {
                   {filteredAdjustments.map(adj => (
                     <tr key={adj.adj_no}>
                       <td>{adj.adj_no}</td>
-                      <td>{adj.product}</td>
-                      <td>{adj.store}</td>
+                      <td>{getProductName(adj.pro_no)}</td>
+                      <td>{getStoreName(adj.store_no)}</td>
                       <td>{adj.qty}</td>
                       <td>{adj.adj_type}</td>
                       <td>{adj.adj_desc}</td>
@@ -208,35 +237,41 @@ const StockAdjustment = ({ onBack }) => {
             </div>
           </div>
         )}
-        {viewMode === 'form' && (
+        {viewMode === 'form' && !loading && (
           <div className={styles['form-container']}>
             <h2>{editingAdjustment ? 'Edit Adjustment' : 'Add New Adjustment'}</h2>
             <form onSubmit={handleSubmit} className={styles.form}>
               <div className={styles['form-group']}>
-                <label htmlFor="product">Product *</label>
-                <input
-                  type="text"
-                  id="product"
-                  name="product"
-                  value={formData.product}
+                <label htmlFor="pro_no">Product *</label>
+                <select
+                  id="pro_no"
+                  name="pro_no"
+                  value={formData.pro_no}
                   onChange={handleInputChange}
-                  placeholder="Enter product name"
+                  className={styles['form-select']}
                   required
-                  className={styles['form-input']}
-                />
+                >
+                  <option value="">Select a product</option>
+                  {products.map(p => (
+                    <option key={p.product_no} value={p.product_no}>{p.product_name}</option>
+                  ))}
+                </select>
               </div>
               <div className={styles['form-group']}>
-                <label htmlFor="store">Store *</label>
-                <input
-                  type="text"
-                  id="store"
-                  name="store"
-                  value={formData.store}
+                <label htmlFor="store_no">Store *</label>
+                <select
+                  id="store_no"
+                  name="store_no"
+                  value={formData.store_no}
                   onChange={handleInputChange}
-                  placeholder="Enter store name"
+                  className={styles['form-select']}
                   required
-                  className={styles['form-input']}
-                />
+                >
+                  <option value="">Select a store</option>
+                  {stores.map(s => (
+                    <option key={s.store_no} value={s.store_no}>{s.store_name}</option>
+                  ))}
+                </select>
               </div>
               <div className={styles['form-group']}>
                 <label htmlFor="qty">Quantity *</label>
@@ -259,7 +294,7 @@ const StockAdjustment = ({ onBack }) => {
                   name="adj_type"
                   value={formData.adj_type}
                   onChange={handleInputChange}
-                  className={styles['form-input']}
+                  className={styles['form-select']}
                   required
                 >
                   <option value="add">Add</option>
