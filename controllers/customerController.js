@@ -13,7 +13,7 @@ async function insertCustomer(customerData) {
     email: customerData.email,
     phone: customerData.phone,
     address: customerData.address,
-    bal: 0, // Initialize balance to 0
+    bal: typeof customerData.bal === 'number' ? customerData.bal : 0,
     created_at: new Date()
   };
   await Customer.create(newCustomer);
@@ -45,14 +45,18 @@ async function getAllCustomers() {
 }
 
 async function updateCustomer(customer_no, updateData) {
+  const updateFields = {
+    name: updateData.name,
+    email: updateData.email,
+    phone: updateData.phone,
+    address: updateData.address
+  };
+  if (typeof updateData.bal === 'number') {
+    updateFields.bal = updateData.bal;
+  }
   const result = await Customer.findOneAndUpdate(
     { customer_no: Number(customer_no) },
-    {
-      name: updateData.name,
-      email: updateData.email,
-      phone: updateData.phone,
-      address: updateData.address
-    },
+    updateFields,
     { new: true }
   );
   if (!result) {

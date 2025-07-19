@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import styles from './payment_in.module.css';
 import { Plus, Eye, Edit, Trash2, ArrowLeft, Search } from 'lucide-react';
+import { getPayments, getPaymentById, createPayment, updatePayment, deletePayment } from '../services/paymentService';
+import { getCustomers } from '../services/customerService';
+import { getAccounts } from '../services/accountService';
 
 const PaymentIn = ({ onBack }) => {
-  const [viewMode, setViewMode] = useState('table'); // 'table' or 'form'
+  const [viewMode, setViewMode] = useState('table');
   const [payments, setPayments] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [accounts, setAccounts] = useState([]);
@@ -12,25 +15,29 @@ const PaymentIn = ({ onBack }) => {
   const [search, setSearch] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  // Mock data
-  const mockCustomers = [
-    { customer_no: 1, customer_name: 'Alice Smith' },
-    { customer_no: 2, customer_name: 'Bob Johnson' }
-  ];
-  const mockAccounts = [
-    { account_id: 1, account_name: 'Cash' },
-    { account_id: 2, account_name: 'Bank' }
-  ];
-  const mockPayments = [
-    { id: 1, customer_id: 1, account_id: 1, amount: 500, created_at: '2024-07-13T10:30:00Z', customer_name: 'Alice Smith', account_name: 'Cash' },
-    { id: 2, customer_id: 2, account_id: 2, amount: 300, created_at: '2024-07-13T11:00:00Z', customer_name: 'Bob Johnson', account_name: 'Bank' }
-  ];
-
+  // Fetch customers and accounts on mount
   useEffect(() => {
-    setCustomers(mockCustomers);
-    setAccounts(mockAccounts);
-    setPayments(mockPayments);
+    const fetchData = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const [cust, acc, pays] = await Promise.all([
+          getCustomers(),
+          getAccounts(),
+          getPayments()
+        ]);
+        setCustomers(cust);
+        setAccounts(acc);
+        setPayments(pays);
+      } catch (err) {
+        setError('Error loading data');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
   }, []);
 
   const handleViewTable = () => {
@@ -57,12 +64,21 @@ const PaymentIn = ({ onBack }) => {
     setSuccess('');
   };
 
-  const handleDelete = (id) => {
-    setPayments(prev => prev.filter(p => p.id !== id));
-    setSuccess('Payment deleted');
+  const handleDelete = async (id) => {
+    setLoading(true);
+    setError('');
+    try {
+      await deletePayment(id);
+      setSuccess('Payment deleted');
+      setPayments(prev => prev.filter(p => p.id !== id));
+    } catch (err) {
+      setError('Error deleting payment');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
@@ -70,37 +86,36 @@ const PaymentIn = ({ onBack }) => {
       setError('All fields required and amount > 0');
       return;
     }
-    const customer = customers.find(c => c.customer_no === parseInt(form.customer_id));
-    const account = accounts.find(a => a.account_id === parseInt(form.account_id));
-    if (editing) {
-      setPayments(prev => prev.map(p => p.id === editing.id ? { ...p, ...form, customer_name: customer.customer_name, account_name: account.account_name } : p));
-      setSuccess('Payment updated');
-    } else {
-      const newId = Math.max(0, ...payments.map(p => p.id)) + 1;
-      setPayments(prev => [...prev, { id: newId, ...form, customer_name: customer.customer_name, account_name: account.account_name, created_at: new Date().toISOString() }]);
-      setSuccess('Payment added');
+    setLoading(true);
+    try {
+      if (editing) {
+        await updatePayment(editing.id, form);
+        setSuccess('Payment updated');
+      } else {
+        await createPayment(form);
+        setSuccess('Payment added');
+      }
+      // Refresh payments
+      const pays = await getPayments();
+      console.log('Fetched payments:', pays); // Debug log
+      setPayments(pays);
+      setForm({ customer_id: '', account_id: '', amount: 0 });
+      setEditing(null);
+      setTimeout(() => setViewMode('table'), 1200);
+    } catch (err) {
+      setError('Error saving payment');
+    } finally {
+      setLoading(false);
     }
-    setForm({ customer_id: '', account_id: '', amount: 0 });
-    setEditing(null);
-    setTimeout(() => setViewMode('table'), 1200);
   };
 
-  const filtered = payments.filter(p =>
-    (p.customer_name && p.customer_name.toLowerCase().includes(search.toLowerCase()))
-  );
+  const filtered = payments.filter(p => {
+    const customer = customers.find(c => c.customer_no === p.customer_id);
+    return customer && customer.name && customer.name.toLowerCase().includes(search.toLowerCase());
+  });
 
   return (
     <div className={styles.paymentin}>
-      <div className={styles['top-header']}>
-        <button className={styles['back-to-main']} onClick={onBack}>
-          <ArrowLeft size={20} />
-          Back to Payments
-        </button>
-        <div className={styles['title-section']}>
-          <h1 className={styles['main-title']}>Payment In Management</h1>
-          <p className={styles['subtitle']}>Manage incoming customer payments</p>
-        </div>
-      </div>
       <div className={styles['center-actions']}>
         <button
           className={`${styles['action-btn']} ${viewMode === 'table' ? styles.active : ''}`}
@@ -120,7 +135,8 @@ const PaymentIn = ({ onBack }) => {
       <div className={styles['content']}>
         {error && <div className={styles.error}>{error}</div>}
         {success && <div className={styles.success}>{success}</div>}
-        {viewMode === 'table' && (
+        {loading && <div className={styles.loading}>Loading...</div>}
+        {viewMode === 'table' && !loading && (
           <div className={styles['table-container']}>
             <div className={styles['table-header']}>
               <div className={styles['search-container']}>
@@ -150,55 +166,83 @@ const PaymentIn = ({ onBack }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map(p => (
-                    <tr key={p.id}>
-                      <td>{p.id}</td>
-                      <td>{p.customer_name}</td>
-                      <td>{p.account_name}</td>
-                      <td>{p.amount}</td>
-                      <td>{new Date(p.created_at).toLocaleDateString()}</td>
-                      <td>
-                        <div className={styles['action-icons']}>
-                          <button onClick={() => handleEdit(p)} className={styles['icon-btn']} title="Edit"><Edit size={16} /></button>
-                          <button onClick={() => handleDelete(p.id)} className={`${styles['icon-btn']} ${styles.delete}`} title="Delete"><Trash2 size={16} /></button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {filtered.map(p => {
+                    const customer = customers.find(c => c.customer_no === p.customer_id);
+                    const account = accounts.find(a => a.account_id === p.account_id);
+                    return (
+                      <tr key={p.id}>
+                        <td>{p.id}</td>
+                        <td>{customer ? customer.name : p.customer_id}</td>
+                        <td>{account ? (account.account_name || account.bank || account.name) : p.account_id}</td>
+                        <td>{p.amount}</td>
+                        <td>{p.created_at ? new Date(p.created_at).toLocaleDateString() : ''}</td>
+                        <td>
+                          <div className={styles['action-icons']}>
+                            <button onClick={() => handleEdit(p)} className={styles['icon-btn']} title="Edit"><Edit size={16} /></button>
+                            <button onClick={() => handleDelete(p.id)} className={`${styles['icon-btn']} ${styles.delete}`} title="Delete"><Trash2 size={16} /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
               {filtered.length === 0 && <div className={styles['no-data']}>No payments found</div>}
             </div>
           </div>
         )}
-        {viewMode === 'form' && (
+        {viewMode === 'form' && !loading && (
           <div className={styles['form-container']}>
             <h2>{editing ? 'Edit Payment In' : 'Add Payment In'}</h2>
             <form onSubmit={handleSubmit} className={styles.form}>
               <div className={styles['form-group']}>
                 <label>Customer *</label>
-                <select name="customer_id" value={form.customer_id} onChange={e => setForm(f => ({ ...f, customer_id: e.target.value }))} required className={styles['form-select']}>
+                <select
+                  name="customer_id"
+                  value={form.customer_id || ''}
+                  onChange={e => setForm(f => ({ ...f, customer_id: Number(e.target.value) }))}
+                  required
+                  className={styles['form-select']}
+                >
                   <option value="">Select a customer</option>
-                  {customers.map(c => <option key={c.customer_no} value={c.customer_no}>{c.customer_name}</option>)}
+                  {customers.map(c => (
+                    <option key={c.customer_no} value={c.customer_no}>{c.name}</option>
+                  ))}
                 </select>
               </div>
               <div className={styles['form-group']}>
                 <label>Account *</label>
-                <select name="account_id" value={form.account_id} onChange={e => setForm(f => ({ ...f, account_id: e.target.value }))} required className={styles['form-select']}>
+                <select
+                  name="account_id"
+                  value={form.account_id || ''}
+                  onChange={e => setForm(f => ({ ...f, account_id: Number(e.target.value) }))}
+                  required
+                  className={styles['form-select']}
+                >
                   <option value="">Select an account</option>
-                  {accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.account_name}</option>)}
+                  {accounts.map(a => (
+                    <option key={a.account_id} value={a.account_id}>{a.account_name || a.bank || a.name}</option>
+                  ))}
                 </select>
               </div>
               <div className={styles['form-group']}>
                 <label>Amount *</label>
-                <input type="number" name="amount" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} min="1" required className={styles['form-input']} />
+                <input
+                  type="number"
+                  name="amount"
+                  value={form.amount !== undefined ? form.amount : ''}
+                  onChange={e => setForm(f => ({ ...f, amount: Number(e.target.value) }))}
+                  min="1"
+                  required
+                  className={styles['form-input']}
+                />
               </div>
               <div className={styles['form-actions']}>
                 <button type="button" onClick={handleViewTable} className={styles['cancel-btn']}>
                   Cancel
                 </button>
                 <button type="submit" className={styles['submit-btn']}>
-                  {editing ? 'Update' : 'Add'}
+                  {editing ? 'Update' : 'Add'} Payment
                 </button>
               </div>
             </form>

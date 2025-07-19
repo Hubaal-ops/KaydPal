@@ -41,41 +41,21 @@ async function insertPurchase(purchase) {
   // Validate required fields
   if (qty <= 0 || price <= 0) throw new Error('❌ Invalid quantity or price.');
 
-  // Calculate amount considering discount and tax
-  const amount = (qty * price) - discount + tax;
-
+  const amount = qty * price - discount + tax;
   if (paid > amount) throw new Error('❌ Paid amount exceeds total.');
 
-  // Check existence of related documents
-  const [product, supplier, store, account] = await Promise.all([
-    db.collection('products').findOne({ product_no }),
-    db.collection('suppliers').findOne({ supplier_no }),
-    db.collection('stores').findOne({ store_no }),
-    db.collection('accounts').findOne({ account_id })
-  ]);
-
-  if (!product) throw new Error('❌ Product not found.');
-  if (!supplier) throw new Error('❌ Supplier not found.');
-  if (!store) throw new Error('❌ Store not found.');
-  if (!account) throw new Error('❌ Account not found.');
-
-  // Generate unique purchase number
+  // Get next numeric purchase_id
+  const purchase_id = await getNextSequence('purchase_id');
+  if (!purchase_id) throw new Error('❌ Failed to get a valid purchase ID.');
+  // Keep purchase_no for display
   const sequence = await getNextSequence('purchase_no');
   const purchase_no = `PUR-${String(sequence).padStart(5, '0')}`;
 
   // Create purchase document using mongoose model
   await Purchase.create({
-    purchase_no,
-    product_no,
-    supplier_no,
-    store_no,
-    qty,
-    price,
-    discount,
-    tax,
-    amount,
-    paid,
-    account_id,
+    purchase_id, purchase_no, product_no, supplier_no, store_no,
+    qty, price, discount, tax,
+    amount, paid, account_id,
     created_at: new Date()
   });
 

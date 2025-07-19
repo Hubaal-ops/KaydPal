@@ -226,7 +226,7 @@ const Purchases = ({ onBack }) => {
 
   return (
     <div className={styles.purchases}>
-      <div className={styles['sales-header']}>
+      <div className={styles['purchases-header']}>
         <button className={styles['back-button']} onClick={onBack}>
           <ArrowLeft size={20} />
           Back to Transactions
@@ -234,7 +234,7 @@ const Purchases = ({ onBack }) => {
         <h1>Purchases Management</h1>
         <p>Manage and record product purchases</p>
       </div>
-      <div className={styles['sales-content']}>
+      <div className={styles['purchases-content']}>
         <div className={styles['action-buttons']}>
           <button
             className={`${styles['action-btn']} ${viewMode === 'table' ? styles.active : ''}`}
@@ -340,162 +340,146 @@ const Purchases = ({ onBack }) => {
         )}
         {viewMode === 'form' && (
           <div className={styles['form-container']}>
-            <h2>{editingPurchase ? 'Edit Purchase' : 'Add New Purchase'}</h2>
-            <form onSubmit={handleSubmit} className={`${styles.form} ${styles['form-grid']}`}>
-              <div className={styles['form-group']}>
-                <label htmlFor="product_no">Product *</label>
-                <select
-                  id="product_no"
-                  name="product_no"
-                  value={formData.product_no}
-                  onChange={handleInputChange}
-                  required
-                  className={styles['form-select']}
-                >
-                  <option value="">Select a product</option>
-                  {products.map(product => (
-                    <option key={product.product_no} value={product.product_no}>
-                      {product.product_name}
-                    </option>
-                  ))}
-                </select>
+            <h2 className={styles['main-title']}>{editingPurchase ? 'Edit Purchase' : 'Add New Purchase'}</h2>
+            <form onSubmit={handleSubmit} className={styles.form}>
+              <div className={styles['form-grid']}>
+                <div className={styles['form-group']}>
+                  <label>Product *</label>
+                  <select
+                    name="product_no"
+                    value={formData.product_no || ''}
+                    onChange={e => setFormData(f => ({ ...f, product_no: Number(e.target.value) }))}
+                    required
+                    className={styles['form-select']}
+                  >
+                    <option value="">Select a product</option>
+                    {products.map(p => (
+                      <option key={p.product_no} value={p.product_no}>{p.product_name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className={styles['form-group']}>
+                  <label>Supplier *</label>
+                  <select
+                    name="supplier_no"
+                    value={formData.supplier_no || ''}
+                    onChange={e => setFormData(f => ({ ...f, supplier_no: Number(e.target.value) }))}
+                    required
+                    className={styles['form-select']}
+                  >
+                    <option value="">Select a supplier</option>
+                    {suppliers.map(s => (
+                      <option key={s.supplier_no} value={s.supplier_no}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className={styles['form-group']}>
+                  <label>Store *</label>
+                  <select
+                    name="store_no"
+                    value={formData.store_no || ''}
+                    onChange={e => setFormData(f => ({ ...f, store_no: Number(e.target.value) }))}
+                    required
+                    className={styles['form-select']}
+                  >
+                    <option value="">Select a store</option>
+                    {stores.map(s => (
+                      <option key={s.store_no} value={s.store_no}>{s.store_name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className={styles['form-group']}>
+                  <label>Quantity *</label>
+                  <input
+                    type="number"
+                    name="qty"
+                    value={formData.qty}
+                    onChange={handleInputChange}
+                    min="1"
+                    required
+                    className={styles['form-input']}
+                  />
+                </div>
+                <div className={styles['form-group']}>
+                  <label>Price *</label>
+                  <input
+                    type="number"
+                    name="price"
+                    value={formData.price}
+                    onChange={handleInputChange}
+                    min="0"
+                    required
+                    className={styles['form-input']}
+                  />
+                </div>
+                <div className={styles['form-group']}>
+                  <label>Discount</label>
+                  <input
+                    type="number"
+                    name="discount"
+                    value={formData.discount}
+                    onChange={handleInputChange}
+                    min="0"
+                    className={styles['form-input']}
+                  />
+                </div>
+                <div className={styles['form-group']}>
+                  <label>Tax</label>
+                  <input
+                    type="number"
+                    name="tax"
+                    value={formData.tax}
+                    onChange={handleInputChange}
+                    min="0"
+                    className={styles['form-input']}
+                  />
+                </div>
+                <div className={styles['form-group']}>
+                  <label>Amount *</label>
+                  <input
+                    type="number"
+                    name="amount"
+                    value={formData.amount}
+                    onChange={handleInputChange}
+                    min="0"
+                    required
+                    className={styles['form-input']}
+                    readOnly
+                  />
+                </div>
+                <div className={styles['form-group']}>
+                  <label>Paid</label>
+                  <input
+                    type="number"
+                    name="paid"
+                    value={formData.paid}
+                    onChange={handleInputChange}
+                    min="0"
+                    className={styles['form-input']}
+                  />
+                </div>
+                <div className={styles['form-group']}>
+                  <label>Account *</label>
+                  <select
+                    name="account_id"
+                    value={formData.account_id || ''}
+                    onChange={e => setFormData(f => ({ ...f, account_id: Number(e.target.value) }))}
+                    required
+                    className={styles['form-select']}
+                  >
+                    <option value="">Select an account</option>
+                    {accounts.map(a => (
+                      <option key={a.account_id} value={a.account_id}>{a.account_name || a.bank || a.name}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <div className={styles['form-group']}>
-                <label htmlFor="supplier_no">Supplier *</label>
-                <select
-                  id="supplier_no"
-                  name="supplier_no"
-                  value={formData.supplier_no}
-                  onChange={handleInputChange}
-                  required
-                  className={styles['form-select']}
-                >
-                  <option value="">Select a supplier</option>
-                  {suppliers.map(supplier => (
-                    <option key={supplier.supplier_no} value={supplier.supplier_no}>
-                      {supplier.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className={styles['form-group']}>
-                <label htmlFor="store_no">Store *</label>
-                <select
-                  id="store_no"
-                  name="store_no"
-                  value={formData.store_no}
-                  onChange={handleInputChange}
-                  required
-                  className={styles['form-select']}
-                >
-                  <option value="">Select a store</option>
-                  {stores.map(store => (
-                    <option key={store.store_no} value={store.store_no}>
-                      {store.store_name || 'Unnamed Store'}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className={styles['form-group']}>
-                <label htmlFor="qty">Quantity *</label>
-                <input
-                  type="number"
-                  id="qty"
-                  name="qty"
-                  value={formData.qty}
-                  onChange={handleInputChange}
-                  min="1"
-                  required
-                  className={styles['form-input']}
-                />
-              </div>
-              <div className={styles['form-group']}>
-                <label htmlFor="price">Price *</label>
-                <input
-                  type="number"
-                  id="price"
-                  name="price"
-                  value={formData.price}
-                  onChange={handleInputChange}
-                  min="0"
-                  required
-                  className={styles['form-input']}
-                />
-              </div>
-              <div className={styles['form-group']}>
-                <label htmlFor="discount">Discount</label>
-                <input
-                  type="number"
-                  id="discount"
-                  name="discount"
-                  value={formData.discount}
-                  onChange={handleInputChange}
-                  min="0"
-                  className={styles['form-input']}
-                />
-              </div>
-              <div className={styles['form-group']}>
-                <label htmlFor="tax">Tax</label>
-                <input
-                  type="number"
-                  id="tax"
-                  name="tax"
-                  value={formData.tax}
-                  onChange={handleInputChange}
-                  min="0"
-                  className={styles['form-input']}
-                />
-              </div>
-              <div className={styles['form-group']}>
-                <label htmlFor="amount">Amount *</label>
-                <input
-                  type="number"
-                  id="amount"
-                  name="amount"
-                  value={formData.amount}
-                  onChange={handleInputChange}
-                  min="0"
-                  required
-                  className={styles['form-input']}
-                  readOnly
-                />
-              </div>
-              <div className={styles['form-group']}>
-                <label htmlFor="paid">Paid</label>
-                <input
-                  type="number"
-                  id="paid"
-                  name="paid"
-                  value={formData.paid}
-                  onChange={handleInputChange}
-                  min="0"
-                  className={styles['form-input']}
-                />
-              </div>
-              <div className={styles['form-group']}>
-                <label htmlFor="account_id">Account *</label>
-                <select
-                  id="account_id"
-                  name="account_id"
-                  value={formData.account_id}
-                  onChange={handleInputChange}
-                  required
-                  className={styles['form-select']}
-                >
-                  <option value="">Select an account</option>
-                  {accounts.map(account => (
-                    <option key={account.account_id} value={account.account_id}>
-                      {account.name || account.account_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className={styles['form-actions']} style={{ gridColumn: '1 / -1' }}>
+              <div className={styles['form-actions']}>
                 <button type="button" onClick={handleViewTable} className={styles['cancel-btn']}>
                   Cancel
                 </button>
                 <button type="submit" className={styles['submit-btn']}>
-                  {editingPurchase ? 'Update Purchase' : 'Add Purchase'}
+                  {editingPurchase ? 'Update' : 'Add'} Purchase
                 </button>
               </div>
             </form>

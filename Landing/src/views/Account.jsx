@@ -207,7 +207,7 @@ const Account = ({ onBack }) => {
                   </thead>
                   <tbody>
                     {filteredAccounts.map((account) => (
-                      <tr key={account._id}>
+                      <tr key={account.account_id}>
                         <td>{account.account_id}</td>
                         <td>{account.name}</td>
                         <td>{account.bank}</td>
@@ -218,7 +218,7 @@ const Account = ({ onBack }) => {
                             <button className={styles['icon-btn']} onClick={() => handleEdit(account)}>
                               <Edit size={18} />
                             </button>
-                            <button className={`${styles['icon-btn']} ${styles.delete}`} onClick={() => handleDelete(account._id)}>
+                            <button className={`${styles['icon-btn']} ${styles.delete}`} onClick={() => handleDelete(account.account_id)}>
                               <Trash2 size={18} />
                             </button>
                           </div>

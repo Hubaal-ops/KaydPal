@@ -238,6 +238,7 @@ const Products = ({ onBack }) => {
                 <table className={styles.table}>
                   <thead>
                     <tr>
+                      <th>ID</th>
                       <th>Product Name</th>
                       <th>Category</th>
                       <th>Storing Balance</th>
@@ -258,6 +259,7 @@ const Products = ({ onBack }) => {
                         
                       return (
                         <tr key={product.product_no}>
+                          <td>{product.product_no}</td>
                           <td>
                             <div className={styles['product-name']}>
                               {product.product_name}

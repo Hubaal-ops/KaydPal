@@ -226,6 +226,7 @@ const Expenses = ({ onBack }) => {
                 <table className={styles.table}>
                   <thead>
                     <tr>
+                      <th>ID</th>
                       <th>Category</th>
                       <th>Account</th>
                       <th>Bank</th>
@@ -238,6 +239,7 @@ const Expenses = ({ onBack }) => {
                   <tbody>
                     {filteredExpenses.map(exp => (
                       <tr key={exp._id}>
+                        <td>{exp.expense_id}</td>
                         <td>{exp.category?.name || ''}</td>
                         <td>{exp.account?.name || ''}</td>
                         <td>{exp.account?.bank || ''}</td>

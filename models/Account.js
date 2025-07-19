@@ -3,9 +3,8 @@ const mongoose = require('mongoose');
 const accountSchema = new mongoose.Schema({
   account_id: {
     type: Number,
-    required: true,
     unique: true,
-    index: true
+    required: true
   },
   name: {
     type: String,

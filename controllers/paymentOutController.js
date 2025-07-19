@@ -1,108 +1,88 @@
-const connectDB = require('../db');
+const PaymentOut = require('../models/PaymentOut');
+const Supplier = require('../models/Supplier');
+const Account = require('../models/Account');
+const getNextSequence = require('../getNextSequence');
 
-async function getNextSequenceValue(sequenceName) {
-  const db = await connectDB();
-  const result = await db.collection('counters').findOneAndUpdate(
-    { _id: sequenceName },
-    { $inc: { seq: 1 } },
-    { returnDocument: 'after', upsert: true }
-  );
-  return result.value ? result.value.seq : result.seq;
-}
-
-async function insertPaymentOut(paymentData) {
-  const db = await connectDB();
-  
-  const {
-    account_id,
-    supplier_no,
-    amount,
-    description
-  } = paymentData;
-
-  // Basic validations
-  if (amount <= 0) {
-    throw new Error('Payment amount must be greater than 0');
-  }
-
-  // Validate account exists and has sufficient balance
-  const account = await db.collection('Accounts').findOne({ account_id });
-  if (!account) {
-    throw new Error('Account not found');
-  }
-
-  if (account.balance < amount) {
-    throw new Error('Insufficient account balance');
-  }
-
-  // Validate supplier exists and check their balance
-  const supplier = await db.collection('Suppliers').findOne({ supplier_no });
-  if (!supplier) {
-    throw new Error('Supplier not found');
-  }
-
-  // Check if supplier has any debt
-  if (!supplier.bal || supplier.bal <= 0) {
-    throw new Error('Supplier has no outstanding balance to pay');
-  }
-
-  // Validate payment amount doesn't exceed supplier's debt
-  if (amount > supplier.bal) {
-    throw new Error(`Payment amount exceeds supplier's debt. Maximum payment allowed: ${supplier.bal}`);
-  }
-
-  // Get next payment id
-  const id = await getNextSequenceValue('payment_out');
-
-  // Create payment record
-  const newPayment = {
-    id,
-    account_id,
-    supplier_no,
-    amount,
-    description,
-    created_at: new Date(),
-    updated_at: new Date()
-  };
-
+// Get all payment outs
+exports.getAllPaymentsOut = async (req, res) => {
   try {
-    // Insert payment record
-    await db.collection('Payment_Out').insertOne(newPayment);
+    const payments = await PaymentOut.find().sort({ created_at: -1 });
+    res.json({ data: payments });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Get payment out by ID
+exports.getPaymentOutById = async (req, res) => {
+  try {
+    const payment = await PaymentOut.findOne({ id: req.params.id });
+    if (!payment) return res.status(404).json({ error: 'Payment not found' });
+    res.json(payment);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Create new payment out
+exports.createPaymentOut = async (req, res) => {
+  try {
+    const { supplier_no, account_id, amount, description } = req.body;
+    if (!supplier_no || !account_id || !amount || amount <= 0) {
+      return res.status(400).json({ error: 'All fields required and amount > 0' });
+    }
+    // Get next payment out id
+    const id = await getNextSequence('payment_out');
+    if (!id) {
+      return res.status(500).json({ error: 'Failed to generate payment out ID' });
+    }
+
+    // Update supplier balance
+    const supplier = await Supplier.findOne({ supplier_no: Number(supplier_no) });
+    if (!supplier) return res.status(404).json({ error: 'Supplier not found' });
+    if (supplier.balance < amount) return res.status(400).json({ error: 'Supplier does not have enough balance' });
+    supplier.balance = (supplier.balance || 0) - Number(amount);
+    await supplier.save();
 
     // Update account balance
-    await db.collection('Accounts').updateOne(
-      { account_id },
-      { $inc: { balance: -amount } }
-    );
+    const account = await Account.findOne({ account_id: Number(account_id) });
+    if (!account) return res.status(404).json({ error: 'Account not found' });
+    account.balance = (account.balance || 0) - Number(amount);
+    await account.save();
 
-    // Update supplier balance (reduce their debt)
-    await db.collection('Suppliers').updateOne(
-      { supplier_no },
-      { $inc: { bal: -amount } }
-    );
+    // Save payment out
+    const payment = new PaymentOut({ id, supplier_no: Number(supplier_no), account_id: Number(account_id), amount: Number(amount), description });
+    await payment.save();
 
-    return {
-      message: 'Payment out processed successfully',
-      id,
-      account: {
-        account_id,
-        new_balance: account.balance - amount
-      },
-      supplier: {
-        supplier_no,
-        new_balance: supplier.bal - amount
-      }
-    };
-
-  } catch (error) {
-    // If any operation fails, try to clean up
-    try {
-      await db.collection('Payment_Out').deleteOne({ id });
-    } catch (cleanupError) {
-      console.error('Error during cleanup:', cleanupError);
-    }
-    throw error;
+    res.status(201).json(payment);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
-}
+};
 
-module.exports = { insertPaymentOut }; 
+// Update payment out
+exports.updatePaymentOut = async (req, res) => {
+  try {
+    const { supplier_no, account_id, amount, description } = req.body;
+    const payment = await PaymentOut.findOneAndUpdate(
+      { id: req.params.id },
+      { supplier_no, account_id, amount, description, updated_at: new Date() },
+      { new: true, runValidators: true }
+    );
+    if (!payment) return res.status(404).json({ error: 'Payment not found' });
+    res.json(payment);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+// Delete payment out
+exports.deletePaymentOut = async (req, res) => {
+  try {
+    const payment = await PaymentOut.findOneAndDelete({ id: req.params.id });
+    if (!payment) return res.status(404).json({ error: 'Payment not found' });
+    res.json({ message: 'Payment deleted' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}; 

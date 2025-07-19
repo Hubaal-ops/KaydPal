@@ -1,6 +1,11 @@
 const mongoose = require('mongoose');
 
 const withdrawalSchema = new mongoose.Schema({
+  withdrawal_id: {
+    type: Number,
+    unique: true,
+    required: true
+  },
   account: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Account',

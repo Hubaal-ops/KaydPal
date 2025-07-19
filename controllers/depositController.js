@@ -1,6 +1,7 @@
 // controllers/depositController.js
 const Deposit = require('../models/Deposit');
 const Account = require('../models/Account');
+const getNextSequence = require('../getNextSequence');
 
 // Get all deposits
 exports.getAllDeposits = async (req, res) => {
@@ -30,7 +31,11 @@ exports.createDeposit = async (req, res) => {
     if (amount <= 0) return res.status(400).json({ error: 'Amount must be greater than zero' });
     const accountDoc = await Account.findById(account);
     if (!accountDoc) return res.status(404).json({ error: 'Account does not exist' });
-    const deposit = new Deposit({ account, amount });
+    const deposit_id = await getNextSequence('deposit_id');
+    if (!deposit_id) {
+      return res.status(500).json({ error: 'Failed to generate deposit ID' });
+    }
+    const deposit = new Deposit({ deposit_id, account, amount });
     await deposit.save();
     // Update account balance
     accountDoc.balance += amount;
