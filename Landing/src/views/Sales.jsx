@@ -45,6 +45,7 @@ const Sales = ({ onBack }) => {
         getCustomers()
       ]);
       setSales(salesData);
+      console.log('Sales loaded in frontend:', salesData);
       setProducts(productsData);
       setStores(storesData);
       setAccounts(accountsData);
@@ -138,34 +139,33 @@ const Sales = ({ onBack }) => {
     e.preventDefault();
     setError('');
     setSuccess('');
-    if (!formData.product_no || !formData.customer_no || !formData.store_no || !formData.account_id) {
+    // Always recalculate amount before validation and submission
+    const calcAmount = (parseInt(formData.qty) || 0) * (parseFloat(formData.price) || 0) - (parseFloat(formData.discount) || 0) + (parseFloat(formData.tax) || 0);
+    const updatedFormData = { ...formData, amount: calcAmount };
+    if (!updatedFormData.product_no || !updatedFormData.customer_no || !updatedFormData.store_no || !updatedFormData.account_id) {
       setError('All dropdowns are required');
       return;
     }
-    if (formData.qty <= 0) {
+    if (updatedFormData.qty <= 0) {
       setError('Quantity must be greater than 0');
       return;
     }
-    if (formData.price <= 0) {
+    if (updatedFormData.price <= 0) {
       setError('Price must be greater than 0');
       return;
     }
-    const calcAmount = formData.qty * formData.price - (formData.discount || 0) + (formData.tax || 0);
-    if (formData.amount !== calcAmount) {
-      setError('Amount does not match calculation');
-      return;
-    }
-    if (formData.paid > formData.amount) {
+    // Removed manual check for amount mismatch
+    if (updatedFormData.paid > updatedFormData.amount) {
       setError('Paid amount cannot exceed total amount');
       return;
     }
     setLoading(true);
     try {
       if (editingSale) {
-        await updateSale(editingSale.sel_no, formData);
+        await updateSale(editingSale.sel_no, updatedFormData);
         setSuccess('Sale updated successfully');
       } else {
-        await addSale(formData);
+        await addSale(updatedFormData);
         setSuccess('Sale added successfully');
       }
       await fetchAll();

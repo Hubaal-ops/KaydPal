@@ -2,12 +2,14 @@
 const mongoose = require('mongoose');
 const Account = require('../models/Account');
 const db = require('../db');
+const getNextSequence = require('../getNextSequence');
 
 async function insertAccount() {
   try {
     await db;
+    const account_id = await getNextSequence('account_id');
     const account = new Account({
-      account_id: 'ACC001',
+      account_id,
       name: 'Sample Account',
       // createdAt will default to now
     });

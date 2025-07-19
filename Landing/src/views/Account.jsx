@@ -17,6 +17,7 @@ const Account = ({ onBack }) => {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
+    account_id: '',
     name: '',
     bank: '',
     balance: 0
@@ -54,7 +55,7 @@ const Account = ({ onBack }) => {
   const handleViewTable = () => {
     setViewMode('table');
     setEditingAccount(null);
-    setFormData({ name: '', bank: '', balance: 0 });
+    setFormData({ account_id: '', name: '', bank: '', balance: 0 });
     setError('');
     setSuccess('');
   };
@@ -62,7 +63,7 @@ const Account = ({ onBack }) => {
   const handleAddNew = () => {
     setViewMode('form');
     setEditingAccount(null);
-    setFormData({ name: '', bank: '', balance: 0 });
+    setFormData({ account_id: '', name: '', bank: '', balance: 0 });
     setError('');
     setSuccess('');
   };
@@ -70,6 +71,7 @@ const Account = ({ onBack }) => {
   const handleEdit = (account) => {
     setEditingAccount(account);
     setFormData({
+      account_id: account.account_id || '',
       name: account.name,
       bank: account.bank,
       balance: account.balance
@@ -116,7 +118,7 @@ const Account = ({ onBack }) => {
         await createAccount(formData);
         setSuccess('Account added successfully');
       }
-      setFormData({ name: '', bank: '', balance: 0 });
+      setFormData({ account_id: '', name: '', bank: '', balance: 0 });
       setEditingAccount(null);
       fetchAccounts();
       setTimeout(() => {
@@ -195,6 +197,7 @@ const Account = ({ onBack }) => {
                 <table className={styles.table}>
                   <thead>
                     <tr>
+                      <th>Account ID</th>
                       <th>Name</th>
                       <th>Bank</th>
                       <th>Balance</th>
@@ -205,6 +208,7 @@ const Account = ({ onBack }) => {
                   <tbody>
                     {filteredAccounts.map((account) => (
                       <tr key={account.account_id}>
+                        <td>{account.account_id}</td>
                         <td>{account.name}</td>
                         <td>{account.bank}</td>
                         <td>{account.balance}</td>
@@ -234,6 +238,18 @@ const Account = ({ onBack }) => {
           <div className={styles['form-container']}>
             <h2>{editingAccount ? 'Edit Account' : 'Add New Account'}</h2>
             <form className={styles.form} onSubmit={handleSubmit}>
+              <div className={styles['form-group']}>
+                <label htmlFor="account_id">Account ID</label>
+                <input
+                  type="number"
+                  id="account_id"
+                  name="account_id"
+                  className={styles['form-input']}
+                  value={formData.account_id}
+                  onChange={handleInputChange}
+                  disabled={!editingAccount}
+                />
+              </div>
               <div className={styles['form-group']}>
                 <label htmlFor="name">Name</label>
                 <input

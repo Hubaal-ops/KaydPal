@@ -1,4 +1,4 @@
-const StoreProduct = require('../models/StoreProduct');
+// const StoreProduct = require('../models/StoreProduct');
 const Product = require('../models/Product'); // Ensure Product schema is registered
 const Store = require('../models/Store'); // Ensure Store schema is registered
 

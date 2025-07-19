@@ -23,8 +23,8 @@ async function runInsertStoreProduct() {
 
     // Insert store product 3
     const result3 = await insertStoreProduct({
-      product_no: 1,
-      store_no: 2,
+      product_no: 2,
+      store_no: 3,
       qty: 3
     });
     console.log(result3.message);
