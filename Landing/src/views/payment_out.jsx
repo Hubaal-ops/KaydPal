@@ -115,16 +115,6 @@ const PaymentOut = ({ onBack }) => {
 
   return (
     <div className={styles.paymentout}>
-      <div className={styles['top-header']}>
-        <button className={styles['back-to-main']} onClick={onBack}>
-          <ArrowLeft size={20} />
-          Back to Payments
-        </button>
-        <div className={styles['title-section']}>
-          <h1 className={styles['main-title']}>Payment Out Management</h1>
-          <p className={styles['subtitle']}>Manage outgoing supplier payments</p>
-        </div>
-      </div>
       <div className={styles['center-actions']}>
         <button
           className={`${styles['action-btn']} ${viewMode === 'table' ? styles.active : ''}`}

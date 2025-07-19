@@ -116,16 +116,6 @@ const PaymentIn = ({ onBack }) => {
 
   return (
     <div className={styles.paymentin}>
-      <div className={styles['top-header']}>
-        <button className={styles['back-to-main']} onClick={onBack}>
-          <ArrowLeft size={20} />
-          Back to Payments
-        </button>
-        <div className={styles['title-section']}>
-          <h1 className={styles['main-title']}>Payment In Management</h1>
-          <p className={styles['subtitle']}>Manage incoming customer payments</p>
-        </div>
-      </div>
       <div className={styles['center-actions']}>
         <button
           className={`${styles['action-btn']} ${viewMode === 'table' ? styles.active : ''}`}
