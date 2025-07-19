@@ -16,4 +16,4 @@ const saleSchema = new mongoose.Schema({
   // Add more fields as needed
 });
 
-module.exports = mongoose.model('Sale', saleSchema); 
+module.exports = mongoose.model('Sale', saleSchema, 'sales'); 

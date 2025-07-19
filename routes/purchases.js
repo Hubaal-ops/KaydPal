@@ -6,7 +6,14 @@ const purchaseController = require('../controllers/purchaseController');
 router.get('/', async (req, res) => {
   try {
     const purchases = await purchaseController.getAllPurchases();
-    res.json(purchases);
+    console.log('API /api/purchases returning:', purchases);
+    if (Array.isArray(purchases)) {
+      res.json(purchases);
+    } else if (purchases && purchases.data && Array.isArray(purchases.data)) {
+      res.json(purchases.data);
+    } else {
+      res.json([]);
+    }
   } catch (err) {
     res.status(500).json({ message: err.message || 'Failed to fetch purchases' });
   }

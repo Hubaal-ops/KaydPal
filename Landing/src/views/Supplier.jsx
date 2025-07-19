@@ -12,7 +12,7 @@ const Supplier = ({ onBack }) => {
     name: '',
     email: '',
     phone: '',
-    balance: 0
+    bal: 0
   });
   const [editingSupplier, setEditingSupplier] = useState(null);
   const [error, setError] = useState('');
@@ -38,7 +38,7 @@ const Supplier = ({ onBack }) => {
   const handleViewTable = () => {
     setViewMode('table');
     setEditingSupplier(null);
-    setFormData({ name: '', email: '', phone: '', balance: 0 });
+    setFormData({ name: '', email: '', phone: '', bal: 0 });
     setError('');
     setSuccess('');
   };
@@ -46,7 +46,7 @@ const Supplier = ({ onBack }) => {
   const handleAddNew = () => {
     setViewMode('form');
     setEditingSupplier(null);
-    setFormData({ name: '', email: '', phone: '', balance: 0 });
+    setFormData({ name: '', email: '', phone: '', bal: 0 });
     setError('');
     setSuccess('');
   };
@@ -57,7 +57,7 @@ const Supplier = ({ onBack }) => {
       name: supplier.name || '',
       email: supplier.email || '',
       phone: supplier.phone || '',
-      balance: supplier.balance || 0
+      bal: supplier.bal || 0
     });
     setViewMode('form');
     setError('');
@@ -99,7 +99,7 @@ const Supplier = ({ onBack }) => {
         setSuccess('Supplier added successfully');
       }
       await fetchSuppliers();
-      setFormData({ name: '', email: '', phone: '', balance: 0 });
+      setFormData({ name: '', email: '', phone: '', bal: 0 });
       setEditingSupplier(null);
       setTimeout(() => {
         setViewMode('table');
@@ -191,7 +191,7 @@ const Supplier = ({ onBack }) => {
                         <td>{supplier.name}</td>
                         <td>{supplier.email}</td>
                         <td>{supplier.phone}</td>
-                        <td>{supplier.balance}</td>
+                        <td>{supplier.bal}</td>
                         <td>{supplier.created_at ? new Date(supplier.created_at).toLocaleDateString() : ''}</td>
                         <td>
                           <div className={styles['action-icons']}>
@@ -262,14 +262,16 @@ const Supplier = ({ onBack }) => {
                 />
               </div>
               <div className={styles['form-group']}>
-                <label>Balance</label>
+                <label htmlFor="bal">Balance *</label>
                 <input
                   type="number"
-                  name="balance"
-                  value={formData.balance !== undefined ? formData.balance : ''}
-                  onChange={e => setFormData(prev => ({ ...prev, balance: Number(e.target.value) }))}
+                  id="bal"
+                  name="bal"
+                  value={formData.bal}
+                  onChange={handleInputChange}
                   min="0"
-                  className={styles['form-input']}
+                  required
+                  placeholder="Enter balance"
                 />
               </div>
               <div className={styles['form-actions']}>

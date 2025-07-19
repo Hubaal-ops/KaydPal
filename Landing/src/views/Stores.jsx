@@ -208,6 +208,7 @@ const Stores = ({ onBack }) => {
                       <th>Name</th>
                       <th>Location</th>
                       <th>Manager</th>
+                      <th>Total Items</th>
                       <th>Created At</th>
                       <th>Actions</th>
                     </tr>
@@ -218,6 +219,7 @@ const Stores = ({ onBack }) => {
                         <td>{store.store_name}</td>
                         <td>{store.location}</td>
                         <td>{store.manager}</td>
+                        <td>{store.total_items}</td>
                         <td>{store.created_at ? new Date(store.created_at).toLocaleDateString() : ''}</td>
                         <td>
                           <div className={styles['action-icons']}>

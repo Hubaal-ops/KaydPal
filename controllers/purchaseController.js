@@ -206,7 +206,34 @@ async function updatePurchase(purchase_no, updated) {
 
 module.exports = {
   insertPurchase,
-  getAllPurchases: async () => await Purchase.find().sort({ created_at: -1 }),
+  getAllPurchases: async () => {
+    const db = await connectDB();
+    const purchases = await Purchase.find().sort({ created_at: -1 });
+    // Get all unique product, supplier, and store numbers
+    const productNos = [...new Set(purchases.map(p => p.product_no))];
+    const supplierNos = [...new Set(purchases.map(p => p.supplier_no))];
+    const storeNos = [...new Set(purchases.map(p => p.store_no))];
+    const accountIds = [...new Set(purchases.map(p => p.account_id))];
+    // Fetch all related data in bulk
+    const [products, suppliers, stores, accounts] = await Promise.all([
+      db.collection('products').find({ product_no: { $in: productNos } }).toArray(),
+      db.collection('suppliers').find({ supplier_no: { $in: supplierNos } }).toArray(),
+      db.collection('stores').find({ store_no: { $in: storeNos } }).toArray(),
+      db.collection('accounts').find({ account_id: { $in: accountIds } }).toArray(),
+    ]);
+    const productMap = Object.fromEntries(products.map(p => [p.product_no, p.product_name]));
+    const supplierMap = Object.fromEntries(suppliers.map(s => [s.supplier_no, s.name]));
+    const storeMap = Object.fromEntries(stores.map(s => [s.store_no, s.store_name]));
+    const accountMap = Object.fromEntries(accounts.map(a => [a.account_id, a.name || a.account_name || a.bank]));
+    // Add names to each purchase
+    return purchases.map(purchase => ({
+      ...purchase.toObject(),
+      product_name: productMap[purchase.product_no] || '',
+      supplier_name: supplierMap[purchase.supplier_no] || '',
+      store_name: storeMap[purchase.store_no] || '',
+      account_name: accountMap[purchase.account_id] || '',
+    }));
+  },
   updatePurchase,
   deletePurchase: async (purchase_no) => {
     const db = await connectDB();

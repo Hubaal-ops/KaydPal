@@ -269,7 +269,7 @@ const Products = ({ onBack }) => {
                             </div>
                           </td>
                           <td>{product.category || '-'}</td>
-                          <td>{product.quantity || 0}</td>
+                          <td>{product.storing_balance ?? 0}</td>
                           <td>{formattedDate}</td>
                           <td>
                             <div className={styles['action-icons']}>
@@ -343,12 +343,12 @@ const Products = ({ onBack }) => {
               </div>
 
               <div className={styles['form-group']}>
-                <label htmlFor="quantity">Storing Balance *</label>
+                <label htmlFor="storing_balance">Storing Balance *</label>
                 <input
                   type="number"
-                  id="quantity"
-                  name="quantity"
-                  value={formData.quantity || ''}
+                  id="storing_balance"
+                  name="storing_balance"
+                  value={formData.storing_balance ?? ''}
                   onChange={handleInputChange}
                   min="0"
                   required

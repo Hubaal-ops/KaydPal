@@ -36,6 +36,7 @@ async function insertProduct(productData) {
     quantity: productData.quantity || 0,
     sku: productData.sku || '',
     barcode: productData.barcode || '',
+    storing_balance: productData.storing_balance !== undefined ? productData.storing_balance : 0,
     created_at: new Date(),
     updated_at: new Date()
   };
