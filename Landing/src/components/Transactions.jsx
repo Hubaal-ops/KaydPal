@@ -1,13 +1,15 @@
-import React from 'react';
-import styles from './Transactions.module.css';
-import { ShoppingCart, FileText, CreditCard, ArrowLeft } from 'lucide-react';
+import React, { useState } from 'react';
+import { ShoppingCart, FileText, CreditCard, ArrowLeft, RotateCcw, RotateCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Purchases from '../views/Purchases';
 import Sales from '../views/Sales';
+import SalesReturn from '../views/SalesReturn';
+import PurchaseReturn from '../views/PurchaseReturn';
+import styles from './Transactions.module.css';
 
 const Transactions = () => {
   const navigate = useNavigate();
-  const [activeModule, setActiveModule] = React.useState(null); // 'sales', 'purchases', 'payments', or null
+  const [activeModule, setActiveModule] = useState(null); // 'sales', 'purchases', 'payments', 'salesReturn', 'purchaseReturn', or null
 
   const transactionModules = [
     {
@@ -33,6 +35,22 @@ const Transactions = () => {
       icon: CreditCard,
       color: '#10b981',
       gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+    },
+    {
+      id: 'salesReturn',
+      title: 'Sales Return',
+      description: 'Manage sales return transactions',
+      icon: RotateCcw,
+      color: '#f59e42',
+      gradient: 'linear-gradient(135deg, #f59e42 0%, #b45309 100%)'
+    },
+    {
+      id: 'purchaseReturn',
+      title: 'Purchase Return',
+      description: 'Manage purchase return transactions',
+      icon: RotateCw,
+      color: '#8b5cf6',
+      gradient: 'linear-gradient(135deg, #8b5cf6 0%, #4c1d95 100%)'
     }
   ];
 
@@ -43,15 +61,16 @@ const Transactions = () => {
       setActiveModule('purchases');
     } else if (moduleId === 'payments') {
       navigate('/payments');
+    } else if (moduleId === 'salesReturn') {
+      setActiveModule('salesReturn');
+    } else if (moduleId === 'purchaseReturn') {
+      setActiveModule('purchaseReturn');
     }
   };
 
   const handleBackClick = () => {
     setActiveModule(null);
   };
-
-  // Find the active module's description
-  const activeModuleObj = transactionModules.find(m => m.id === activeModule);
 
   return (
     <div className={styles.transactions}>
@@ -76,6 +95,14 @@ const Transactions = () => {
           <div className={styles.sales} style={{ background: 'none', boxShadow: 'none', padding: 0 }}>
             <Purchases onBack={handleBackClick} />
           </div>
+        ) : activeModule === 'salesReturn' ? (
+          <div className={styles.sales} style={{ background: 'none', boxShadow: 'none', padding: 0 }}>
+            <SalesReturn onBack={handleBackClick} />
+          </div>
+        ) : activeModule === 'purchaseReturn' ? (
+          <div className={styles.sales} style={{ background: 'none', boxShadow: 'none', padding: 0 }}>
+            <PurchaseReturn onBack={handleBackClick} />
+          </div>
         ) : (
           <div className={styles['modules-grid']}>
             {transactionModules.map((module) => {
@@ -99,7 +126,7 @@ const Transactions = () => {
                     <div className={styles['arrow-icon']}>→</div>
                   </div>
                 </div>
-              ); 
+              );
             })}
           </div>
         )}

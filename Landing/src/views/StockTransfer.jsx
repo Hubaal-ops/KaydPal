@@ -1,34 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styles from './Stores.module.css';
 import { Plus, Eye, Edit, Trash2, ArrowLeft, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { getProducts } from '../services/productService';
+import { getStores } from '../services/storeService';
+import { createStockTransfer, getStockTransfers } from '../services/stockTransferService';
 
 const StockTransfer = ({ onBack }) => {
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState('table');
-  const [transfers, setTransfers] = useState([
-    {
-      transfer_id: 1,
-      product: 'Product A',
-      from_store: 'Main Street Store',
-      to_store: 'Downtown Branch',
-      qty: 8,
-      transfer_desc: 'Restocking',
-      created_at: '2024-06-03T09:00:00Z'
-    },
-    {
-      transfer_id: 2,
-      product: 'Product B',
-      from_store: 'Downtown Branch',
-      to_store: 'Mall Location',
-      qty: 3,
-      transfer_desc: 'Low stock transfer',
-      created_at: '2024-06-04T11:15:00Z'
-    }
-  ]);
+  const [transfers, setTransfers] = useState([]); // For now, only add new
+  const [products, setProducts] = useState([]);
+  const [stores, setStores] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
-    product: '',
+    product_no: '',
     from_store: '',
     to_store: '',
     qty: '',
@@ -37,6 +23,29 @@ const StockTransfer = ({ onBack }) => {
   const [editingTransfer, setEditingTransfer] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const [prods, strs, transfersData] = await Promise.all([
+          getProducts(),
+          getStores(),
+          getStockTransfers()
+        ]);
+        setProducts(prods);
+        setStores(Array.isArray(strs) ? strs : (strs.data || []));
+        setTransfers(transfersData);
+      } catch (err) {
+        setError('Error loading products, stores, or transfers');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
 
   const handleBackClick = () => {
     if (onBack) {
@@ -49,7 +58,7 @@ const StockTransfer = ({ onBack }) => {
   const handleViewTable = () => {
     setViewMode('table');
     setEditingTransfer(null);
-    setFormData({ product: '', from_store: '', to_store: '', qty: '', transfer_desc: '' });
+    setFormData({ product_no: '', from_store: '', to_store: '', qty: '', transfer_desc: '' });
     setError('');
     setSuccess('');
   };
@@ -57,7 +66,7 @@ const StockTransfer = ({ onBack }) => {
   const handleAddNew = () => {
     setViewMode('form');
     setEditingTransfer(null);
-    setFormData({ product: '', from_store: '', to_store: '', qty: '', transfer_desc: '' });
+    setFormData({ product_no: '', from_store: '', to_store: '', qty: '', transfer_desc: '' });
     setError('');
     setSuccess('');
   };
@@ -65,7 +74,7 @@ const StockTransfer = ({ onBack }) => {
   const handleEdit = (transfer) => {
     setEditingTransfer(transfer);
     setFormData({
-      product: transfer.product,
+      product_no: transfer.product_no,
       from_store: transfer.from_store,
       to_store: transfer.to_store,
       qty: transfer.qty,
@@ -83,31 +92,40 @@ const StockTransfer = ({ onBack }) => {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
-    if (!formData.product.trim() || !formData.from_store.trim() || !formData.to_store.trim() || !formData.qty) {
+    if (!formData.product_no || !formData.from_store || !formData.to_store || !formData.qty) {
       setError('All fields are required');
       return;
     }
-    if (editingTransfer) {
-      setTransfers(prev => prev.map(tr =>
-        tr.transfer_id === editingTransfer.transfer_id ? { ...tr, ...formData } : tr
-      ));
-      setSuccess('Transfer updated successfully');
-    } else {
-      const newTransfer = {
-        transfer_id: Math.max(...transfers.map(t => t.transfer_id), 0) + 1,
-        ...formData,
-        created_at: new Date().toISOString()
-      };
-      setTransfers(prev => [...prev, newTransfer]);
-      setSuccess('Transfer added successfully');
+    if (formData.from_store === formData.to_store) {
+      setError('Source and destination stores must be different');
+      return;
     }
-    setFormData({ product: '', from_store: '', to_store: '', qty: '', transfer_desc: '' });
-    setEditingTransfer(null);
-    setTimeout(() => setViewMode('table'), 1500);
+    if (Number(formData.qty) <= 0) {
+      setError('Quantity must be greater than 0');
+      return;
+    }
+    setLoading(true);
+    try {
+      await createStockTransfer({
+        product_no: Number(formData.product_no),
+        from_store: Number(formData.from_store),
+        to_store: Number(formData.to_store),
+        qty: Number(formData.qty),
+        transfer_desc: formData.transfer_desc
+      });
+      setSuccess('Stock transfer completed successfully');
+      setFormData({ product_no: '', from_store: '', to_store: '', qty: '', transfer_desc: '' });
+      setEditingTransfer(null);
+      setTimeout(() => setViewMode('table'), 1500);
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || 'Error creating stock transfer');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleInputChange = (e) => {
@@ -115,11 +133,22 @@ const StockTransfer = ({ onBack }) => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // Map product/store numbers to names for display
+  const getProductName = (product_no) => {
+    const prod = products.find(p => p.product_no === product_no);
+    return prod ? prod.product_name : product_no;
+  };
+  const getStoreName = (store_no) => {
+    const store = stores.find(s => s.store_no === store_no);
+    return store ? store.store_name : store_no;
+  };
+
+  // For now, transfers are not fetched from backend, so search is on local state
   const filteredTransfers = transfers.filter(tr =>
-    tr.product.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    tr.from_store.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    tr.to_store.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    tr.transfer_desc.toLowerCase().includes(searchTerm.toLowerCase())
+    (tr.product_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (tr.from_store_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (tr.to_store_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (tr.transfer_desc || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -145,7 +174,8 @@ const StockTransfer = ({ onBack }) => {
         </div>
         {error && <div className={styles.error}>{error}</div>}
         {success && <div className={styles.success}>{success}</div>}
-        {viewMode === 'table' && (
+        {loading && <div className={styles.loading}>Loading...</div>}
+        {viewMode === 'table' && !loading && (
           <div className={styles['table-container']}>
             <div className={styles['table-header']}>
               <div className={styles['search-container']}>
@@ -172,7 +202,6 @@ const StockTransfer = ({ onBack }) => {
                     <th>To Store</th>
                     <th>Quantity</th>
                     <th>Description</th>
-                    <th>Date</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -180,12 +209,11 @@ const StockTransfer = ({ onBack }) => {
                   {filteredTransfers.map(tr => (
                     <tr key={tr.transfer_id}>
                       <td>{tr.transfer_id}</td>
-                      <td>{tr.product}</td>
-                      <td>{tr.from_store}</td>
-                      <td>{tr.to_store}</td>
+                      <td>{tr.product_name}</td>
+                      <td>{tr.from_store_name}</td>
+                      <td>{tr.to_store_name}</td>
                       <td>{tr.qty}</td>
                       <td>{tr.transfer_desc}</td>
-                      <td>{new Date(tr.created_at).toLocaleDateString()}</td>
                       <td>
                         <div className={styles['action-icons']}>
                           <button onClick={() => handleEdit(tr)} className={styles['icon-btn']} title="Edit">
@@ -208,59 +236,56 @@ const StockTransfer = ({ onBack }) => {
             </div>
           </div>
         )}
-        {viewMode === 'form' && (
+        {viewMode === 'form' && !loading && (
           <div className={styles['form-container']}>
             <h2>{editingTransfer ? 'Edit Transfer' : 'Add New Transfer'}</h2>
             <form onSubmit={handleSubmit} className={styles.form}>
-              <div style={{ display: 'flex', gap: '2rem', alignItems: 'center', marginBottom: '1.5rem' }}>
-                <div style={{ flex: 1 }}>
-                  <label htmlFor="from_store">From Store *</label>
-                  <select
-                    id="from_store"
-                    name="from_store"
-                    value={formData.from_store}
-                    onChange={handleInputChange}
-                    required
-                    className={styles['form-input']}
-                  >
-                    <option value="">Select Store</option>
-                    <option value="Main Street Store">Main Street Store</option>
-                    <option value="Downtown Branch">Downtown Branch</option>
-                    <option value="Mall Location">Mall Location</option>
-                  </select>
-                </div>
-                <div style={{ fontSize: '2rem', color: '#bdbdbd', marginTop: '2rem' }}>&rarr;</div>
-                <div style={{ flex: 1 }}>
-                  <label htmlFor="to_store">To Store *</label>
-                  <select
-                    id="to_store"
-                    name="to_store"
-                    value={formData.to_store}
-                    onChange={handleInputChange}
-                    required
-                    className={styles['form-input']}
-                  >
-                    <option value="">Select Store</option>
-                    <option value="Main Street Store">Main Street Store</option>
-                    <option value="Downtown Branch">Downtown Branch</option>
-                    <option value="Mall Location">Mall Location</option>
-                  </select>
-                </div>
+              <div className={styles['form-group']}>
+                <label htmlFor="product_no">Product *</label>
+                <select
+                  id="product_no"
+                  name="product_no"
+                  value={formData.product_no}
+                  onChange={handleInputChange}
+                  className={styles['form-select']}
+                  required
+                >
+                  <option value="">Select a product</option>
+                  {products.map(p => (
+                    <option key={p.product_no} value={p.product_no}>{p.product_name}</option>
+                  ))}
+                </select>
               </div>
               <div className={styles['form-group']}>
-                <label htmlFor="product">Product *</label>
+                <label htmlFor="from_store">From Store *</label>
                 <select
-                  id="product"
-                  name="product"
-                  value={formData.product}
+                  id="from_store"
+                  name="from_store"
+                  value={formData.from_store}
                   onChange={handleInputChange}
+                  className={styles['form-select']}
                   required
-                  className={styles['form-input']}
                 >
-                  <option value="">Select Product</option>
-                  <option value="Product A">Product A</option>
-                  <option value="Product B">Product B</option>
-                  <option value="Product C">Product C</option>
+                  <option value="">Select source store</option>
+                  {stores.map(s => (
+                    <option key={s.store_no} value={s.store_no}>{s.store_name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className={styles['form-group']}>
+                <label htmlFor="to_store">To Store *</label>
+                <select
+                  id="to_store"
+                  name="to_store"
+                  value={formData.to_store}
+                  onChange={handleInputChange}
+                  className={styles['form-select']}
+                  required
+                >
+                  <option value="">Select destination store</option>
+                  {stores.map(s => (
+                    <option key={s.store_no} value={s.store_no}>{s.store_name}</option>
+                  ))}
                 </select>
               </div>
               <div className={styles['form-group']}>

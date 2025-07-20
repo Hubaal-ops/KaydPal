@@ -1,22 +1,20 @@
 const connectDB = require('../db');
+const StockTransfer = require('../models/StockTransfer');
+const StoreProduct = require('../models/StoreProduct');
+const Product = require('../models/Product');
+const Store = require('../models/Store');
+const getNextSequence = require('../getNextSequence');
+const { recalculateProductBalance, recalculateStoreTotal } = require('./storeProductController');
 
 async function getNextSequenceValue(sequenceName) {
-  const db = await connectDB();
-  const result = await db.collection('counters').findOneAndUpdate(
-    { _id: sequenceName },
-    { $inc: { seq: 1 } },
-    { returnDocument: 'after', upsert: true }
-  );
-  return result.value ? result.value.seq : result.seq;
+  return await getNextSequence(sequenceName);
 }
 
 async function insertStockTransfer(transferData) {
-  const db = await connectDB();
-  
   const {
     from_store,
     to_store,
-    pro_no,
+    product_no,
     qty,
     transfer_desc
   } = transferData;
@@ -30,131 +28,89 @@ async function insertStockTransfer(transferData) {
   }
 
   // Validate stores exist
-  const fromStore = await db.collection('Stores').findOne({ store_no: from_store });
-  if (!fromStore) {
-    throw new Error('Source store not found');
-  }
-
-  const toStore = await db.collection('Stores').findOne({ store_no: to_store });
-  if (!toStore) {
-    throw new Error('Destination store not found');
-  }
+  const fromStore = await Store.findOne({ store_no: from_store });
+  if (!fromStore) throw new Error('Source store not found');
+  const toStore = await Store.findOne({ store_no: to_store });
+  if (!toStore) throw new Error('Destination store not found');
 
   // Validate product exists
-  const product = await db.collection('Products').findOne({ product_no: pro_no });
-  if (!product) {
-    throw new Error('Product not found');
-  }
+  const product = await Product.findOne({ product_no });
+  if (!product) throw new Error('Product not found');
 
   // Check if source store has enough stock
-  const fromStoreProduct = await db.collection('Stores_Product').findOne({
-    pro_no,
-    store_no: from_store
-  });
-
-  if (!fromStoreProduct) {
-    throw new Error('Product not found in source store');
-  }
-
-  if (fromStoreProduct.qty < qty) {
-    throw new Error('Insufficient stock in source store');
-  }
+  const fromStoreProduct = await StoreProduct.findOne({ product_no, store_no: from_store });
+  if (!fromStoreProduct) throw new Error('Product not found in source store');
+  if (fromStoreProduct.qty < qty) throw new Error('Insufficient stock in source store');
 
   // Get next transfer_id
   const transfer_id = await getNextSequenceValue('stock_transfers');
 
   // Create transfer record
-  const newTransfer = {
+  const newTransfer = new StockTransfer({
     transfer_id,
     from_store,
     to_store,
-    pro_no,
+    product_no,
     qty,
-    status: 'pending',
     transfer_desc,
+    status: 'completed',
     created_at: new Date(),
     updated_at: new Date()
-  };
+  });
 
   try {
-    // Insert transfer record
-    await db.collection('Stock_Transfers').insertOne(newTransfer);
+    await newTransfer.save();
 
     // Update source store stock
-    await db.collection('Stores_Product').updateOne(
-      { pro_no, store_no: from_store },
-      { 
-        $inc: { qty: -qty },
-        $set: { updated_at: new Date() }
-      }
+    await StoreProduct.updateOne(
+      { product_no, store_no: from_store },
+      { $inc: { qty: -qty }, $set: { updated_at: new Date() } }
     );
 
     // Update source store total items
-    await db.collection('Stores').updateOne(
+    await Store.updateOne(
       { store_no: from_store },
       { $inc: { total_items: -qty } }
     );
 
-    // Check if product exists in destination store
-    const toStoreProduct = await db.collection('Stores_Product').findOne({
-      pro_no,
-      store_no: to_store
-    });
-
-    if (toStoreProduct) {
-      // Update existing product in destination store
-      await db.collection('Stores_Product').updateOne(
-        { pro_no, store_no: to_store },
-        { 
-          $inc: { qty: qty },
-          $set: { updated_at: new Date() }
-        }
-      );
-    } else {
-      // Create new product record in destination store
-      await db.collection('Stores_Product').insertOne({
-        pro_no,
+    // Update/Create destination store product
+    let toStoreProduct = await StoreProduct.findOne({ product_no, store_no: to_store });
+    if (!toStoreProduct) {
+      const store_product_no = await getNextSequence('store_product_no');
+      await StoreProduct.create({
+        store_product_no,
+        product_no,
         store_no: to_store,
         qty,
         created_at: new Date(),
         updated_at: new Date()
       });
+    } else {
+      await StoreProduct.updateOne(
+        { product_no, store_no: to_store },
+        { $inc: { qty }, $set: { updated_at: new Date() } }
+      );
     }
 
     // Update destination store total items
-    await db.collection('Stores').updateOne(
+    await Store.updateOne(
       { store_no: to_store },
       { $inc: { total_items: qty } }
     );
 
-    // Update transfer status to completed
-    await db.collection('Stock_Transfers').updateOne(
-      { transfer_id },
-      { 
-        $set: { 
-          status: 'completed',
-          updated_at: new Date()
-        }
-      }
-    );
+    // Recalculate product and store summaries
+    await recalculateProductBalance(product_no);
+    await recalculateStoreTotal(from_store);
+    await recalculateStoreTotal(to_store);
 
     return {
       message: 'Stock transfer completed successfully',
-      transfer_id,
-      from_store: {
-        store_no: from_store,
-        remaining_qty: fromStoreProduct.qty - qty
-      },
-      to_store: {
-        store_no: to_store,
-        new_qty: toStoreProduct ? toStoreProduct.qty + qty : qty
-      }
+      transfer_id
     };
-
   } catch (error) {
     // If any operation fails, try to clean up
     try {
-      await db.collection('Stock_Transfers').deleteOne({ transfer_id });
+      await StockTransfer.deleteOne({ transfer_id });
     } catch (cleanupError) {
       console.error('Error during cleanup:', cleanupError);
     }
@@ -162,4 +118,21 @@ async function insertStockTransfer(transferData) {
   }
 }
 
-module.exports = { insertStockTransfer }; 
+async function getAllStockTransfers() {
+  const StockTransfer = require('../models/StockTransfer');
+  const Product = require('../models/Product');
+  const Store = require('../models/Store');
+  const transfers = await StockTransfer.find().sort({ created_at: -1 });
+  const products = await Product.find();
+  const stores = await Store.find();
+  const productMap = Object.fromEntries(products.map(p => [p.product_no, p.product_name]));
+  const storeMap = Object.fromEntries(stores.map(s => [s.store_no, s.store_name]));
+  return transfers.map(tr => ({
+    ...tr.toObject(),
+    product_name: productMap[tr.product_no] || '',
+    from_store_name: storeMap[tr.from_store] || '',
+    to_store_name: storeMap[tr.to_store] || ''
+  }));
+}
+
+module.exports = { insertStockTransfer, getAllStockTransfers }; 

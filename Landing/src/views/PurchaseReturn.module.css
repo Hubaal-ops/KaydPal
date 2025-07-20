@@ -1,0 +1,53 @@
+.purchaseReturn {
+  padding: 2rem;
+}
+.purchaseReturnHeader {
+  margin-bottom: 2rem;
+}
+.tableContainer {
+  background: #23293a;
+  border-radius: 12px;
+  margin-top: 1.5rem;
+  overflow-x: auto;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  color: #fff;
+}
+.table th, .table td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+}
+.table th {
+  background: #1a1f2b;
+  font-weight: 600;
+}
+.table tr:nth-child(even) {
+  background: #23293a;
+}
+.table tr:nth-child(odd) {
+  background: #1a1f2b;
+}
+.actionIcons {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.iconBtn {
+  background: none;
+  border: none;
+  color: #3b82f6;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+.iconBtn.delete {
+  color: #f43f5e;
+}
+.noData {
+  color: #bdbdbd;
+  text-align: center;
+  padding: 2rem 0;
+} 
