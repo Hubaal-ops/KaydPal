@@ -1,27 +1,11 @@
 const connectDB = require('../db');
 const Purchase = require('../models/Purchase');
+const StoreProduct = require('../models/StoreProduct');
+const recalculateProductBalance = require('./storeProductController').recalculateProductBalance;
+const recalculateStoreTotal = require('./storeProductController').recalculateStoreTotal;
+const getNextSequence = require('../getNextSequence');
 
 // 🔧 Fix for getNextSequence function
-async function getNextSequence(name) {
-  const db = await connectDB();
-
-  let result = await db.collection('Counters').findOneAndUpdate(
-    { _id: name },
-    { $inc: { seq: 1 } },
-    {
-      returnDocument: 'after', // For MongoDB v4+
-      upsert: true
-    }
-  );
-
-  const document = result.value || result;
-
-  if (!document || typeof document.seq !== 'number') {
-    throw new Error(`❌ Sequence '${name}' not found or invalid.`);
-  }
-
-  return document.seq;
-}
 
 // 🔁 Insert Purchase
 async function insertPurchase(purchase) {
@@ -40,6 +24,13 @@ async function insertPurchase(purchase) {
 
   // Validate required fields
   if (qty <= 0 || price <= 0) throw new Error('❌ Invalid quantity or price.');
+
+  // Check account balance before proceeding
+  const account = await db.collection('accounts').findOne({ account_id });
+  if (!account) throw new Error('Account not found.');
+  if (paid > 0 && account.balance < paid) {
+    throw new Error('Insufficient account balance for this purchase.');
+  }
 
   const amount = qty * price - discount + tax;
   if (paid > amount) throw new Error('❌ Paid amount exceeds total.');
@@ -76,6 +67,26 @@ async function insertPurchase(purchase) {
     )
   ]);
 
+  let storeProduct = await StoreProduct.findOne({ product_no, store_no });
+  if (!storeProduct) {
+    const store_product_no = await getNextSequence('store_product_no');
+    await StoreProduct.create({
+      store_product_no,
+      product_no,
+      store_no,
+      qty,
+      created_at: new Date(),
+      updated_at: new Date()
+    });
+  } else {
+    await StoreProduct.updateOne(
+      { product_no, store_no },
+      { $inc: { qty }, $set: { updated_at: new Date() } }
+    );
+  }
+  await recalculateProductBalance(product_no);
+  await recalculateStoreTotal(store_no);
+
   const debt = amount - paid;
 
   if (debt > 0) {
@@ -92,10 +103,13 @@ async function insertPurchase(purchase) {
   }
 
   if (paid > 0) {
-    await db.collection('accounts').updateOne(
+    const result = await db.collection('accounts').updateOne(
       { account_id },
       { $inc: { balance: -paid } }
     );
+    if (result.matchedCount === 0) {
+      throw new Error('Account not found or balance not updated.');
+    }
   }
 
   return { message: '✅ Purchase inserted successfully.', purchase_no };
@@ -201,6 +215,26 @@ async function updatePurchase(purchase_no, updated) {
       : Promise.resolve()
   ]);
 
+  let storeProduct = await StoreProduct.findOne({ product_no, store_no });
+  if (!storeProduct) {
+    const store_product_no = await getNextSequence('store_product_no');
+    await StoreProduct.create({
+      store_product_no,
+      product_no,
+      store_no,
+      qty,
+      created_at: new Date(),
+      updated_at: new Date()
+    });
+  } else {
+    await StoreProduct.updateOne(
+      { product_no, store_no },
+      { $inc: { qty }, $set: { updated_at: new Date() } }
+    );
+  }
+  await recalculateProductBalance(product_no);
+  await recalculateStoreTotal(store_no);
+
   return { message: '✅ Purchase updated successfully.' };
 }
 
@@ -267,6 +301,12 @@ module.exports = {
     ]);
 
     await Purchase.deleteOne({ purchase_no });
+    await StoreProduct.updateOne(
+      { product_no: oldPurchase.product_no, store_no: oldPurchase.store_no },
+      { $inc: { qty: -oldPurchase.qty }, $set: { updated_at: new Date() } }
+    );
+    await recalculateProductBalance(oldPurchase.product_no);
+    await recalculateStoreTotal(oldPurchase.store_no);
 
     return { message: '✅ Purchase deleted successfully.' };
   }

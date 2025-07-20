@@ -1,20 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import styles from './StoreProducts.module.css';
-import { 
-  Plus, 
-  Eye, 
-  Edit, 
-  Trash2, 
-  ArrowLeft,
-  Search
-} from 'lucide-react';
+import { Plus, Eye, Edit, Trash2, ArrowLeft, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getProducts } from '../services/productService';
 import { getStores } from '../services/storeService';
+import {
+  getStoreProducts,
+  getStoreProductById,
+  createStoreProduct,
+  updateStoreProduct,
+  deleteStoreProduct
+} from '../services/storeProductService';
 
 const StoreProducts = ({ onBack }) => {
   const navigate = useNavigate();
-  const [viewMode, setViewMode] = useState('table'); // 'table' or 'form'
+  const [viewMode, setViewMode] = useState('table');
   const [storeProducts, setStoreProducts] = useState([]);
   const [products, setProducts] = useState([]);
   const [stores, setStores] = useState([]);
@@ -34,13 +34,8 @@ const StoreProducts = ({ onBack }) => {
     setLoading(true);
     setError('');
     try {
-      // The original code had getStoreProducts() here, but getStoreProducts is removed.
-      // Assuming the intent was to fetch store products from a different source or remove this functionality.
-      // For now, removing the call as per the edit hint.
-      // const data = await getStoreProducts();
-      // setStoreProducts(data);
-      // If the intent was to fetch store products, this would need to be re-added with a new service.
-      // For now, removing the call as per the edit hint.
+      const data = await getStoreProducts();
+      setStoreProducts(Array.isArray(data) ? data : (data.data || []));
     } catch (error) {
       setError('Error fetching store products');
     } finally {
@@ -51,7 +46,7 @@ const StoreProducts = ({ onBack }) => {
   const fetchProducts = async () => {
     try {
       const data = await getProducts();
-      setProducts(data);
+      setProducts(Array.isArray(data) ? data : (data.data || []));
     } catch (error) {
       setError('Error fetching products');
     }
@@ -60,7 +55,7 @@ const StoreProducts = ({ onBack }) => {
   const fetchStoresList = async () => {
     try {
       const data = await getStores();
-      setStores(data);
+      setStores(Array.isArray(data) ? data : (data.data || []));
     } catch (error) {
       setError('Error fetching stores');
     }
@@ -107,17 +102,17 @@ const StoreProducts = ({ onBack }) => {
     setSuccess('');
   };
 
-  const handleDelete = async (storeProductId) => {
+  const handleDelete = async (storeProductNo) => {
     if (window.confirm('Are you sure you want to delete this store product?')) {
       try {
-        // The original code had deleteStoreProduct(storeProductId) here, but deleteStoreProduct is removed.
-        // Assuming the intent was to remove this functionality or handle deletion differently.
-        // For now, removing the call as per the edit hint.
-        // await deleteStoreProduct(storeProductId);
-        // await fetchStoreProducts();
+        setLoading(true);
+        await deleteStoreProduct(storeProductNo);
         setSuccess('Store product deleted successfully');
+        await fetchStoreProducts();
       } catch (error) {
         setError('Error deleting store product');
+      } finally {
+        setLoading(false);
       }
     }
   };
@@ -140,23 +135,19 @@ const StoreProducts = ({ onBack }) => {
     }
     try {
       setLoading(true);
+      const payload = {
+        product_no: formData.product_no,
+        store_no: formData.store_no,
+        qty: formData.qty
+      };
       if (editingStoreProduct) {
-        // The original code had updateStoreProduct(editingStoreProduct._id, formData) here, but updateStoreProduct is removed.
-        // Assuming the intent was to update store products differently or remove this functionality.
-        // For now, removing the call as per the edit hint.
-        // await updateStoreProduct(editingStoreProduct._id, formData);
+        await updateStoreProduct(editingStoreProduct.store_product_no, payload);
         setSuccess('Store product updated successfully');
       } else {
-        // The original code had createStoreProduct(formData) here, but createStoreProduct is removed.
-        // Assuming the intent was to add store products differently or remove this functionality.
-        // For now, removing the call as per the edit hint.
-        // await createStoreProduct(formData);
+        await createStoreProduct(payload);
         setSuccess('Store product added successfully');
       }
-      // The original code had fetchStoreProducts() here, but fetchStoreProducts is removed.
-      // Assuming the intent was to re-fetch store products or remove this functionality.
-      // For now, removing the call as per the edit hint.
-      // await fetchStoreProducts();
+      await fetchStoreProducts();
       setFormData({ product_no: '', store_no: '', qty: 0 });
       setEditingStoreProduct(null);
       setTimeout(() => {
@@ -177,9 +168,19 @@ const StoreProducts = ({ onBack }) => {
     }));
   };
 
+  // Map product/store numbers to names for display
+  const getProductName = (product_no) => {
+    const prod = products.find(p => p.product_no === product_no || p._id === product_no);
+    return prod && typeof prod.product_name === 'string' ? prod.product_name : String(product_no || '');
+  };
+  const getStoreName = (store_no) => {
+    const store = stores.find(s => s.store_no === store_no || s._id === store_no);
+    return store && typeof store.store_name === 'string' ? store.store_name : String(store_no || '');
+  };
+
   const filteredStoreProducts = storeProducts.filter(storeProduct =>
-    (storeProduct.product_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (storeProduct.store_name || '').toLowerCase().includes(searchTerm.toLowerCase())
+    (getProductName(storeProduct.product_no) || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (getStoreName(storeProduct.store_no) || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -192,31 +193,19 @@ const StoreProducts = ({ onBack }) => {
         <h1>Store Products Management</h1>
         <p>Manage product inventory across stores</p>
       </div>
-
       <div className={styles['store-products-content']}>
-        {/* Action Buttons */}
         <div className={styles['action-buttons']}>
-          <button 
-            className={`${styles['action-btn']} ${viewMode === 'table' ? styles.active : ''}`}
-            onClick={handleViewTable}
-          >
+          <button className={`${styles['action-btn']} ${viewMode === 'table' ? styles.active : ''}`} onClick={handleViewTable}>
             <Eye size={20} />
             View Table
           </button>
-          <button 
-            className={`${styles['action-btn']} ${viewMode === 'form' ? styles.active : ''}`}
-            onClick={handleAddNew}
-          >
+          <button className={`${styles['action-btn']} ${viewMode === 'form' ? styles.active : ''}`} onClick={handleAddNew}>
             <Plus size={20} />
             Add New Store Product
           </button>
         </div>
-
-        {/* Error and Success Messages */}
         {error && <div className={styles.error}>{error}</div>}
         {success && <div className={styles.success}>{success}</div>}
-
-        {/* Table View */}
         {viewMode === 'table' && (
           <div className={styles['table-container']}>
             <div className={styles['table-header']}>
@@ -226,7 +215,7 @@ const StoreProducts = ({ onBack }) => {
                   type="text"
                   placeholder="Search store products..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={e => setSearchTerm(e.target.value)}
                   className={styles['search-input']}
                 />
               </div>
@@ -234,7 +223,6 @@ const StoreProducts = ({ onBack }) => {
                 {filteredStoreProducts.length} store products found
               </div>
             </div>
-
             {loading ? (
               <div className={styles.loading}>Loading store products...</div>
             ) : (
@@ -251,25 +239,17 @@ const StoreProducts = ({ onBack }) => {
                   </thead>
                   <tbody>
                     {filteredStoreProducts.map((storeProduct) => (
-                      <tr key={storeProduct._id}>
-                        <td>{storeProduct._id}</td>
-                        <td>{storeProduct.product_name}</td>
-                        <td>{storeProduct.store_name}</td>
+                      <tr key={storeProduct.store_product_no || storeProduct._id || Math.random()}>
+                        <td>{storeProduct.store_product_no}</td>
+                        <td>{getProductName(storeProduct.product_no)}</td>
+                        <td>{getStoreName(storeProduct.store_no)}</td>
                         <td>{storeProduct.qty}</td>
                         <td>
                           <div className={styles['action-icons']}>
-                            <button
-                              onClick={() => handleEdit(storeProduct)}
-                              className={styles['icon-btn']}
-                              title="Edit"
-                            >
+                            <button onClick={() => handleEdit(storeProduct)} className={styles['icon-btn']} title="Edit">
                               <Edit size={16} />
                             </button>
-                            <button
-                              onClick={() => handleDelete(storeProduct._id)}
-                              className={`${styles['icon-btn']} ${styles.delete}`}
-                              title="Delete"
-                            >
+                            <button onClick={() => handleDelete(storeProduct.store_product_no)} className={`${styles['icon-btn']} ${styles.delete}`} title="Delete">
                               <Trash2 size={16} />
                             </button>
                           </div>
@@ -287,8 +267,6 @@ const StoreProducts = ({ onBack }) => {
             )}
           </div>
         )}
-
-        {/* Form View */}
         {viewMode === 'form' && (
           <div className={styles['form-container']}>
             <h2>{editingStoreProduct ? 'Edit Store Product' : 'Add New Store Product'}</h2>
@@ -305,13 +283,12 @@ const StoreProducts = ({ onBack }) => {
                 >
                   <option value="">Select a product</option>
                   {products.map((product) => (
-                    <option key={product._id} value={product._id}>
+                    <option key={product.product_no || product._id} value={product.product_no || product._id}>
                       {product.product_name}
                     </option>
                   ))}
                 </select>
               </div>
-
               <div className={styles['form-group']}>
                 <label htmlFor="store_no">Store *</label>
                 <select
@@ -324,13 +301,12 @@ const StoreProducts = ({ onBack }) => {
                 >
                   <option value="">Select a store</option>
                   {stores.map((store) => (
-                    <option key={store._id} value={store._id}>
+                    <option key={store.store_no || store._id} value={store.store_no || store._id}>
                       {store.store_name}
                     </option>
                   ))}
                 </select>
               </div>
-
               <div className={styles['form-group']}>
                 <label htmlFor="qty">Quantity</label>
                 <input
@@ -344,7 +320,6 @@ const StoreProducts = ({ onBack }) => {
                   className={styles['form-input']}
                 />
               </div>
-
               <div className={styles['form-actions']}>
                 <button type="button" onClick={handleViewTable} className={styles['cancel-btn']}>
                   Cancel

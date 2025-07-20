@@ -14,7 +14,7 @@ const StockAdjustment = ({ onBack }) => {
   const [stores, setStores] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
-    pro_no: '',
+    product_no: '',
     store_no: '',
     qty: '',
     adj_type: 'add',
@@ -58,7 +58,7 @@ const StockAdjustment = ({ onBack }) => {
   const handleViewTable = () => {
     setViewMode('table');
     setEditingAdjustment(null);
-    setFormData({ pro_no: '', store_no: '', qty: '', adj_type: 'add', adj_desc: '' });
+    setFormData({ product_no: '', store_no: '', qty: '', adj_type: 'add', adj_desc: '' });
     setError('');
     setSuccess('');
   };
@@ -66,7 +66,7 @@ const StockAdjustment = ({ onBack }) => {
   const handleAddNew = () => {
     setViewMode('form');
     setEditingAdjustment(null);
-    setFormData({ pro_no: '', store_no: '', qty: '', adj_type: 'add', adj_desc: '' });
+    setFormData({ product_no: '', store_no: '', qty: '', adj_type: 'add', adj_desc: '' });
     setError('');
     setSuccess('');
   };
@@ -74,7 +74,7 @@ const StockAdjustment = ({ onBack }) => {
   const handleEdit = (adj) => {
     setEditingAdjustment(adj);
     setFormData({
-      pro_no: adj.pro_no,
+      product_no: adj.product_no,
       store_no: adj.store_no,
       qty: adj.qty,
       adj_type: adj.adj_type,
@@ -97,7 +97,7 @@ const StockAdjustment = ({ onBack }) => {
     e.preventDefault();
     setError('');
     setSuccess('');
-    if (!formData.pro_no || !formData.store_no || !formData.qty) {
+    if (!formData.product_no || !formData.store_no || !formData.qty) {
       setError('All fields are required');
       return;
     }
@@ -108,7 +108,7 @@ const StockAdjustment = ({ onBack }) => {
     setLoading(true);
     try {
       await addStockAdjustment({
-        pro_no: Number(formData.pro_no),
+        product_no: Number(formData.product_no),
         store_no: Number(formData.store_no),
         qty: Number(formData.qty),
         adj_type: formData.adj_type,
@@ -118,7 +118,7 @@ const StockAdjustment = ({ onBack }) => {
       // Refresh adjustments
       const adjs = await getAllStockAdjustments();
       setAdjustments(adjs);
-      setFormData({ pro_no: '', store_no: '', qty: '', adj_type: 'add', adj_desc: '' });
+      setFormData({ product_no: '', store_no: '', qty: '', adj_type: 'add', adj_desc: '' });
       setEditingAdjustment(null);
       setTimeout(() => setViewMode('table'), 1500);
     } catch (err) {
@@ -134,9 +134,9 @@ const StockAdjustment = ({ onBack }) => {
   };
 
   // Map product/store numbers to names for display
-  const getProductName = (pro_no) => {
-    const prod = products.find(p => p.product_no === pro_no);
-    return prod ? prod.product_name : pro_no;
+  const getProductName = (product_no) => {
+    const prod = products.find(p => p.product_no === product_no);
+    return prod ? prod.product_name : product_no;
   };
   const getStoreName = (store_no) => {
     const store = stores.find(s => s.store_no === store_no);
@@ -144,7 +144,7 @@ const StockAdjustment = ({ onBack }) => {
   };
 
   const filteredAdjustments = adjustments.filter(adj =>
-    getProductName(adj.pro_no).toLowerCase().includes(searchTerm.toLowerCase()) ||
+    getProductName(adj.product_no).toLowerCase().includes(searchTerm.toLowerCase()) ||
     getStoreName(adj.store_no).toLowerCase().includes(searchTerm.toLowerCase()) ||
     (adj.adj_type || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (adj.adj_desc || '').toLowerCase().includes(searchTerm.toLowerCase())
@@ -209,7 +209,7 @@ const StockAdjustment = ({ onBack }) => {
                   {filteredAdjustments.map(adj => (
                     <tr key={adj.adj_no}>
                       <td>{adj.adj_no}</td>
-                      <td>{getProductName(adj.pro_no)}</td>
+                      <td>{getProductName(adj.product_no)}</td>
                       <td>{getStoreName(adj.store_no)}</td>
                       <td>{adj.qty}</td>
                       <td>{adj.adj_type}</td>
@@ -242,11 +242,11 @@ const StockAdjustment = ({ onBack }) => {
             <h2>{editingAdjustment ? 'Edit Adjustment' : 'Add New Adjustment'}</h2>
             <form onSubmit={handleSubmit} className={styles.form}>
               <div className={styles['form-group']}>
-                <label htmlFor="pro_no">Product *</label>
+                <label htmlFor="product_no">Product *</label>
                 <select
-                  id="pro_no"
-                  name="pro_no"
-                  value={formData.pro_no}
+                  id="product_no"
+                  name="product_no"
+                  value={formData.product_no}
                   onChange={handleInputChange}
                   className={styles['form-select']}
                   required
