@@ -1,157 +1,238 @@
-const connectDB = require('../db');
+const SalesReturn = require('../models/SalesReturn');
+const getNextSequence = require('../getNextSequence');
+const Sale = require('../models/Sale');
+const Product = require('../models/Product');
+const Store = require('../models/Store');
+const Customer = require('../models/Customer');
+const Account = require('../models/Account');
+const StoreProduct = require('../models/StoreProduct');
 
-async function getNextSequenceValue(sequenceName) {
-  const db = await connectDB();
-  const result = await db.collection('counters').findOneAndUpdate(
-    { _id: sequenceName },
-    { $inc: { seq: 1 } },
-    { returnDocument: 'after', upsert: true }
-  );
-  return result.value ? result.value.seq : result.seq;
-}
-
-async function insertSalesReturn(returnData) {
-  const db = await connectDB();
-  
-  const {
-    sel_no,
-    product_no,
-    customer_no,
-    store_no,
-    qty,
-    price,
-    amount,
-    paid,
-    reason
-  } = returnData;
-
-  // Validate input
-  if (qty <= 0) throw new Error('Return quantity must be greater than 0');
-  if (price <= 0) throw new Error('Price must be greater than 0');
-  if (amount <= 0) throw new Error('Amount must be greater than 0');
-  if (paid < 0) throw new Error('Paid amount cannot be negative');
-  if (paid > amount) throw new Error('Paid amount cannot exceed return amount');
-
-  // Get the original sale
-  const originalSale = await db.collection('Sales').findOne({ sel_no });
-  if (!originalSale) throw new Error('Sale not found');
-  
-  // Validate it's the last sale for this product
-  const lastSale = await db.collection('Sales')
-    .findOne(
-      { product_no },
-      { sort: { sel_date: -1 } }
-    );
-  
-  if (!lastSale || lastSale.sel_no !== sel_no) {
-    throw new Error('Can only return the most recent sale for this product');
-  }
-
-  // Validate return quantity doesn't exceed original sale quantity
-  if (qty > originalSale.qty) {
-    throw new Error('Return quantity cannot exceed original sale quantity');
-  }
-
-  // Get customer current balance
-  const customer = await db.collection('Customers').findOne({ customer_no });
-  if (!customer) throw new Error('Customer not found');
-
-  // Calculate refund amount
-  const refundAmount = Math.min(paid, amount);
-  
-  // Get original sale account
-  const originalAccount = await db.collection('Accounts').findOne({ account_id: originalSale.account_id });
-  if (!originalAccount) throw new Error('Original sale account not found');
-
-  // Get next return_id
-  const return_id = await getNextSequenceValue('sales_returns');
-
-  // Create return record
-  const newReturn = {
-    return_id,
-    sel_no,
-    product_no,
-    customer_no,
-    store_no,
-    qty,
-    price,
-    amount,
-    paid,
-    reason,
-    account_id: originalSale.account_id, // Use original sale's account
-    return_date: new Date()
-  };
-
+// Get all sales returns with names
+exports.getAllSalesReturns = async (req, res) => {
   try {
-    // Insert return record
-    await db.collection('Sales_Returns').insertOne(newReturn);
-
-    // Update stock - using pro_no for Stores_Product collection
-    await db.collection('Stores_Product').updateOne(
-      { pro_no: product_no, store_no },
-      { $inc: { qty: qty }, $set: { updated_at: new Date() } }
-    );
-
-    // Update product storing balance
-    await db.collection('Products').updateOne(
-      { product_no },
-      { $inc: { storing_balance: qty } }
-    );
-
-    // Update store total items
-    await db.collection('Stores').updateOne(
-      { store_no },
-      { $inc: { total_items: qty } }
-    );
-
-    // Handle refund
-    if (refundAmount > 0) {
-      // First, reduce customer's debt if they have any
-      const debtReduction = Math.min(customer.bal, refundAmount);
-      if (debtReduction > 0) {
-        await db.collection('Customers').updateOne(
-          { customer_no },
-          { $inc: { bal: -debtReduction } }
-        );
-      }
-
-      // If there's still amount to refund, take it from the original sale account
-      const remainingRefund = refundAmount - debtReduction;
-      if (remainingRefund > 0) {
-        // Update account balance for refund
-        const accountUpdate = await db.collection('Accounts').updateOne(
-          { account_id: originalSale.account_id },
-          { $inc: { balance: -remainingRefund } }
-        );
-
-        if (accountUpdate.modifiedCount === 0) {
-          throw new Error('Failed to update account balance');
-        }
-
-        // Verify the account update
-        const updatedAccount = await db.collection('Accounts').findOne({ account_id: originalSale.account_id });
-        console.log('Account balance before:', originalAccount.balance);
-        console.log('Account balance after:', updatedAccount.balance);
-        console.log('Refund amount:', remainingRefund);
-      }
-    }
-
-    return { 
-      message: 'Sales return processed successfully',
-      return_id,
-      refundAmount,
-      debtReduction: Math.min(customer.bal, refundAmount),
-      accountRefund: Math.max(0, refundAmount - Math.min(customer.bal, refundAmount))
-    };
-  } catch (error) {
-    // If any operation fails, try to clean up
-    try {
-      await db.collection('Sales_Returns').deleteOne({ return_id });
-    } catch (cleanupError) {
-      console.error('Error during cleanup:', cleanupError);
-    }
-    throw error;
+    const returns = await SalesReturn.find().sort({ created_at: -1 });
+    const productNos = [...new Set(returns.map(r => r.product_no))];
+    const customerNos = [...new Set(returns.map(r => r.customer_no))];
+    const storeNos = [...new Set(returns.map(r => r.store_no))];
+    const [products, customers, stores] = await Promise.all([
+      Product.find({ product_no: { $in: productNos } }),
+      Customer.find({ customer_no: { $in: customerNos } }),
+      Store.find({ store_no: { $in: storeNos } })
+    ]);
+    const productMap = Object.fromEntries(products.map(p => [p.product_no, p.product_name]));
+    const customerMap = Object.fromEntries(customers.map(c => [c.customer_no, c.name]));
+    const storeMap = Object.fromEntries(stores.map(s => [s.store_no, s.store_name]));
+    res.json(returns.map(r => ({
+      ...r.toObject(),
+      product_name: productMap[r.product_no] || '',
+      customer_name: customerMap[r.customer_no] || '',
+      store_name: storeMap[r.store_no] || ''
+    })));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-}
+};
 
-module.exports = { insertSalesReturn }; 
+// Create a new sales return with validations and effects
+exports.createSalesReturn = async (req, res) => {
+  try {
+    const { sel_no, product_no, customer_no, store_no, qty, price, paid, reason, account_id } = req.body;
+    if (!sel_no || !product_no || !customer_no || !store_no || !qty || !price) {
+      return res.status(400).json({ error: 'All required fields must be provided.' });
+    }
+    if (qty <= 0 || price <= 0) {
+      return res.status(400).json({ error: 'Quantity and price must be greater than 0.' });
+    }
+    // Validate entities
+    const [sale, product, customer, store, account, storeProduct] = await Promise.all([
+      Sale.findOne({ sel_no }),
+      Product.findOne({ product_no }),
+      Customer.findOne({ customer_no }),
+      Store.findOne({ store_no }),
+      account_id ? Account.findOne({ account_id }) : null,
+      StoreProduct.findOne({ product_no, store_no })
+    ]);
+    if (!sale) return res.status(400).json({ error: 'Sale not found.' });
+    if (!product) return res.status(400).json({ error: 'Product not found.' });
+    if (!customer) return res.status(400).json({ error: 'Customer not found.' });
+    if (!store) return res.status(400).json({ error: 'Store not found.' });
+    if (!storeProduct) return res.status(400).json({ error: 'Product not found in this store.' });
+    if (qty > sale.qty) return res.status(400).json({ error: 'Return quantity cannot exceed original sale quantity.' });
+    const amount = qty * price;
+    if (paid > amount) return res.status(400).json({ error: 'Paid amount cannot exceed total amount.' });
+    // Get next return_no
+    const return_no = await getNextSequence('sales_return_no');
+    // Create return record
+    const newReturn = new SalesReturn({
+      ...req.body,
+      return_no,
+      amount,
+      date: req.body.date || new Date(),
+      created_at: new Date(),
+      updated_at: new Date()
+    });
+    await newReturn.save();
+    // Update inventory and balances
+    await Promise.all([
+      // Increase StoreProduct qty
+      StoreProduct.updateOne(
+        { product_no, store_no },
+        { $inc: { qty: qty }, $set: { updated_at: new Date() } }
+      ),
+      // Increase product storing_balance
+      Product.updateOne(
+        { product_no },
+        { $inc: { storing_balance: qty } }
+      ),
+      // Increase store total_items
+      Store.updateOne(
+        { store_no },
+        { $inc: { total_items: qty } }
+      ),
+      // Reduce customer debt if paid
+      paid > 0 ? Customer.updateOne(
+        { customer_no },
+        { $inc: { bal: -paid } }
+      ) : Promise.resolve(),
+      // Refund from account if paid
+      paid > 0 && account ? Account.updateOne(
+        { account_id },
+        { $inc: { balance: -paid } }
+      ) : Promise.resolve()
+    ]);
+    res.status(201).json(newReturn);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Update a sales return and adjust inventory/account
+exports.updateSalesReturn = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { sel_no, product_no, customer_no, store_no, qty, price, paid, reason, account_id } = req.body;
+    if (!sel_no || !product_no || !customer_no || !store_no || !qty || !price) {
+      return res.status(400).json({ error: 'All required fields must be provided.' });
+    }
+    if (qty <= 0 || price <= 0) {
+      return res.status(400).json({ error: 'Quantity and price must be greater than 0.' });
+    }
+    const oldReturn = await SalesReturn.findById(id);
+    if (!oldReturn) return res.status(404).json({ error: 'Sales return not found.' });
+    // Reverse previous effects
+    await Promise.all([
+      StoreProduct.updateOne(
+        { product_no: oldReturn.product_no, store_no: oldReturn.store_no },
+        { $inc: { qty: -oldReturn.qty }, $set: { updated_at: new Date() } }
+      ),
+      Product.updateOne(
+        { product_no: oldReturn.product_no },
+        { $inc: { storing_balance: -oldReturn.qty } }
+      ),
+      Store.updateOne(
+        { store_no: oldReturn.store_no },
+        { $inc: { total_items: -oldReturn.qty } }
+      ),
+      oldReturn.paid > 0 ? Customer.updateOne(
+        { customer_no: oldReturn.customer_no },
+        { $inc: { bal: oldReturn.paid } }
+      ) : Promise.resolve(),
+      oldReturn.paid > 0 && oldReturn.account_id ? Account.updateOne(
+        { account_id: oldReturn.account_id },
+        { $inc: { balance: oldReturn.paid } }
+      ) : Promise.resolve()
+    ]);
+    // Validate new entities
+    const [sale, product, customer, store, account, storeProduct] = await Promise.all([
+      Sale.findOne({ sel_no }),
+      Product.findOne({ product_no }),
+      Customer.findOne({ customer_no }),
+      Store.findOne({ store_no }),
+      account_id ? Account.findOne({ account_id }) : null,
+      StoreProduct.findOne({ product_no, store_no })
+    ]);
+    if (!sale) return res.status(400).json({ error: 'Sale not found.' });
+    if (!product) return res.status(400).json({ error: 'Product not found.' });
+    if (!customer) return res.status(400).json({ error: 'Customer not found.' });
+    if (!store) return res.status(400).json({ error: 'Store not found.' });
+    if (!storeProduct) return res.status(400).json({ error: 'Product not found in this store.' });
+    if (qty > sale.qty) return res.status(400).json({ error: 'Return quantity cannot exceed original sale quantity.' });
+    const amount = qty * price;
+    if (paid > amount) return res.status(400).json({ error: 'Paid amount cannot exceed total amount.' });
+    // Apply new effects
+    await Promise.all([
+      StoreProduct.updateOne(
+        { product_no, store_no },
+        { $inc: { qty: qty }, $set: { updated_at: new Date() } }
+      ),
+      Product.updateOne(
+        { product_no },
+        { $inc: { storing_balance: qty } }
+      ),
+      Store.updateOne(
+        { store_no },
+        { $inc: { total_items: qty } }
+      ),
+      paid > 0 ? Customer.updateOne(
+        { customer_no },
+        { $inc: { bal: -paid } }
+      ) : Promise.resolve(),
+      paid > 0 && account ? Account.updateOne(
+        { account_id },
+        { $inc: { balance: -paid } }
+      ) : Promise.resolve()
+    ]);
+    // Update return record
+    oldReturn.sel_no = sel_no;
+    oldReturn.product_no = product_no;
+    oldReturn.customer_no = customer_no;
+    oldReturn.store_no = store_no;
+    oldReturn.qty = qty;
+    oldReturn.price = price;
+    oldReturn.amount = amount;
+    oldReturn.paid = paid;
+    oldReturn.reason = reason;
+    oldReturn.account_id = account_id;
+    oldReturn.updated_at = new Date();
+    await oldReturn.save();
+    res.json(oldReturn);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Delete a sales return and reverse inventory/account effects
+exports.deleteSalesReturn = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const oldReturn = await SalesReturn.findById(id);
+    if (!oldReturn) return res.status(404).json({ error: 'Sales return not found.' });
+    // Reverse effects
+    await Promise.all([
+      StoreProduct.updateOne(
+        { product_no: oldReturn.product_no, store_no: oldReturn.store_no },
+        { $inc: { qty: -oldReturn.qty }, $set: { updated_at: new Date() } }
+      ),
+      Product.updateOne(
+        { product_no: oldReturn.product_no },
+        { $inc: { storing_balance: -oldReturn.qty } }
+      ),
+      Store.updateOne(
+        { store_no: oldReturn.store_no },
+        { $inc: { total_items: -oldReturn.qty } }
+      ),
+      oldReturn.paid > 0 ? Customer.updateOne(
+        { customer_no: oldReturn.customer_no },
+        { $inc: { bal: oldReturn.paid } }
+      ) : Promise.resolve(),
+      oldReturn.paid > 0 && oldReturn.account_id ? Account.updateOne(
+        { account_id: oldReturn.account_id },
+        { $inc: { balance: oldReturn.paid } }
+      ) : Promise.resolve()
+    ]);
+    await SalesReturn.findByIdAndDelete(id);
+    res.json({ message: 'Sales return deleted.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}; 
