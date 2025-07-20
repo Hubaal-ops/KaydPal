@@ -9,6 +9,7 @@ import {
   updateEmployee,
   deleteEmployee
 } from '../services/employeeService';
+import { getStores } from '../services/storeService';
 
 const Employees = ({ onBack }) => {
   const navigate = useNavigate();
@@ -26,6 +27,7 @@ const Employees = ({ onBack }) => {
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [stores, setStores] = useState([]);
 
   // Fetch employees from backend
   const fetchEmployees = async () => {
@@ -33,7 +35,17 @@ const Employees = ({ onBack }) => {
     setError('');
     try {
       const data = await getEmployees();
-      setEmployees(data);
+      // Map backend fields to frontend expected fields
+      const mapped = data.map(emp => ({
+        ...emp,
+        name: emp.name || emp.emp_name || '',
+        store: emp.store || emp.emp_store || emp.store_name || '',
+        contact: emp.contact || emp.emp_contact || emp.phone || '',
+        position: emp.position || emp.emp_position || '',
+        date_hired: emp.date_hired || emp.hire_date || '',
+        employee_id: emp.employee_id || emp.emp_no || emp._id
+      }));
+      setEmployees(mapped);
     } catch (err) {
       setError('Error fetching employees');
     } finally {
@@ -43,6 +55,16 @@ const Employees = ({ onBack }) => {
 
   useEffect(() => {
     fetchEmployees();
+    // Fetch stores for dropdown
+    const fetchStores = async () => {
+      try {
+        const data = await getStores();
+        setStores(data.data || data);
+      } catch (err) {
+        // Optionally handle error
+      }
+    };
+    fetchStores();
   }, []);
 
   const handleBackClick = () => {
@@ -144,10 +166,10 @@ const Employees = ({ onBack }) => {
   };
 
   const filteredEmployees = employees.filter(emp =>
-    emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    emp.position.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    emp.store.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    emp.contact.toLowerCase().includes(searchTerm.toLowerCase())
+    String(emp?.name || emp?.emp_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    String(emp?.position || emp?.emp_position || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    String(emp?.store || emp?.emp_store || emp?.store_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    String(emp?.contact || emp?.emp_contact || emp?.phone || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -197,6 +219,7 @@ const Employees = ({ onBack }) => {
                 <table className={styles.table}>
                   <thead>
                     <tr>
+                      <th>ID</th>
                       <th>Name</th>
                       <th>Position</th>
                       <th>Store</th>
@@ -208,6 +231,7 @@ const Employees = ({ onBack }) => {
                   <tbody>
                     {filteredEmployees.map(emp => (
                       <tr key={emp._id}>
+                        <td>{emp.employee_id || emp.emp_no || emp._id}</td>
                         <td>{emp.name}</td>
                         <td>{emp.position}</td>
                         <td>{emp.store}</td>
@@ -266,15 +290,19 @@ const Employees = ({ onBack }) => {
               </div>
               <div className={styles['form-group']}>
                 <label htmlFor="store">Store</label>
-                <input
-                  type="text"
+                <select
                   id="store"
                   name="store"
                   className={styles['form-input']}
                   value={formData.store}
                   onChange={handleInputChange}
                   required
-                />
+                >
+                  <option value="">Select a store</option>
+                  {stores.map(s => (
+                    <option key={s.store_no || s._id} value={s.store_name || s.name}>{s.store_name || s.name}</option>
+                  ))}
+                </select>
               </div>
               <div className={styles['form-group']}>
                 <label htmlFor="contact">Contact</label>
