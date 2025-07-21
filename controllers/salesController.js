@@ -2,6 +2,10 @@ const Sale = require('../models/Sale');
 const connectDB = require('../db');
 const StoreProduct = require('../models/StoreProduct');
 const { recalculateProductBalance, recalculateStoreTotal } = require('./storeProductController');
+const Invoice = require('../models/Invoice');
+const getNextSequence = require('../getNextSequence');
+const Customer = require('../models/Customer');
+const Product = require('../models/Product');
 
 async function getNextSequenceValue(sequenceName) {
   const db = await connectDB();
@@ -34,11 +38,9 @@ async function insertSale(sale) {
   const totalCost = nQty * nPrice - nDiscount + nTax;
   if (nPaid > totalCost) throw new Error('Paid amount cannot exceed total amount.');
 
-  // Use correct field for product in stock check
-  console.log('Checking stock for:', { pro_no: Number(product_no), store_no: Number(store_no) });
-  const stock = await db.collection('Stores_Product').findOne({ pro_no: Number(product_no), store_no: Number(store_no) });
-  console.log('Stock found:', stock);
-  if (!stock || stock.qty < nQty) throw new Error('Insufficient stock for this product in the selected store.');
+  // Use StoreProduct model for stock check
+  const storeProduct = await StoreProduct.findOne({ product_no: Number(product_no), store_no: Number(store_no) });
+  if (!storeProduct || storeProduct.qty < nQty) throw new Error('Insufficient stock for this product in the selected store.');
 
   // Get next sel_no
   const sel_no = await getNextSequenceValue('sales');
@@ -55,7 +57,54 @@ async function insertSale(sale) {
   };
 
   // Use Mongoose model to create the sale
-  await Sale.create(newSale);
+  const createdSale = await Sale.create(newSale);
+
+  // Automatically create an invoice for this sale
+  try {
+    const invoice_no = await getNextSequence('invoice_no');
+    // Fetch customer and product details for names
+    const customerDoc = await Customer.findOne({ customer_no: createdSale.customer_no });
+    const productDoc = await Product.findOne({ product_no: createdSale.product_no });
+    const items = [{
+      product_no: createdSale.product_no,
+      name: productDoc ? productDoc.product_name : '',
+      qty: createdSale.qty,
+      price: createdSale.price,
+      discount: createdSale.discount || 0,
+      tax: createdSale.tax || 0,
+      subtotal: (createdSale.qty * createdSale.price) - (createdSale.discount || 0) + (createdSale.tax || 0)
+    }];
+    const subtotal = items.reduce((sum, i) => sum + (i.qty * i.price), 0);
+    const total_discount = items.reduce((sum, i) => sum + (i.discount || 0), 0);
+    const total_tax = items.reduce((sum, i) => sum + (i.tax || 0), 0);
+    const total = subtotal - total_discount + total_tax;
+    const paidVal = createdSale.paid || 0;
+    const balance_due = total - paidVal;
+    const status = paidVal >= total ? 'Paid' : (paidVal > 0 ? 'Partially Paid' : 'Unpaid');
+    await Invoice.create({
+      invoice_no,
+      sale_id: createdSale._id,
+      date: new Date(),
+      customer: {
+        customer_no: createdSale.customer_no,
+        name: customerDoc ? customerDoc.name : '',
+        address: customerDoc ? customerDoc.address : '',
+        phone: customerDoc ? customerDoc.phone : '',
+        email: customerDoc ? customerDoc.email : ''
+      },
+      items,
+      subtotal,
+      total_discount,
+      total_tax,
+      total,
+      paid: paidVal,
+      balance_due,
+      status,
+      notes: createdSale.notes || ''
+    });
+  } catch (err) {
+    console.error('Failed to create invoice for sale:', err.message);
+  }
 
   // Update legacy collection
   await db.collection('Stores_Product').updateOne(
@@ -63,8 +112,8 @@ async function insertSale(sale) {
     { $inc: { qty: -nQty }, $set: { updated_at: new Date() } }
   );
   // Update StoreProduct model
-  let storeProduct = await StoreProduct.findOne({ product_no: Number(product_no), store_no: Number(store_no) });
-  if (!storeProduct) {
+  let storeProductModel = await StoreProduct.findOne({ product_no: Number(product_no), store_no: Number(store_no) });
+  if (!storeProductModel) {
     const getNextSequence = require('../getNextSequence');
     const store_product_no = await getNextSequence('store_product_no');
     await StoreProduct.create({
