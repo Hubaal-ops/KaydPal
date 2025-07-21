@@ -77,21 +77,21 @@ exports.createSalesReturn = async (req, res) => {
       // Increase StoreProduct qty
       StoreProduct.updateOne(
         { product_no, store_no },
-        { $inc: { qty: qty }, $set: { updated_at: new Date() } }
+      { $inc: { qty: qty }, $set: { updated_at: new Date() } }
       ),
       // Increase product storing_balance
       Product.updateOne(
-        { product_no },
-        { $inc: { storing_balance: qty } }
+      { product_no },
+      { $inc: { storing_balance: qty } }
       ),
       // Increase store total_items
       Store.updateOne(
-        { store_no },
-        { $inc: { total_items: qty } }
+      { store_no },
+      { $inc: { total_items: qty } }
       ),
       // Reduce customer debt if paid
       paid > 0 ? Customer.updateOne(
-        { customer_no },
+          { customer_no },
         { $inc: { bal: -paid } }
       ) : Promise.resolve(),
       // Refund from account if paid

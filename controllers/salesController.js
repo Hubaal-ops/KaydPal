@@ -1,5 +1,7 @@
 const Sale = require('../models/Sale');
 const connectDB = require('../db');
+const StoreProduct = require('../models/StoreProduct');
+const { recalculateProductBalance, recalculateStoreTotal } = require('./storeProductController');
 
 async function getNextSequenceValue(sequenceName) {
   const db = await connectDB();
@@ -55,10 +57,33 @@ async function insertSale(sale) {
   // Use Mongoose model to create the sale
   await Sale.create(newSale);
 
+  // Update legacy collection
   await db.collection('Stores_Product').updateOne(
     { pro_no: Number(product_no), store_no: Number(store_no) },
     { $inc: { qty: -nQty }, $set: { updated_at: new Date() } }
   );
+  // Update StoreProduct model
+  let storeProduct = await StoreProduct.findOne({ product_no: Number(product_no), store_no: Number(store_no) });
+  if (!storeProduct) {
+    const getNextSequence = require('../getNextSequence');
+    const store_product_no = await getNextSequence('store_product_no');
+    await StoreProduct.create({
+      store_product_no,
+      product_no: Number(product_no),
+      store_no: Number(store_no),
+      qty: -nQty,
+      created_at: new Date(),
+      updated_at: new Date()
+    });
+  } else {
+    await StoreProduct.updateOne(
+      { product_no: Number(product_no), store_no: Number(store_no) },
+      { $inc: { qty: -nQty }, $set: { updated_at: new Date() } }
+    );
+  }
+  await recalculateProductBalance(Number(product_no));
+  await recalculateStoreTotal(Number(store_no));
+
   await db.collection('products').updateOne(
     { product_no: Number(product_no) },
     { $inc: { storing_balance: -nQty } }
@@ -124,6 +149,9 @@ async function updateSale(sel_no, updatedSale) {
     { pro_no: Number(oldSale.product_no), store_no: Number(oldSale.store_no) },
     { $inc: { qty: oldSale.qty }, $set: { updated_at: new Date() } }
   );
+  await recalculateProductBalance(Number(oldSale.product_no));
+  await recalculateStoreTotal(Number(oldSale.store_no));
+
   await db.collection('products').updateOne(
     { product_no: Number(oldSale.product_no) },
     { $inc: { storing_balance: oldSale.qty } }
@@ -145,14 +173,9 @@ async function updateSale(sel_no, updatedSale) {
     { pro_no: Number(product_no), store_no: Number(store_no) },
     { $inc: { qty: -nQty }, $set: { updated_at: new Date() } }
   );
-  await db.collection('products').updateOne(
-    { product_no: Number(product_no) },
-    { $inc: { storing_balance: -nQty } }
-  );
-  await db.collection('stores').updateOne(
-    { store_no: Number(store_no) },
-    { $inc: { total_items: -nQty } }
-  );
+  await recalculateProductBalance(Number(product_no));
+  await recalculateStoreTotal(Number(store_no));
+
   if (newDebt > 0) {
     await db.collection('customers').updateOne(
       { customer_no: Number(customer_no) },
@@ -189,10 +212,14 @@ async function deleteSale(sel_no) {
   const oldSale = await Sale.findOne({ sel_no });
   if (!oldSale) throw new Error('Sale not found.');
   const unpaid = oldSale.amount - oldSale.paid;
-  await db.collection('Stores_Product').updateOne(
-    { pro_no: Number(oldSale.product_no), store_no: Number(oldSale.store_no) },
+  // Reverse inventory in StoreProduct
+  await StoreProduct.updateOne(
+    { product_no: Number(oldSale.product_no), store_no: Number(oldSale.store_no) },
     { $inc: { qty: oldSale.qty }, $set: { updated_at: new Date() } }
   );
+  await recalculateProductBalance(Number(oldSale.product_no));
+  await recalculateStoreTotal(Number(oldSale.store_no));
+
   await db.collection('products').updateOne(
     { product_no: Number(oldSale.product_no) },
     { $inc: { storing_balance: oldSale.qty } }
