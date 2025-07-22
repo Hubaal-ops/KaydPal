@@ -21,66 +21,104 @@ async function getNextSequenceValue(sequenceName) {
 async function insertSale(sale) {
   const db = await connectDB();
   const {
-    product_no, customer_no, store_no,
-    qty, price, discount = 0, tax = 0,
-    paid = 0, account_id,
+    customer_no, store_no, items = [], paid = 0, account_id, discount = 0, tax = 0
   } = sale;
 
-  // Convert all inputs to Number to avoid type mismatches
-  const nQty = Number(qty);
-  const nPrice = Number(price);
-  const nDiscount = Number(discount || 0);
-  const nTax = Number(tax || 0);
-  const nPaid = Number(paid || 0);
+  if (!Array.isArray(items) || items.length === 0) throw new Error('At least one item is required.');
 
-  if (nQty <= 0) throw new Error('Sale quantity must be greater than 0.');
-  if (nPrice <= 0) throw new Error('Sale price must be greater than 0.');
-  const totalCost = nQty * nPrice - nDiscount + nTax;
-  if (nPaid > totalCost) throw new Error('Paid amount cannot exceed total amount.');
+  let totalAmount = 0;
+  let totalDiscount = 0;
+  let totalTax = 0;
+  const processedItems = [];
 
-  // Use StoreProduct model for stock check
-  const storeProduct = await StoreProduct.findOne({ product_no: Number(product_no), store_no: Number(store_no) });
-  if (!storeProduct || storeProduct.qty < nQty) throw new Error('Insufficient stock for this product in the selected store.');
+  // Check stock and prepare items
+  for (const item of items) {
+    const nQty = Number(item.qty);
+    const nPrice = Number(item.price);
+    const nDiscount = Number(item.discount || 0);
+    const nTax = Number(item.tax || 0);
+    if (nQty <= 0) throw new Error('Sale quantity must be greater than 0.');
+    if (nPrice <= 0) throw new Error('Sale price must be greater than 0.');
+    const storeProduct = await StoreProduct.findOne({ product_no: Number(item.product_no), store_no: Number(store_no) });
+    if (!storeProduct || storeProduct.qty < nQty) throw new Error('Insufficient stock for product ' + item.product_no + ' in the selected store.');
+    const subtotal = nQty * nPrice - nDiscount + nTax;
+    totalAmount += subtotal;
+    totalDiscount += nDiscount;
+    totalTax += nTax;
+    processedItems.push({
+      product_no: Number(item.product_no),
+      qty: nQty,
+      price: nPrice,
+      discount: nDiscount,
+      tax: nTax,
+      subtotal
+    });
+  }
+
+  if (paid > totalAmount) throw new Error('Paid amount cannot exceed total amount.');
 
   // Get next sel_no
   const sel_no = await getNextSequenceValue('sales');
   const newSale = {
-    ...sale,
-    qty: nQty,
-    price: nPrice,
-    discount: nDiscount,
-    tax: nTax,
-    amount: totalCost,
-    paid: nPaid,
     sel_no,
-    sel_date: new Date()
+    customer_no: Number(customer_no),
+    store_no: Number(store_no),
+    items: processedItems,
+    amount: totalAmount,
+    paid: Number(paid),
+    account_id: Number(account_id),
+    discount: totalDiscount,
+    tax: totalTax,
+    sel_date: new Date(),
+    created_at: new Date(),
+    updated_at: new Date()
   };
 
-  // Use Mongoose model to create the sale
+  // Create the sale
   const createdSale = await Sale.create(newSale);
+
+  // Update inventory for each item
+  for (const item of processedItems) {
+    await StoreProduct.updateOne(
+      { product_no: item.product_no, store_no: Number(store_no) },
+      { $inc: { qty: -item.qty }, $set: { updated_at: new Date() } }
+    );
+    await recalculateProductBalance(item.product_no);
+  }
+  await recalculateStoreTotal(Number(store_no));
+
+  // Update customer balance and account
+  const debt = totalAmount - paid;
+  if (debt > 0) {
+    await db.collection('customers').updateOne(
+      { customer_no: Number(customer_no) },
+      { $inc: { bal: debt } }
+    );
+  }
+  if (paid > 0) {
+    await db.collection('accounts').updateOne(
+      { account_id: Number(account_id) },
+      { $inc: { balance: paid } }
+    );
+  }
 
   // Automatically create an invoice for this sale
   try {
     const invoice_no = await getNextSequence('invoice_no');
-    // Fetch customer and product details for names
     const customerDoc = await Customer.findOne({ customer_no: createdSale.customer_no });
-    const productDoc = await Product.findOne({ product_no: createdSale.product_no });
-    const items = [{
-      product_no: createdSale.product_no,
-      name: productDoc ? productDoc.product_name : '',
-      qty: createdSale.qty,
-      price: createdSale.price,
-      discount: createdSale.discount || 0,
-      tax: createdSale.tax || 0,
-      subtotal: (createdSale.qty * createdSale.price) - (createdSale.discount || 0) + (createdSale.tax || 0)
-    }];
-    const subtotal = items.reduce((sum, i) => sum + (i.qty * i.price), 0);
-    const total_discount = items.reduce((sum, i) => sum + (i.discount || 0), 0);
-    const total_tax = items.reduce((sum, i) => sum + (i.tax || 0), 0);
-    const total = subtotal - total_discount + total_tax;
-    const paidVal = createdSale.paid || 0;
-    const balance_due = total - paidVal;
-    const status = paidVal >= total ? 'Paid' : (paidVal > 0 ? 'Partially Paid' : 'Unpaid');
+    // Fetch product names for all items
+    const productMap = {};
+    for (const item of processedItems) {
+      if (!productMap[item.product_no]) {
+        const productDoc = await Product.findOne({ product_no: item.product_no });
+        productMap[item.product_no] = productDoc ? productDoc.product_name : '';
+      }
+    }
+    const invoiceItems = processedItems.map(item => ({
+      ...item,
+      name: productMap[item.product_no]
+    }));
+    const status = paid >= totalAmount ? 'Paid' : (paid > 0 ? 'Partially Paid' : 'Unpaid');
     await Invoice.create({
       invoice_no,
       sale_id: createdSale._id,
@@ -92,13 +130,13 @@ async function insertSale(sale) {
         phone: customerDoc ? customerDoc.phone : '',
         email: customerDoc ? customerDoc.email : ''
       },
-      items,
-      subtotal,
-      total_discount,
-      total_tax,
-      total,
-      paid: paidVal,
-      balance_due,
+      items: invoiceItems,
+      subtotal: totalAmount,
+      total_discount: totalDiscount,
+      total_tax: totalTax,
+      total: totalAmount,
+      paid: paid,
+      balance_due: totalAmount - paid,
       status,
       notes: createdSale.notes || ''
     });
@@ -106,54 +144,6 @@ async function insertSale(sale) {
     console.error('Failed to create invoice for sale:', err.message);
   }
 
-  // Update legacy collection
-  await db.collection('Stores_Product').updateOne(
-    { pro_no: Number(product_no), store_no: Number(store_no) },
-    { $inc: { qty: -nQty }, $set: { updated_at: new Date() } }
-  );
-  // Update StoreProduct model
-  let storeProductModel = await StoreProduct.findOne({ product_no: Number(product_no), store_no: Number(store_no) });
-  if (!storeProductModel) {
-    const getNextSequence = require('../getNextSequence');
-    const store_product_no = await getNextSequence('store_product_no');
-    await StoreProduct.create({
-      store_product_no,
-      product_no: Number(product_no),
-      store_no: Number(store_no),
-      qty: -nQty,
-      created_at: new Date(),
-      updated_at: new Date()
-    });
-  } else {
-    await StoreProduct.updateOne(
-      { product_no: Number(product_no), store_no: Number(store_no) },
-      { $inc: { qty: -nQty }, $set: { updated_at: new Date() } }
-    );
-  }
-  await recalculateProductBalance(Number(product_no));
-  await recalculateStoreTotal(Number(store_no));
-
-  await db.collection('products').updateOne(
-    { product_no: Number(product_no) },
-    { $inc: { storing_balance: -nQty } }
-  );
-  await db.collection('stores').updateOne(
-    { store_no: Number(store_no) },
-    { $inc: { total_items: -nQty } }
-  );
-  const debt = totalCost - nPaid;
-  if (debt > 0) {
-    await db.collection('customers').updateOne(
-      { customer_no: Number(customer_no) },
-      { $inc: { bal: debt } }
-    );
-  }
-  if (nPaid > 0) {
-    await db.collection('accounts').updateOne(
-      { account_id: Number(account_id) },
-      { $inc: { balance: nPaid } }
-    );
-  }
   return { message: 'Sale inserted successfully', sel_no };
 }
 

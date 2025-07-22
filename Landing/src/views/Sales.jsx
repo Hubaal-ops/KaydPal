@@ -22,14 +22,11 @@ const Sales = ({ onBack }) => {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
-    product_no: '',
+    items: [
+      { product_no: '', qty: 1, price: 0, discount: 0, tax: 0 }
+    ],
     customer_no: '',
     store_no: '',
-    qty: 1,
-    price: 0,
-    discount: 0,
-    tax: 0,
-    amount: 0,
     paid: 0,
     account_id: ''
   });
@@ -70,14 +67,9 @@ const Sales = ({ onBack }) => {
     setViewMode('table');
     setEditingSale(null);
     setFormData({
-      product_no: '',
+      items: [{ product_no: '', qty: 1, price: 0, discount: 0, tax: 0 }],
       customer_no: '',
       store_no: '',
-      qty: 1,
-      price: 0,
-      discount: 0,
-      tax: 0,
-      amount: 0,
       paid: 0,
       account_id: ''
     });
@@ -89,14 +81,9 @@ const Sales = ({ onBack }) => {
     setViewMode('form');
     setEditingSale(null);
     setFormData({
-      product_no: '',
+      items: [{ product_no: '', qty: 1, price: 0, discount: 0, tax: 0 }],
       customer_no: '',
       store_no: '',
-      qty: 1,
-      price: 0,
-      discount: 0,
-      tax: 0,
-      amount: 0,
       paid: 0,
       account_id: ''
     });
@@ -107,14 +94,9 @@ const Sales = ({ onBack }) => {
   const handleEdit = (sale) => {
     setEditingSale(sale);
     setFormData({
-      product_no: sale.product_no,
+      items: sale.items || [{ product_no: '', qty: 1, price: 0, discount: 0, tax: 0 }],
       customer_no: sale.customer_no,
       store_no: sale.store_no,
-      qty: sale.qty,
-      price: sale.price,
-      discount: sale.discount,
-      tax: sale.tax,
-      amount: sale.amount,
       paid: sale.paid,
       account_id: sale.account_id
     });
@@ -140,6 +122,22 @@ const Sales = ({ onBack }) => {
     }
   };
 
+  const handleItemChange = (idx, e) => {
+    const { name, value } = e.target;
+    setFormData(prev => {
+      const items = prev.items.map((item, i) =>
+        i === idx ? { ...item, [name]: name === 'product_no' ? Number(value) : Number(value) } : item
+      );
+      return { ...prev, items };
+    });
+  };
+  const handleAddItem = () => {
+    setFormData(prev => ({ ...prev, items: [...prev.items, { product_no: '', qty: 1, price: 0, discount: 0, tax: 0 }] }));
+  };
+  const handleRemoveItem = (idx) => {
+    setFormData(prev => ({ ...prev, items: prev.items.filter((_, i) => i !== idx) }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -147,17 +145,28 @@ const Sales = ({ onBack }) => {
     setSuccess('');
     try {
       let result;
+      const payload = {
+        ...formData,
+        items: formData.items.map(item => ({
+          ...item,
+          product_no: Number(item.product_no),
+          qty: Number(item.qty),
+          price: Number(item.price),
+          discount: Number(item.discount),
+          tax: Number(item.tax)
+        })),
+        paid: Number(formData.paid),
+        customer_no: Number(formData.customer_no),
+        store_no: Number(formData.store_no),
+        account_id: Number(formData.account_id)
+      };
       if (editingSale) {
-        result = await updateSale(editingSale.sel_no, formData);
+        result = await updateSale(editingSale.sel_no, payload);
         setSuccess('Sale updated successfully');
       } else {
-        result = await addSale(formData);
+        result = await addSale(payload);
         setSuccess('Sale added successfully');
-        // Fetch the latest invoice for this sale
-        // Option 1: If backend returns sale_id or _id, use it directly
-        // Option 2: Otherwise, fetch all invoices and find the latest for this customer/product
         const invoices = await getInvoices();
-        // Try to find the invoice with the highest invoice_no for this customer
         const latestInvoice = invoices
           .filter(inv => inv.customer?.customer_no === Number(formData.customer_no))
           .sort((a, b) => b.invoice_no - a.invoice_no)[0];
@@ -170,14 +179,9 @@ const Sales = ({ onBack }) => {
       setViewMode('table');
       setEditingSale(null);
       setFormData({
-        product_no: '',
+        items: [{ product_no: '', qty: 1, price: 0, discount: 0, tax: 0 }],
         customer_no: '',
         store_no: '',
-        qty: 1,
-        price: 0,
-        discount: 0,
-        tax: 0,
-        amount: 0,
         paid: 0,
         account_id: ''
       });
@@ -296,13 +300,13 @@ const Sales = ({ onBack }) => {
                         {filteredSales.map((sale) => (
                           <tr key={sale.sel_no}>
                             <td>{sale.sel_no}</td>
-                            <td>{sale.product_name}</td>
+                            <td>{Array.isArray(sale.items) ? sale.items.map(i => products.find(p => p.product_no === i.product_no)?.product_name || i.product_no).join(', ') : sale.product_name}</td>
                             <td>{sale.customer_name}</td>
                             <td>{sale.store_name}</td>
-                            <td>{sale.qty}</td>
-                            <td>{sale.price}</td>
-                            <td>{sale.discount}</td>
-                            <td>{sale.tax}</td>
+                            <td>{Array.isArray(sale.items) ? sale.items.reduce((sum, i) => sum + (i.qty || 0), 0) : sale.qty}</td>
+                            <td>{Array.isArray(sale.items) ? sale.items.map(i => i.price).join(', ') : sale.price}</td>
+                            <td>{Array.isArray(sale.items) ? sale.items.map(i => i.discount).join(', ') : sale.discount}</td>
+                            <td>{Array.isArray(sale.items) ? sale.items.map(i => i.tax).join(', ') : sale.tax}</td>
                             <td>{sale.amount}</td>
                             <td>{sale.paid}</td>
                             <td>{sale.account_name}</td>
@@ -342,34 +346,34 @@ const Sales = ({ onBack }) => {
               <div className={styles['form-container']}>
                 <h2>{editingSale ? 'Edit Sale' : 'Add New Sale'}</h2>
                 <form onSubmit={handleSubmit} className={`${styles.form} ${styles['form-grid']}`}>
-                  <div className={styles['form-group']}>
-                    <label htmlFor="product_no">Product *</label>
-                    <select
-                      id="product_no"
-                      name="product_no"
-                      value={formData.product_no}
-                      onChange={handleInputChange}
-                      required
-                      className={styles['form-select']}
-                    >
-                      <option value="">Select a product</option>
-                      {products.map((product) => (
-                        <option key={product.product_no} value={product.product_no}>
-                          {product.product_name}
-                        </option>
-                      ))}
-                    </select>
+                  <div style={{ gridColumn: '1 / -1', marginBottom: 16 }}>
+                    <b>Sale Items</b>
+                    {/* Header row for sale item inputs */}
+                    <div style={{ display: 'flex', gap: 8, fontWeight: 600, marginBottom: 4 }}>
+                      <span style={{ minWidth: 120 }}>Product</span>
+                      <span style={{ width: 60 }}>Qty</span>
+                      <span style={{ width: 80 }}>Price</span>
+                      <span style={{ width: 80 }}>Discount</span>
+                      <span style={{ width: 80 }}>Tax</span>
+                    </div>
+                    {formData.items.map((item, idx) => (
+                      <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                        <select name="product_no" value={item.product_no} onChange={e => handleItemChange(idx, e)} required className={styles['form-select']} style={{ minWidth: 120 }}>
+                          <option value="">Product</option>
+                          {products.map(p => (<option key={p.product_no} value={p.product_no}>{p.product_name}</option>))}
+                        </select>
+                        <input type="number" name="qty" value={item.qty} onChange={e => handleItemChange(idx, e)} min="1" placeholder="Qty" className={styles['form-input']} style={{ width: 60 }} />
+                        <input type="number" name="price" value={item.price} onChange={e => handleItemChange(idx, e)} min="0" placeholder="Price" className={styles['form-input']} style={{ width: 80 }} />
+                        <input type="number" name="discount" value={item.discount} onChange={e => handleItemChange(idx, e)} min="0" placeholder="Discount" className={styles['form-input']} style={{ width: 80 }} />
+                        <input type="number" name="tax" value={item.tax} onChange={e => handleItemChange(idx, e)} min="0" placeholder="Tax" className={styles['form-input']} style={{ width: 80 }} />
+                        {formData.items.length > 1 && <button type="button" onClick={() => handleRemoveItem(idx)} style={{ color: 'red', fontWeight: 700, border: 'none', background: 'none', cursor: 'pointer' }}>×</button>}
+                      </div>
+                    ))}
+                    <button type="button" onClick={handleAddItem} style={{ marginTop: 4, marginBottom: 8 }}>+ Add Item</button>
                   </div>
                   <div className={styles['form-group']}>
                     <label htmlFor="customer_no">Customer *</label>
-                    <select
-                      id="customer_no"
-                      name="customer_no"
-                      value={formData.customer_no}
-                      onChange={handleInputChange}
-                      required
-                      className={styles['form-select']}
-                    >
+                    <select id="customer_no" name="customer_no" value={formData.customer_no} onChange={handleInputChange} required className={styles['form-select']}>
                       <option value="">Select a customer</option>
                       {customers.map((customer) => (
                         <option key={customer.customer_no} value={customer.customer_no}>
@@ -380,14 +384,7 @@ const Sales = ({ onBack }) => {
                   </div>
                   <div className={styles['form-group']}>
                     <label htmlFor="store_no">Store *</label>
-                    <select
-                      id="store_no"
-                      name="store_no"
-                      value={formData.store_no}
-                      onChange={handleInputChange}
-                      required
-                      className={styles['form-select']}
-                    >
+                    <select id="store_no" name="store_no" value={formData.store_no} onChange={handleInputChange} required className={styles['form-select']}>
                       <option value="">Select a store</option>
                       {stores.map((store) => (
                         <option key={store.store_no} value={store.store_no}>
@@ -397,91 +394,12 @@ const Sales = ({ onBack }) => {
                     </select>
                   </div>
                   <div className={styles['form-group']}>
-                    <label htmlFor="qty">Quantity *</label>
-                    <input
-                      type="number"
-                      id="qty"
-                      name="qty"
-                      value={formData.qty}
-                      onChange={handleInputChange}
-                      min="1"
-                      required
-                      className={styles['form-input']}
-                    />
-                  </div>
-                  <div className={styles['form-group']}>
-                    <label htmlFor="price">Price *</label>
-                    <input
-                      type="number"
-                      id="price"
-                      name="price"
-                      value={formData.price}
-                      onChange={handleInputChange}
-                      min="0"
-                      required
-                      className={styles['form-input']}
-                    />
-                  </div>
-                  <div className={styles['form-group']}>
-                    <label htmlFor="discount">Discount</label>
-                    <input
-                      type="number"
-                      id="discount"
-                      name="discount"
-                      value={formData.discount}
-                      onChange={handleInputChange}
-                      min="0"
-                      className={styles['form-input']}
-                    />
-                  </div>
-                  <div className={styles['form-group']}>
-                    <label htmlFor="tax">Tax</label>
-                    <input
-                      type="number"
-                      id="tax"
-                      name="tax"
-                      value={formData.tax}
-                      onChange={handleInputChange}
-                      min="0"
-                      className={styles['form-input']}
-                    />
-                  </div>
-                  <div className={styles['form-group']}>
-                    <label htmlFor="amount">Amount *</label>
-                    <input
-                      type="number"
-                      id="amount"
-                      name="amount"
-                      value={formData.amount}
-                      onChange={handleInputChange}
-                      min="0"
-                      required
-                      className={styles['form-input']}
-                      readOnly
-                    />
-                  </div>
-                  <div className={styles['form-group']}>
                     <label htmlFor="paid">Paid</label>
-                    <input
-                      type="number"
-                      id="paid"
-                      name="paid"
-                      value={formData.paid}
-                      onChange={handleInputChange}
-                      min="0"
-                      className={styles['form-input']}
-                    />
+                    <input type="number" id="paid" name="paid" value={formData.paid} onChange={handleInputChange} min="0" className={styles['form-input']} />
                   </div>
                   <div className={styles['form-group']}>
                     <label htmlFor="account_id">Account *</label>
-                    <select
-                      id="account_id"
-                      name="account_id"
-                      value={formData.account_id}
-                      onChange={handleInputChange}
-                      required
-                      className={styles['form-select']}
-                    >
+                    <select id="account_id" name="account_id" value={formData.account_id} onChange={handleInputChange} required className={styles['form-select']}>
                       <option value="">Select an account</option>
                       {accounts.map((account) => (
                         <option key={account.account_id} value={account.account_id}>
