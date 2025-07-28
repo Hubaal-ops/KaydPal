@@ -166,7 +166,8 @@ const Purchases = ({ onBack }) => {
       store_no: Number(formData.store_no),
       account_id: Number(formData.account_id)
     };
-    if (formData.paid > calcAmount) {
+    // Only validate paid amount if it's greater than 0 and exceeds the calculated amount
+    if (formData.paid > 0 && parseFloat(formData.paid) > parseFloat(calcAmount)) {
       setError('Paid amount cannot exceed total amount');
       return;
     }

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, createContext, useMemo } from 'react';
+import { ThemeProvider as MuiThemeProvider, createTheme } from '@mui/material/styles';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Dashboard from './components/Dashboard';
 import AdminDashboard from './components/AdminDashboard';
@@ -22,12 +23,52 @@ import Transfer from './views/Transfer';
 import Account from './views/Account';
 import Deposit from './views/Deposit';
 import Withdrawal from './views/Withdrawal';
+import Analytics from './views/Analytics';
+import Reports from './views/Reports';
 import { fetchUserProfile } from '../../APIs/auth';
 
+export const ColorModeContext = createContext({ toggleColorMode: () => {} });
+
 function App() {
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [mode, setMode] = useState('light');
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  const colorMode = useMemo(
+    () => ({
+      toggleColorMode: () => {
+        setMode((prevMode) => (prevMode === 'light' ? 'dark' : 'light'));
+      },
+    }),
+    [],
+  );
+
+  const theme = useMemo(
+    () =>
+      createTheme({
+        palette: {
+          mode,
+          ...(mode === 'light'
+            ? {
+                // Light theme settings
+                background: {
+                  default: '#f5f5f5',
+                  paper: '#ffffff',
+                },
+              }
+            : {
+                // Dark theme settings
+                background: {
+                  default: '#121212',
+                  paper: '#1e1e1e',
+                },
+              }),
+        },
+      }),
+    [mode],
+  );
+
+  const isDarkMode = mode === 'dark';
 
   useEffect(() => {
     document.body.classList.toggle('dark', isDarkMode);
@@ -45,7 +86,7 @@ function App() {
   }, []);
 
   const toggleTheme = () => {
-    setIsDarkMode(!isDarkMode)
+    colorMode.toggleColorMode();
   }
 
   if (loading) {
@@ -53,9 +94,11 @@ function App() {
   }
 
   return (
-    <div className="app">
-      <Navbar isDarkMode={isDarkMode} toggleTheme={toggleTheme} user={user} setUser={setUser} />
-      <main>
+    <ColorModeContext.Provider value={colorMode}>
+      <MuiThemeProvider theme={theme}>
+        <div className="app">
+          <Navbar isDarkMode={isDarkMode} toggleTheme={toggleTheme} user={user} setUser={setUser} />
+          <main>
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <LoginForm setUser={setUser} />} />
@@ -133,10 +176,26 @@ function App() {
             }
           />
           <Route
-            path="/financial/withdrawals"
+            path="/financial/withdrawal"
             element={
               user && user.role === 'user'
                 ? <Withdrawal onBack={() => window.history.back()} />
+                : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
+            }
+          />
+          <Route
+            path="/analytics"
+            element={
+              user && user.role === 'user'
+                ? <Analytics />
+                : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
+            }
+          />
+          <Route
+            path="/reports"
+            element={
+              user && user.role === 'user'
+                ? <Reports />
                 : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
             }
           />
@@ -209,8 +268,10 @@ function App() {
             }
           />
         </Routes>
-      </main>
-    </div>
+          </main>
+        </div>
+      </MuiThemeProvider>
+    </ColorModeContext.Provider>
   );
 }
 

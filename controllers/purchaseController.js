@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const connectDB = require('../db');
 const Purchase = require('../models/Purchase');
 const StoreProduct = require('../models/StoreProduct');
@@ -50,39 +51,60 @@ async function insertPurchase(purchase) {
     created_at: new Date()
   });
 
-  // Update inventory and related balances
-  await Promise.all([
-    db.collection('Stores_Product').updateOne(
-      { pro_no: product_no, store_no },
-      { $inc: { qty }, $set: { updated_at: new Date() } },
-      { upsert: true }
-    ),
-    db.collection('products').updateOne(
-      { product_no },
-      { $inc: { storing_balance: qty } }
-    ),
-    db.collection('stores').updateOne(
-      { store_no },
-      { $inc: { total_items: qty } }
-    )
-  ]);
-
+  // Update StoreProduct using mongoose model
   let storeProduct = await StoreProduct.findOne({ product_no, store_no });
-  if (!storeProduct) {
-    const store_product_no = await getNextSequence('store_product_no');
-    await StoreProduct.create({
-      store_product_no,
-      product_no,
-      store_no,
-      qty,
-      created_at: new Date(),
-      updated_at: new Date()
-    });
-  } else {
-    await StoreProduct.updateOne(
-      { product_no, store_no },
-      { $inc: { qty }, $set: { updated_at: new Date() } }
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  
+  try {
+    if (!storeProduct) {
+      const store_product_no = await getNextSequence('store_product_no');
+      storeProduct = new StoreProduct({
+        store_product_no,
+        product_no,
+        store_no,
+        qty,
+        created_at: new Date(),
+        updated_at: new Date()
+      });
+      await storeProduct.save({ session });
+    } else {
+      storeProduct.qty = (storeProduct.qty || 0) + qty;
+      storeProduct.updated_at = new Date();
+      await storeProduct.save({ session });
+    }
+
+    // Update product's storing_balance
+    await db.collection('products').updateOne(
+      { product_no },
+      [
+        {
+          $set: {
+            storing_balance: {
+              $add: [
+                { $toDouble: { $ifNull: ["$storing_balance", 0] } },
+                qty
+              ]
+            }
+          }
+        }
+      ],
+      { session }
     );
+
+    // Update store's total_items
+    await db.collection('stores').updateOne(
+      { store_no },
+      { $inc: { total_items: qty } },
+      { session }
+    );
+
+    await session.commitTransaction();
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
   }
   await recalculateProductBalance(product_no);
   await recalculateStoreTotal(store_no);
@@ -156,7 +178,18 @@ async function updatePurchase(purchase_no, updated) {
     ),
     db.collection('products').updateOne(
       { product_no: oldPurchase.product_no },
-      { $inc: { storing_balance: -oldPurchase.qty } }
+      [
+        {
+          $set: {
+            storing_balance: {
+              $subtract: [
+                { $toDouble: { $ifNull: ["$storing_balance", 0] } },
+                oldPurchase.qty
+              ]
+            }
+          }
+        }
+      ]
     ),
     db.collection('stores').updateOne(
       { store_no: oldPurchase.store_no },

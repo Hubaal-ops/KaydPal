@@ -75,19 +75,19 @@ const Dashboard = () => {
 
   const handleCardClick = (moduleId) => {
     console.log(`Navigating to ${moduleId} module`);
-    if (moduleId === 'inventory') {
-      navigate('/inventory');
-    } else if (moduleId === 'transactions') {
-      navigate('/transactions');
-    } else if (moduleId === 'financial') {
-      navigate('/financial');
-    } else if (moduleId === 'stocks') {
-      navigate('/stocks');
-    }else if (moduleId === 'employees') {
-      navigate('/employees');
+    const routes = {
+      'inventory': '/inventory',
+      'transactions': '/transactions',
+      'financial': '/financial',
+      'stocks': '/stocks',
+      'employees': '/employees',
+      'analytics': '/analytics',
+      'reports': '/reports'
+    };
+
+    if (routes[moduleId]) {
+      navigate(routes[moduleId]);
     }
-    
-    // Add more navigation logic for other modules as needed
   };
 
   return (
