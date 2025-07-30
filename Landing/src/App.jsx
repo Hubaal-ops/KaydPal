@@ -2,7 +2,7 @@ import React, { useState, useEffect, createContext, useMemo } from 'react';
 import { ThemeProvider as MuiThemeProvider, createTheme } from '@mui/material/styles';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Dashboard from './components/Dashboard';
-import AdminDashboard from './components/AdminDashboard';
+import AdminDashboard from './components/admin/AdminDashboard';
 import LandingPage from './components/LandingPage';
 import LoginForm from './components/LoginForm';
 import RegisterForm from './components/RegisterForm';
@@ -25,6 +25,12 @@ import Deposit from './views/Deposit';
 import Withdrawal from './views/Withdrawal';
 import Analytics from './views/Analytics';
 import Reports from './views/Reports';
+import UserManagement from './views/admin/UserManagement';
+import SystemSettings from './views/admin/SystemSettings';
+import AuditLogs from './views/admin/AuditLogs';
+import Notifications from './views/admin/Notifications';
+import RolesPermissions from './views/admin/RolesPermissions';
+import Support from './views/admin/Support';
 import { fetchUserProfile } from '../../APIs/auth';
 
 export const ColorModeContext = createContext({ toggleColorMode: () => {} });
@@ -266,6 +272,30 @@ function App() {
                 ? <AdminDashboard />
                 : <Navigate to={user && user.role === 'user' ? "/dashboard" : "/login"} />
             }
+          />
+          <Route
+            path="/admin/user-management"
+            element={user && user.role === 'admin' ? <UserManagement /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/admin/system-settings"
+            element={user && user.role === 'admin' ? <SystemSettings /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/admin/audit-logs"
+            element={user && user.role === 'admin' ? <AuditLogs /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/admin/notifications"
+            element={user && user.role === 'admin' ? <Notifications /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/admin/roles-permissions"
+            element={user && user.role === 'admin' ? <RolesPermissions /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/admin/support"
+            element={user && user.role === 'admin' ? <Support /> : <Navigate to="/login" />}
           />
         </Routes>
           </main>

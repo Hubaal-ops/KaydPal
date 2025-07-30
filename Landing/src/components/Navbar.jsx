@@ -18,8 +18,12 @@ const Navbar = ({ isDarkMode, toggleTheme, user, setUser }) => {
     <nav className="navbar">
       <div className="nav-container">
         <div className="nav-logo-left">
-          <Link to={user ? (user.role === 'admin' ? '/admin-dashboard' : '/dashboard') : "/"} style={{ textDecoration: 'none', color: 'inherit' }}>
-            KaydPal
+          <Link to={user ? (user.role === 'admin' ? '/admin-dashboard' : '/dashboard') : "/"} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center' }}>
+            <img 
+              src={isDarkMode ? "/src/assets/Kaydpalw.png" : "/src/assets/Kaydpal.png"} 
+              alt="KaydPal Logo" 
+              style={{ height: '150px', width: 'auto' }} 
+            />
           </Link>
         </div>
         <div className="nav-menu-center">

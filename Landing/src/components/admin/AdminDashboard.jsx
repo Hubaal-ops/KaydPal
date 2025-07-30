@@ -1,5 +1,6 @@
 import React from 'react';
 import './AdminDashboard.css';
+import { useNavigate } from 'react-router-dom';
 import {
   Users,
   Settings,
@@ -60,10 +61,21 @@ const adminModules = [
   }
 ];
 
+const routeMap = {
+  'user-management': '/admin/user-management',
+  'system-settings': '/admin/system-settings',
+  'audit-logs': '/admin/audit-logs',
+  'notifications': '/admin/notifications',
+  'roles-permissions': '/admin/roles-permissions',
+  'support': '/admin/support',
+};
+
 const AdminDashboard = () => {
+  const navigate = useNavigate();
   const handleCardClick = (moduleId) => {
-    console.log(`Navigating to ${moduleId} admin module`);
-    // Navigation logic goes here
+    if (routeMap[moduleId]) {
+      navigate(routeMap[moduleId]);
+    }
   };
 
   return (

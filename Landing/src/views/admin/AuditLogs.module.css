@@ -1,0 +1,161 @@
+/* Audit Logs Styles */
+.auditLogs {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+  color: var(--text-primary);
+  background: var(--background);
+  min-height: 100vh;
+  font-family: 'Inter', sans-serif;
+}
+
+.header { margin-bottom: 2rem; }
+.title { 
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.description {
+  color: var(--text-secondary);
+  margin-bottom: 2rem;
+}
+
+/* Filters */
+.filters {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.searchInput,
+.filterSelect,
+.dateInput {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 0.9375rem;
+  transition: all 0.2s ease;
+}
+
+.searchInput:focus,
+.filterSelect:focus,
+.dateInput:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.searchInput { flex: 1; min-width: 250px; }
+.filterSelect { min-width: 180px; }
+.dateRange { display: flex; gap: 0.5rem; }
+
+/* Logs Table */
+.logsTable {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+}
+
+.logsTable th {
+  background: var(--surface-hover);
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.logsTable td { padding: 1rem; border-bottom: 1px solid var(--border); }
+.logsTable tr:last-child td { border-bottom: none; }
+.logsTable tr:hover { background: var(--surface-hover); }
+
+/* Log Item */
+.logItem { display: flex; gap: 1rem; align-items: flex-start; }
+.logIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.logIcon.info { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+.logIcon.warning { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+.logIcon.error { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+.logIcon.success { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+
+.logContent { flex: 1; min-width: 0; }
+.logTitle { font-weight: 500; margin-bottom: 0.25rem; }
+.logDescription { color: var(--text-secondary); font-size: 0.875rem; }
+.logMeta { 
+  display: flex; 
+  gap: 0.5rem; 
+  margin-top: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--text-tertiary);
+  flex-wrap: wrap;
+}
+
+.logBadge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.logBadge.user { background: rgba(99, 102, 241, 0.1); color: var(--primary-color); }
+.logBadge.system { background: rgba(107, 114, 128, 0.1); color: #6b7280; }
+.logBadge.admin { background: rgba(236, 72, 153, 0.1); color: #ec4899; }
+
+/* Pagination */
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1.5rem;
+  padding: 0 0.5rem;
+}
+
+.paginationInfo { color: var(--text-secondary); font-size: 0.875rem; }
+.paginationControls { display: flex; gap: 0.5rem; }
+
+.pageButton {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.875rem;
+}
+
+.pageButton:hover { background: var(--surface-hover); border-color: var(--border-hover); }
+.pageButton.active { background: var(--primary-color); color: white; border-color: var(--primary-color); }
+.pageButton:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .auditLogs { padding: 1.5rem 1rem; }
+  .filters { flex-direction: column; }
+  .searchInput, .filterSelect { width: 100%; }
+  .logsTable { display: block; overflow-x: auto; }
+}

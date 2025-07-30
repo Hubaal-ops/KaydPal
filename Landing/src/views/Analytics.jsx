@@ -336,7 +336,6 @@ const Analytics = () => {
                       dataKey="value"
                       label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
                       labelLine={false}
-                      label
                     >
                       {productData.map((entry, index) => (
                         <Cell 
