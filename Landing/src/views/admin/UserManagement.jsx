@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Search, 
   Filter, 
@@ -11,15 +11,26 @@ import {
   ArrowLeft,
   Users,
   User,
-  UserCog
+  UserCog,
+  X,
+  Save,
+  Loader2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import styles from './UserManagement.module.css';
 
-const UserManagement = ({ onBack }) => {
+const UserManagement = () => {
   const navigate = useNavigate();
-  // Mock data - replace with real API calls
+  
+  // Handle back navigation
+  const handleBack = (e) => {
+    e?.preventDefault();
+    navigate(-1); // Go back to previous page
+  };
+  
+  // State management
   const [users, setUsers] = useState([
+    // Mock user data
     {
       id: 1,
       name: 'John Doe',
@@ -28,41 +39,42 @@ const UserManagement = ({ onBack }) => {
       status: 'active',
       lastLogin: '2023-06-15T10:30:00Z',
       joinDate: '2023-01-15',
-      avatar: 'JD'
+      avatar: 'JD',
+      phone: '+1234567890',
+      department: 'IT'
     },
-    {
-      id: 2,
-      name: 'Jane Smith',
-      email: 'jane@example.com',
-      role: 'manager',
-      status: 'active',
-      lastLogin: '2023-06-14T15:45:00Z',
-      joinDate: '2023-02-20',
-      avatar: 'JS'
-    },
-    {
-      id: 3,
-      name: 'Bob Johnson',
-      email: 'bob@example.com',
-      role: 'user',
-      status: 'inactive',
-      lastLogin: '2023-06-10T09:15:00Z',
-      joinDate: '2023-03-05',
-      avatar: 'BJ'
-    },
+    // Add more mock users as needed
   ]);
 
+  const [viewMode, setViewMode] = React.useState('table');
+  
+  // Track view mode changes
+  React.useEffect(() => {
+    console.log('Current view mode:', viewMode);
+  }, [viewMode]);
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRole, setSelectedRole] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [usersPerPage] = useState(10);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const usersPerPage = 8;
+  const [formData, setFormData] = useState({
+    id: '',
+    name: '',
+    email: '',
+    role: 'user',
+    status: 'active',
+    phone: '',
+    department: ''
+  });
+  const [errors, setErrors] = useState({});
 
-  // Filter users based on search and filters
+  // Filter users based on search term and filters
   const filteredUsers = users.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          user.email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = selectedRole === 'all' || user.role === selectedRole;
     const matchesStatus = selectedStatus === 'all' || user.status === selectedStatus;
@@ -76,55 +88,143 @@ const UserManagement = ({ onBack }) => {
   const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
   const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
 
+  // Handle pagination
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+
+  // Handle add new user
+  const handleAddUser = (e) => {
+    e?.preventDefault();
+    setFormData({
+      id: '',
+      name: '',
+      email: '',
+      role: 'user',
+      status: 'active',
+      phone: '',
+      department: ''
+    });
+    setViewMode('form');
+  };
+  
+  const handleViewUsers = (e) => {
+    e?.preventDefault();
+    setViewMode('table');
+  };
+
+  // Handle edit user
+  const handleEditUser = (user) => {
+    setFormData({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      status: user.status,
+      phone: user.phone || '',
+      department: user.department || ''
+    });
+    setViewModeWithLog('form');
+  };
+
+  // Handle delete user
   const handleDeleteClick = (user) => {
     setSelectedUser(user);
     setShowDeleteModal(true);
   };
 
+  // Confirm delete
   const confirmDelete = () => {
-    // In a real app, this would be an API call
     setUsers(users.filter(user => user.id !== selectedUser.id));
     setShowDeleteModal(false);
-    setSelectedUser(null);
+    setSuccess(`User "${selectedUser.name}" has been deleted successfully.`);
+    setTimeout(() => setSuccess(''), 3000);
   };
 
-  const toggleUserStatus = (userId) => {
-    setUsers(users.map(user => {
-      if (user.id === userId) {
-        const newStatus = user.status === 'active' ? 'inactive' : 'active';
-        // Show a confirmation for deactivating users
-        if (user.status === 'active' && !window.confirm(`Are you sure you want to deactivate ${user.name}?`)) {
-          return user; // Return unchanged user if cancelled
-        }
-        return { 
-          ...user, 
-          status: newStatus,
-          lastLogin: newStatus === 'active' ? new Date().toISOString() : user.lastLogin
-        };
-      }
-      return user;
+  // Handle form input changes
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
     }));
-  };
-
-  // Handle back navigation
-  const handleBackClick = () => {
-    if (onBack) {
-      onBack();
-    } else {
-      navigate(-1);
+    
+    // Clear error for the field being edited
+    if (errors[name]) {
+      setErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
     }
   };
 
-  // Handle add new user
-  const handleAddUser = () => {
-    // Add your add user logic here
-    console.log('Add new user clicked');
+  // Validate form
+  const validateForm = () => {
+    const newErrors = {};
+    
+    if (!formData.name.trim()) {
+      newErrors.name = 'Name is required';
+    }
+    
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = 'Email is invalid';
+    }
+    
+    if (!formData.role) {
+      newErrors.role = 'Role is required';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
-  // Handle edit user
-  const handleEditUser = (userId) => {
-    // Add your edit user logic here
-    console.log('Edit user:', userId);
+  // Handle form submission
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    
+    if (!validateForm()) {
+      return;
+    }
+    
+    setLoading(true);
+    
+    // Simulate API call
+    setTimeout(() => {
+      if (formData.id) {
+        // Update existing user
+        setUsers(users.map(user => 
+          user.id === formData.id ? { ...formData } : user
+        ));
+        setSuccess('User updated successfully');
+      } else {
+        // Add new user
+        const newUser = {
+          ...formData,
+          id: Math.max(...users.map(u => u.id), 0) + 1,
+          joinDate: new Date().toISOString().split('T')[0],
+          lastLogin: null
+        };
+        setUsers([newUser, ...users]);
+        setSuccess('User created successfully');
+      }
+      
+      setLoading(false);
+      setViewModeWithLog('table');
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setSuccess('');
+      }, 3000);
+      
+    }, 1000);
+  };
+
+  // Handle cancel form
+  const handleCancel = () => {
+    if (window.confirm('Are you sure you want to cancel? Any unsaved changes will be lost.')) {
+      setViewModeWithLog('table');
+      setErrors({});
+    }
   };
 
   // Format date with time
@@ -132,37 +232,13 @@ const UserManagement = ({ onBack }) => {
     if (!dateString) return 'Never';
     
     const date = new Date(dateString);
-    const now = new Date();
-    const diffInDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
-    
-    // If within the last 7 days, show relative time
-    if (diffInDays === 0) {
-      return 'Today';
-    } else if (diffInDays === 1) {
-      return 'Yesterday';
-    } else if (diffInDays < 7) {
-      return `${diffInDays} days ago`;
-    }
-    
-    // Otherwise show the date
-    const options = { 
-      year: 'numeric', 
-      month: 'short', 
+    return date.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
-    };
-    return date.toLocaleDateString(undefined, options);
-  };
-
-  // Handle pagination
-  const paginate = (pageNumber) => {
-    setCurrentPage(pageNumber);
-    // Scroll to top of table on page change
-    const tableElement = document.querySelector(`.${styles.tableWrapper}`);
-    if (tableElement) {
-      tableElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    });
   };
 
   // Generate page numbers for pagination
@@ -170,7 +246,7 @@ const UserManagement = ({ onBack }) => {
   const maxPagesToShow = 5;
   
   if (totalPages <= maxPagesToShow) {
-    // Show all pages if there are 5 or fewer
+    // Show all pages if total pages are less than or equal to maxPagesToShow
     for (let i = 1; i <= totalPages; i++) {
       pageNumbers.push(i);
     }
@@ -183,18 +259,10 @@ const UserManagement = ({ onBack }) => {
       pageNumbers.push('...');
     }
     
-    // Calculate start and end pages to show around current page
-    let startPage = Math.max(2, currentPage - 1);
-    let endPage = Math.min(totalPages - 1, currentPage + 1);
+    // Show current page and adjacent pages
+    const startPage = Math.max(2, currentPage - 1);
+    const endPage = Math.min(totalPages - 1, currentPage + 1);
     
-    // Adjust if we're near the start or end
-    if (currentPage <= 3) {
-      endPage = 4;
-    } else if (currentPage >= totalPages - 2) {
-      startPage = totalPages - 3;
-    }
-    
-    // Add the page numbers around current page
     for (let i = startPage; i <= endPage; i++) {
       if (i > 1 && i < totalPages) {
         pageNumbers.push(i);
@@ -212,253 +280,506 @@ const UserManagement = ({ onBack }) => {
     }
   }
 
+  console.log('Rendering with viewMode:', viewMode);
+  
+  // Add global button styles to your main CSS file instead
+  React.useEffect(() => {
+    // Add global styles for buttons
+    const style = document.createElement('style');
+    style.textContent = `
+      button {
+        cursor: pointer;
+      }
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.7;
+      }
+    `;
+    document.head.appendChild(style);
+    return () => document.head.removeChild(style);
+  }, []);
+
   return (
-    <div className={styles.userManagement}>
+    <div className={styles.container} style={{ position: 'relative', zIndex: 1 }}>
+      {/* Debug overlay */}
+      <div style={{
+        position: 'fixed',
+        top: '10px',
+        right: '10px',
+        background: 'rgba(0,0,0,0.8)',
+        color: 'white',
+        padding: '10px',
+        borderRadius: '4px',
+        zIndex: 9999,
+        fontSize: '12px',
+        pointerEvents: 'none'
+      }}>
+        Current View: {viewMode}
+      </div>
+      {/* Header */}
       <div className={styles.header}>
-        <button className={styles.backButton} onClick={handleBackClick}>
-          <ArrowLeft size={16} />
-          Back
+        <button 
+          onClick={handleBack}
+          className={styles.backButton}
+          aria-label="Go back"
+        >
+          <ArrowLeft size={20} />
         </button>
-        <h1>User Management</h1>
-        <p>Manage your system users and their permissions</p>
+        <div className={styles.headerCenter}>
+          <h1 className={styles.title}>User Management</h1>
+          <p className={styles.subtitle}>Manage your users and their permissions</p>
+        </div>
+        <div style={{
+        display: 'flex',
+        gap: '1rem',
+        zIndex: 1000,
+        position: 'relative'
+      }}>
+        {/* View Users Button */}
+        <div style={{
+          border: '1px solid #e2e8f0',
+          borderRadius: '8px',
+          overflow: 'hidden',
+          background: viewMode === 'table' ? '#4f46e5' : 'white'
+        }}>
+          <button 
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('View Users clicked');
+              setViewMode('table');
+            }}
+            style={{
+              padding: '8px 16px',
+              border: 'none',
+              background: 'transparent',
+              color: viewMode === 'table' ? 'white' : '#1e293b',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '14px',
+              fontWeight: 500
+            }}
+          >
+            <User size={18} />
+            View Users
+          </button>
+        </div>
+
+        {/* Add User Button - Only show in table view */}
+        {viewMode === 'table' && (
+          <div style={{
+            border: '1px solid #4f46e5',
+            borderRadius: '8px',
+            overflow: 'hidden',
+            background: '#4f46e5'
+          }}>
+            <button 
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Add User clicked');
+                setFormData({
+                  id: '',
+                  name: '',
+                  email: '',
+                  role: 'user',
+                  status: 'active',
+                  phone: '',
+                  department: ''
+                });
+                setViewMode('form');
+              }}
+              style={{
+                padding: '8px 16px',
+                border: 'none',
+                background: 'transparent',
+                color: 'white',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '14px',
+                fontWeight: 500
+              }}
+            >
+              <UserPlus size={18} />
+              Add User
+            </button>
+          </div>
+        )}
       </div>
-      
-      <div className={styles.headerActions}>
-        <button className={styles.secondaryButton}>
-          <Download size={16} />
-          Export
-        </button>
-        <button className={styles.primaryButton} onClick={handleAddUser}>
-          <UserPlus size={16} />
-          Add New User
-        </button>
       </div>
 
-      {/* Stats Cards */}
-      <div className={styles.statsContainer}>
-        <div className={styles.statCard}>
-          <div className={styles.statIcon}>
-            <Users size={20} />
-          </div>
-          <div className={styles.statValue}>{users.length}</div>
-          <div className={styles.statLabel}>Total Users</div>
+      {/* Success Message */}
+      {success && (
+        <div className={styles.successMessage}>
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+          </svg>
+          {success}
         </div>
-        <div className={styles.statCard}>
-          <div className={styles.statIcon} style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}>
-            <UserCheck size={20} />
-          </div>
-          <div className={styles.statValue}>
-            {users.filter(u => u.status === 'active').length}
-          </div>
-          <div className={styles.statLabel}>Active Users</div>
-        </div>
-        <div className={styles.statCard}>
-          <div className={styles.statIcon} style={{ backgroundColor: 'rgba(99, 102, 241, 0.1)', color: '#6366f1' }}>
-            <UserCog size={20} />
-          </div>
-          <div className={styles.statValue}>
-            {users.filter(u => u.role === 'admin').length}
-          </div>
-          <div className={styles.statLabel}>Administrators</div>
-        </div>
-      </div>
+      )}
 
-      {/* Table Container */}
-      <div className={styles.tableContainer}>
-        {/* Table Header with Search and Filters */}
-        <div className={styles.tableHeader}>
-          <div className={styles.searchBox}>
-            <Search className={styles.searchIcon} />
-            <input
-              type="text"
-              placeholder="Search users..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className={styles.searchInput}
-              aria-label="Search users"
-            />
+      {viewMode === 'form' ? (
+        <div className={styles.formContainer}>
+          <div className={styles.formHeader}>
+            <h2>{formData.id ? 'Edit User' : 'Add New User'}</h2>
+            <p className={styles.formSubtitle}>
+              {formData.id 
+                ? 'Update the user details below.' 
+                : 'Fill in the form below to create a new user account.'}
+            </p>
           </div>
           
-          <div className={styles.tableActions}>
-            <div className={styles.filterGroup}>
-              <Filter size={16} className={styles.filterIcon} />
-              <select 
-                value={selectedRole} 
-                onChange={(e) => setSelectedRole(e.target.value)}
-                className={styles.filterSelect}
-                aria-label="Filter by role"
-              >
-                <option value="all">All Roles</option>
-                <option value="admin">Admin</option>
-                <option value="manager">Manager</option>
-                <option value="user">User</option>
-              </select>
+          <form onSubmit={handleSubmit}>
+            <div className={styles.formSection}>
+              <h3 className={styles.sectionTitle}>Basic Information</h3>
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                  <label htmlFor="name" className={styles.formLabel}>
+                    Full Name <span className={styles.required}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    id="name"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    className={`${styles.formInput} ${errors.name ? styles.error : ''}`}
+                    placeholder="John Doe"
+                  />
+                  {errors.name && <span className={styles.errorText}>{errors.name}</span>}
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label htmlFor="email" className={styles.formLabel}>
+                    Email Address <span className={styles.required}>*</span>
+                  </label>
+                  <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    className={`${styles.formInput} ${errors.email ? styles.error : ''}`}
+                    placeholder="john@example.com"
+                  />
+                  {errors.email && <span className={styles.errorText}>{errors.email}</span>}
+                </div>
+              </div>
+
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                  <label htmlFor="phone" className={styles.formLabel}>
+                    Phone Number
+                  </label>
+                  <input
+                    type="tel"
+                    id="phone"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                    className={styles.formInput}
+                    placeholder="+1 (555) 000-0000"
+                  />
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label htmlFor="department" className={styles.formLabel}>
+                    Department
+                  </label>
+                  <input
+                    type="text"
+                    id="department"
+                    name="department"
+                    value={formData.department}
+                    onChange={handleInputChange}
+                    className={styles.formInput}
+                    placeholder="e.g., Engineering, Marketing"
+                  />
+                </div>
+              </div>
             </div>
-            
-            <div className={styles.filterGroup}>
-              <select 
-                value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
-                className={styles.filterSelect}
-                aria-label="Filter by status"
+
+            <div className={styles.formSection}>
+              <h3 className={styles.sectionTitle}>Account Settings</h3>
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                  <label htmlFor="role" className={styles.formLabel}>
+                    User Role <span className={styles.required}>*</span>
+                  </label>
+                  <select
+                    id="role"
+                    name="role"
+                    value={formData.role}
+                    onChange={handleInputChange}
+                    className={`${styles.formSelect} ${errors.role ? styles.error : ''}`}
+                  >
+                    <option value="">Select a role</option>
+                    <option value="user">Standard User</option>
+                    <option value="manager">Manager</option>
+                    <option value="admin">Administrator</option>
+                  </select>
+                  {errors.role && <span className={styles.errorText}>{errors.role}</span>}
+                  <p className={styles.helperText}>
+                    {formData.role === 'admin' 
+                      ? 'Administrators have full access to all features.'
+                      : formData.role === 'manager'
+                      ? 'Managers can manage users but have limited administrative access.'
+                      : formData.role === 'user'
+                      ? 'Standard users have basic access to the system.'
+                      : 'Select the appropriate role for this user.'}
+                  </p>
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label htmlFor="status" className={styles.formLabel}>
+                    Account Status
+                  </label>
+                  <select
+                    id="status"
+                    name="status"
+                    value={formData.status}
+                    onChange={handleInputChange}
+                    className={styles.formSelect}
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                  <p className={styles.helperText}>
+                    {formData.status === 'active'
+                      ? 'Active users can sign in and use the system.'
+                      : 'Inactive users cannot sign in.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className={styles.formActions}>
+              <button
+                type="button"
+                onClick={handleCancel}
+                className={styles.cancelBtn}
+                disabled={loading}
               >
-                <option value="all">All Status</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
+                <X size={16} />
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className={`${styles.submitButton} ${loading ? styles.loading : ''}`}
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className={styles.spinner} size={16} />
+                    {formData.id ? 'Saving Changes...' : 'Creating User...'}
+                  </>
+                ) : (
+                  <>
+                    <Save size={16} className={styles.buttonIcon} />
+                    {formData.id ? 'Update User' : 'Create User'}
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : (
+        <div className={styles.tableContainer}>
+          <div className={styles.tableFilters}>
+            <div className={styles.filtersContainer}>
+              <div className={styles.searchBox}>
+                <Search size={16} className={styles.searchIcon} />
+                <input
+                  type="text"
+                  placeholder="Search users..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className={styles.searchInput}
+                  aria-label="Search users"
+                />
+              </div>
+              
+              <div className={styles.filtersGroup}>
+                <div className={styles.filterField}>
+                  <Filter size={14} className={styles.filterIcon} />
+                  <select 
+                    value={selectedRole} 
+                    onChange={(e) => setSelectedRole(e.target.value)}
+                    className={styles.filterSelect}
+                    aria-label="Filter by role"
+                  >
+                    <option value="all">All Roles</option>
+                    <option value="admin">Admin</option>
+                    <option value="manager">Manager</option>
+                    <option value="user">User</option>
+                  </select>
+                </div>
+                
+                <div className={styles.filterField}>
+                  <select 
+                    value={selectedStatus}
+                    onChange={(e) => setSelectedStatus(e.target.value)}
+                    className={styles.filterSelect}
+                    aria-label="Filter by status"
+                  >
+                    <option value="all">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+              </div>
             </div>
             
             <div className={styles.tableInfo}>
-              {filteredUsers.length} {filteredUsers.length === 1 ? 'user' : 'users'} found
+              <span className={styles.infoCount}>{filteredUsers.length}</span>
+              <span>{filteredUsers.length === 1 ? ' user' : ' users'} found</span>
             </div>
           </div>
-        </div>
 
-        {/* Table Wrapper */}
-        <div className={styles.tableWrapper}>
-          <table className={styles.usersTable}>
-            <thead>
-              <tr>
-                <th>USER</th>
-                <th>ROLE</th>
-                <th>STATUS</th>
-                <th>LAST LOGIN</th>
-                <th>JOIN DATE</th>
-                <th>ACTIONS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {currentUsers.length > 0 ? (
-                currentUsers.map((user) => (
-                <tr key={user.id}>
-                  <td>
-                    <div className={styles.userInfo}>
-                      <div className={styles.avatar}>
-                        {user.name.charAt(0)}
-                      </div>
-                      <div>
-                        <div className={styles.userName}>{user.name}</div>
-                        <div className={styles.userEmail}>{user.email}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <span className={`${styles.roleBadge} ${styles[user.role]}`}>
-                      {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
-                    </span>
-                  </td>
-                  <td>
-                    <span className={`${styles.statusBadge} ${styles[user.status]}`}>
-                      <span className={styles.statusDot}></span>
-                      {user.status.charAt(0).toUpperCase() + user.status.slice(1)}
-                    </span>
-                  </td>
-                  <td>{formatDate(user.lastLogin)}</td>
-                  <td>{formatDate(user.joinDate)}</td>
-                  <td>
-                    <div className={styles.actions}>
-                      <button 
-                        onClick={() => toggleUserStatus(user.id)}
-                        className={`${styles.actionButton} ${user.status === 'active' ? styles.warningButton : styles.successButton}`}
-                        aria-label={user.status === 'active' ? 'Deactivate user' : 'Activate user'}
-                        title={user.status === 'active' ? 'Deactivate' : 'Activate'}
-                      >
-                        {user.status === 'active' ? <UserX size={16} /> : <UserCheck size={16} />}
-                      </button>
-                      <button 
-                        onClick={() => handleEditUser(user.id)}
-                        className={`${styles.actionButton} ${styles.editButton}`}
-                        aria-label="Edit user"
-                        title="Edit"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                      <button 
-                        onClick={() => handleDeleteClick(user)}
-                        className={`${styles.actionButton} ${styles.deleteButton}`}
-                        aria-label="Delete user"
-                        title="Delete"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
+          <div className={styles.tableWrapper}>
+            <table className={styles.usersTable}>
+              <thead>
+                <tr>
+                  <th>USER</th>
+                  <th>ROLE</th>
+                  <th>STATUS</th>
+                  <th>LAST LOGIN</th>
+                  <th>JOINED</th>
+                  <th>ACTIONS</th>
                 </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="6" className={styles.noResults}>
-                  <div className={styles.noResultsContent}>
-                    <User size={40} className={styles.noResultsIcon} />
-                    <h3>No users found</h3>
-                    <p>Try adjusting your search or filter criteria</p>
-                  </div>
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className={styles.pagination}>
-          <div className={styles.paginationInfo}>
-            Showing <span>{Math.min((currentPage - 1) * usersPerPage + 1, filteredUsers.length)}</span> to{' '}
-            <span>{Math.min(currentPage * usersPerPage, filteredUsers.length)}</span> of{' '}
-            <span>{filteredUsers.length}</span> users
+              </thead>
+              <tbody>
+                {currentUsers.length > 0 ? (
+                  currentUsers.map(user => (
+                    <tr key={user.id}>
+                      <td>
+                        <div className={styles.userCell}>
+                          <div className={styles.avatar}>
+                            {user.avatar || user.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className={styles.userName}>{user.name}</div>
+                            <div className={styles.userEmail}>{user.email}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <span className={`${styles.badge} ${styles[user.role]}`}>
+                          {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`${styles.status} ${styles[user.status]}`}>
+                          <span className={styles.statusIndicator}></span>
+                          {user.status.charAt(0).toUpperCase() + user.status.slice(1)}
+                        </span>
+                      </td>
+                      <td>{formatDate(user.lastLogin)}</td>
+                      <td>{new Date(user.joinDate).toLocaleDateString()}</td>
+                      <td>
+                        <div className={styles.actionButtons}>
+                          <button 
+                            className={`${styles.actionButton} ${styles.editButton}`}
+                            aria-label={`Edit ${user.name}`}
+                            onClick={() => handleEditUser(user)}
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                          <button 
+                            className={`${styles.actionButton} ${styles.deleteButton}`}
+                            aria-label={`Delete ${user.name}`}
+                            onClick={() => handleDeleteClick(user)}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="6" className={styles.noResults}>
+                      <div className={styles.noResultsContent}>
+                        <User size={40} className={styles.noResultsIcon} />
+                        <h3>No users found</h3>
+                        <p>Try adjusting your search or filter criteria</p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
-          
-          <div className={styles.paginationControls}>
-            <button 
-              onClick={() => paginate(currentPage - 1)} 
-              disabled={currentPage === 1}
-              className={`${styles.paginationButton} ${styles.paginationNav}`}
-              aria-label="Previous page"
-            >
-              <ArrowLeft size={16} />
-              Previous
-            </button>
-            
-            <div className={styles.pageNumbers}>
-              {pageNumbers.map(number => (
+
+          {totalPages > 1 && (
+            <div className={styles.pagination}>
+              <button
+                onClick={() => paginate(1)}
+                disabled={currentPage === 1}
+                className={styles.pageButton}
+                aria-label="First page"
+              >
+                «
+              </button>
+              <button
+                onClick={() => paginate(currentPage - 1)}
+                disabled={currentPage === 1}
+                className={styles.pageButton}
+                aria-label="Previous page"
+              >
+                ‹
+              </button>
+              
+              {pageNumbers.map((number, index) => (
                 <button
-                  key={number}
-                  onClick={() => paginate(number)}
-                  className={`${styles.pageNumber} ${currentPage === number ? styles.active : ''}`}
-                  aria-label={`Page ${number}`}
+                  key={index}
+                  onClick={() => typeof number === 'number' && paginate(number)}
+                  className={`${styles.pageButton} ${currentPage === number ? styles.active : ''}`}
+                  disabled={number === '...'}
+                  aria-label={number === '...' ? 'More pages' : `Page ${number}`}
                   aria-current={currentPage === number ? 'page' : undefined}
                 >
                   {number}
                 </button>
               ))}
+              
+              <button
+                onClick={() => paginate(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className={styles.pageButton}
+                aria-label="Next page"
+              >
+                ›
+              </button>
+              <button
+                onClick={() => paginate(totalPages)}
+                disabled={currentPage === totalPages}
+                className={styles.pageButton}
+                aria-label="Last page"
+              >
+                »
+              </button>
             </div>
-            
-            <button 
-              onClick={() => paginate(currentPage + 1)} 
-              disabled={currentPage === totalPages}
-              className={`${styles.paginationButton} ${styles.paginationNav}`}
-              aria-label="Next page"
-            >
-              Next
-              <ArrowLeft size={16} className={styles.nextIcon} />
-            </button>
-          </div>
+          )}
         </div>
       )}
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && selectedUser && (
         <div className={styles.modalOverlay} onClick={() => setShowDeleteModal(false)}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+          <div className={styles.modal} onClick={e => e.stopPropagation()}>
             <div className={styles.modalHeader}>
-              <h3>Confirm Deletion</h3>
+              <h3>Delete User</h3>
               <button 
                 onClick={() => setShowDeleteModal(false)}
                 className={styles.closeButton}
                 aria-label="Close"
               >
-                &times;
+                <X size={20} />
               </button>
             </div>
             <div className={styles.modalBody}>
@@ -476,19 +797,7 @@ const UserManagement = ({ onBack }) => {
                 Cancel
               </button>
               <button 
-                onClick={() => {
-                  // In a real app, you would make an API call here
-                  console.log('Deleting user:', selectedUser.id);
-                  
-                  // Simulate API call with timeout
-                  setTimeout(() => {
-                    setUsers(users.filter(user => user.id !== selectedUser.id));
-                    setShowDeleteModal(false);
-                    
-                    // Show success message (you might want to use a toast notification in a real app)
-                    alert(`User "${selectedUser.name}" has been deleted successfully.`);
-                  }, 500);
-                }}
+                onClick={confirmDelete}
                 className={`${styles.button} ${styles.dangerButton}`}
               >
                 <Trash2 size={16} />
@@ -498,7 +807,6 @@ const UserManagement = ({ onBack }) => {
           </div>
         </div>
       )}
-      </div>
     </div>
   );
 };
