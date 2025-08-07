@@ -11,5 +11,13 @@ export default defineConfig({
         changeOrigin: true,
       },
     }
+  },
+  optimizeDeps: {
+    exclude: [
+      'chunk-ONK6742D',
+      'chunk-MMSP66ID',
+      'chunk-HNKOMKDZ',
+      'chunk-NAWEHX53'
+    ]
   }
 })

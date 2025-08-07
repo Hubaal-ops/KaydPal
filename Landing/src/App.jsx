@@ -31,7 +31,7 @@ import AuditLogs from './views/admin/AuditLogs';
 import Notifications from './views/admin/Notifications';
 import RolesPermissions from './views/admin/RolesPermissions';
 import Support from './views/admin/Support';
-import { fetchUserProfile } from '../../APIs/auth';
+// import { fetchUserProfile } from '../../APIs/auth';
 
 export const ColorModeContext = createContext({ toggleColorMode: () => {} });
 
@@ -80,11 +80,24 @@ function App() {
     document.body.classList.toggle('dark', isDarkMode);
   }, [isDarkMode]);
 
+
+
+
   useEffect(() => {
     const getProfile = async () => {
-      const profile = await fetchUserProfile();
-      if (profile && profile.success) {
-        setUser(profile.data.user);
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/protected/user/profile', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        const profile = await response.json();
+        if (profile && profile.success) {
+          setUser(profile.data.user);
+        }
+      } catch (err) {
+        // Optionally handle error
       }
       setLoading(false);
     };

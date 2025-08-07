@@ -1,3 +1,4 @@
+const User = require('../models/User');
 const express = require('express');
 const { verifyToken, isAdmin, isUser } = require('../middleware/auth');
 
@@ -83,23 +84,90 @@ router.get('/dashboard', verifyToken, (req, res) => {
  * @desc    Admin user management panel
  * @access  Admin only
  */
-router.get('/admin/users', verifyToken, isAdmin, (req, res) => {
-  res.json({ 
-    success: true,
-    message: 'Admin user management panel',
-    data: {
-      user: req.user,
-      action: 'View all users',
-      timestamp: new Date().toISOString(),
-      managementFeatures: [
-        'View All Users',
-        'Create New Users',
-        'Edit User Roles',
-        'Deactivate Users',
-        'View User Analytics'
-      ]
+// List all users (for admin panel)
+router.get('/admin/users/list', verifyToken, isAdmin, async (req, res) => {
+  try {
+    const users = await User.find({}, '-password -loginAttempts -lockUntil');
+    res.json({
+      success: true,
+      message: 'User list fetched successfully',
+      data: users
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch users', error: error.message });
+  }
+});
+
+/**
+ * @route   POST /api/protected/admin/users
+ * @desc    Create a new user (admin only)
+ * @access  Admin only
+ */
+router.post('/admin/users', verifyToken, isAdmin, async (req, res) => {
+  try {
+    const { name, email, password, role, isActive } = req.body;
+    if (!name || !email || !password || !role) {
+      return res.status(400).json({ success: false, message: 'Name, email, password, and role are required.' });
     }
-  });
+    const existing = await User.findOne({ email });
+    if (existing) {
+      return res.status(409).json({ success: false, message: 'Email already exists.' });
+    }
+    const user = new User({ name, email, password, role, isActive });
+    await user.save();
+    const userObj = user.toObject();
+    delete userObj.password;
+    res.status(201).json({ success: true, message: 'User created successfully', data: userObj });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to create user', error: error.message });
+  }
+});
+
+/**
+ * @route   PUT /api/protected/admin/users/:id
+ * @desc    Update a user (admin only)
+ * @access  Admin only
+ */
+router.put('/admin/users/:id', verifyToken, isAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, email, password, role, isActive } = req.body;
+    const update = { name, email, role, isActive };
+    // Only update password if provided
+    if (password) update.password = password;
+    // Remove undefined fields
+    Object.keys(update).forEach(key => update[key] === undefined && delete update[key]);
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    // If password is being updated, let pre-save hash it
+    Object.assign(user, update);
+    await user.save();
+    const userObj = user.toObject();
+    delete userObj.password;
+    res.json({ success: true, message: 'User updated successfully', data: userObj });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to update user', error: error.message });
+  }
+});
+
+/**
+ * @route   DELETE /api/protected/admin/users/:id
+ * @desc    Delete a user (admin only)
+ * @access  Admin only
+ */
+router.delete('/admin/users/:id', verifyToken, isAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findByIdAndDelete(id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    res.json({ success: true, message: 'User deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to delete user', error: error.message });
+  }
 });
 
 /**

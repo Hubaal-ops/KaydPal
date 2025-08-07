@@ -29,23 +29,39 @@ const UserManagement = () => {
   };
   
   // State management
-  const [users, setUsers] = useState([
-    // Mock user data
-    {
-      id: 1,
-      name: 'John Doe',
-      email: 'john@example.com',
-      role: 'admin',
-      status: 'active',
-      lastLogin: '2023-06-15T10:30:00Z',
-      joinDate: '2023-01-15',
-      avatar: 'JD',
-      phone: '+1234567890',
-      department: 'IT'
-    },
-    // Add more mock users as needed
-  ]);
+  const [users, setUsers] = useState([]);
 
+  // Fetch users from backend API
+  useEffect(() => {
+    const fetchUsers = async () => {
+      setLoading(true);
+      try {
+        const token = localStorage.getItem('token'); // Adjust if you store token elsewhere
+        const response = await fetch('/api/protected/admin/users/list', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        const result = await response.json();
+        if (result.success && Array.isArray(result.data)) {
+          // Map backend _id to id for frontend compatibility
+          setUsers(result.data.map(u => ({
+            ...u,
+            id: u._id,
+            status: u.isActive ? 'active' : 'inactive',
+            joinDate: u.createdAt ? u.createdAt.split('T')[0] : '',
+            lastLogin: u.lastLogin || null
+          })));
+        } else {
+          setUsers([]);
+        }
+      } catch (err) {
+        setUsers([]);
+      }
+      setLoading(false);
+    };
+    fetchUsers();
+  }, []);
   const [viewMode, setViewMode] = React.useState('table');
   
   // Track view mode changes
@@ -68,7 +84,8 @@ const UserManagement = () => {
     role: 'user',
     status: 'active',
     phone: '',
-    department: ''
+    department: '',
+    password: '' // Only used for create or reset
   });
   const [errors, setErrors] = useState({});
 
@@ -120,9 +137,10 @@ const UserManagement = () => {
       role: user.role,
       status: user.status,
       phone: user.phone || '',
-      department: user.department || ''
+      department: user.department || '',
+      password: '' // blank for edit
     });
-    setViewModeWithLog('form');
+    setViewMode('form');
   };
 
   // Handle delete user
@@ -131,12 +149,30 @@ const UserManagement = () => {
     setShowDeleteModal(true);
   };
 
-  // Confirm delete
-  const confirmDelete = () => {
-    setUsers(users.filter(user => user.id !== selectedUser.id));
-    setShowDeleteModal(false);
-    setSuccess(`User "${selectedUser.name}" has been deleted successfully.`);
-    setTimeout(() => setSuccess(''), 3000);
+  // Confirm delete (API)
+  const confirmDelete = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/protected/admin/users/${selectedUser.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.success) {
+        setUsers(users.filter(user => user.id !== selectedUser.id));
+        setShowDeleteModal(false);
+        setSuccess(`User "${selectedUser.name}" has been deleted successfully.`);
+        setTimeout(() => setSuccess(''), 3000);
+      } else {
+        setSuccess(result.message || 'Failed to delete user');
+      }
+    } catch (err) {
+      setSuccess('Failed to delete user');
+    }
+    setLoading(false);
   };
 
   // Handle form input changes
@@ -178,51 +214,93 @@ const UserManagement = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  // Handle form submission
-  const handleSubmit = (e) => {
+  // Handle form submission (API)
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    
     if (!validateForm()) {
       return;
     }
-    
     setLoading(true);
-    
-    // Simulate API call
-    setTimeout(() => {
+    const token = localStorage.getItem('token');
+    const payload = {
+      name: formData.name,
+      email: formData.email,
+      role: formData.role,
+      isActive: formData.status === 'active',
+      phone: formData.phone,
+      department: formData.department
+    };
+    // Only send password if creating or if admin wants to reset
+    if (!formData.id && formData.password) payload.password = formData.password;
+    if (formData.id && formData.password) payload.password = formData.password;
+    try {
+      let response, result;
       if (formData.id) {
-        // Update existing user
-        setUsers(users.map(user => 
-          user.id === formData.id ? { ...formData } : user
-        ));
-        setSuccess('User updated successfully');
+        // Update user
+        response = await fetch(`/api/protected/admin/users/${formData.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        });
+        result = await response.json();
+        if (result.success) {
+          setUsers(users.map(user => user.id === formData.id ? {
+            ...user,
+            ...result.data,
+            id: result.data._id || user.id,
+            status: result.data.isActive ? 'active' : 'inactive',
+            joinDate: result.data.createdAt ? result.data.createdAt.split('T')[0] : user.joinDate
+          } : user));
+          setSuccess('User updated successfully');
+        } else {
+          setSuccess(result.message || 'Failed to update user');
+        }
       } else {
-        // Add new user
-        const newUser = {
-          ...formData,
-          id: Math.max(...users.map(u => u.id), 0) + 1,
-          joinDate: new Date().toISOString().split('T')[0],
-          lastLogin: null
-        };
-        setUsers([newUser, ...users]);
-        setSuccess('User created successfully');
+        // Create user
+        if (!formData.password) {
+          setErrors(prev => ({ ...prev, password: 'Password is required' }));
+          setLoading(false);
+          return;
+        }
+        payload.password = formData.password;
+        response = await fetch('/api/protected/admin/users', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        });
+        result = await response.json();
+        if (result.success) {
+          const newUser = {
+            ...result.data,
+            id: result.data._id,
+            status: result.data.isActive ? 'active' : 'inactive',
+            joinDate: result.data.createdAt ? result.data.createdAt.split('T')[0] : '',
+            lastLogin: result.data.lastLogin || null
+          };
+          setUsers([newUser, ...users]);
+          setSuccess('User created successfully');
+        } else {
+          setSuccess(result.message || 'Failed to create user');
+        }
       }
-      
-      setLoading(false);
-      setViewModeWithLog('table');
-      
-      // Clear success message after 3 seconds
-      setTimeout(() => {
-        setSuccess('');
-      }, 3000);
-      
-    }, 1000);
+      setViewMode('table');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setSuccess('Failed to save user');
+    }
+    setLoading(false);
   };
 
   // Handle cancel form
   const handleCancel = () => {
     if (window.confirm('Are you sure you want to cancel? Any unsaved changes will be lost.')) {
-      setViewModeWithLog('table');
+      setViewMode('table');
       setErrors({});
     }
   };
@@ -470,6 +548,26 @@ const UserManagement = () => {
                 </div>
               </div>
 
+              {/* Password field for create or reset */}
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                  <label htmlFor="password" className={styles.formLabel}>
+                    {formData.id ? 'Reset Password' : 'Password'}{!formData.id && <span className={styles.required}>*</span>}
+                  </label>
+                  <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    className={`${styles.formInput} ${errors.password ? styles.error : ''}`}
+                    placeholder={formData.id ? 'Leave blank to keep current password' : 'Enter password'}
+                  />
+                  {errors.password && <span className={styles.errorText}>{errors.password}</span>}
+                  {formData.id && <span className={styles.helperText}>Leave blank to keep the current password.</span>}
+                </div>
+              </div>
+
               <div className={styles.formRow}>
                 <div className={styles.formGroup}>
                   <label htmlFor="phone" className={styles.formLabel}>
@@ -519,7 +617,6 @@ const UserManagement = () => {
                   >
                     <option value="">Select a role</option>
                     <option value="user">Standard User</option>
-                    <option value="manager">Manager</option>
                     <option value="admin">Administrator</option>
                   </select>
                   {errors.role && <span className={styles.errorText}>{errors.role}</span>}

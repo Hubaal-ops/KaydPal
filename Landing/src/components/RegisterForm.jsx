@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { register } from '../../../APIs/auth';
+// import { register } from '../../../APIs/auth';
 import { Link } from 'react-router-dom';
 import './Auth.css';
+
 
 function RegisterForm() {
     const [formData, setFormData] = useState({
@@ -9,44 +10,53 @@ function RegisterForm() {
         email: '',
         password: '',
         confirmPassword: '',
-      });
-      const [errors, setErrors] = useState({});
-      const [success, setSuccess] = useState(null);
-    
-      const handleChange = (e) => {
+    });
+    const [errors, setErrors] = useState({});
+    const [success, setSuccess] = useState(null);
+
+    const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
         if (errors[e.target.name]) {
             setErrors({ ...errors, [e.target.name]: null });
         }
-      };
-    
-      const handleSubmit = async (e) => {
+    };
+
+    const handleSubmit = async (e) => {
         e.preventDefault();
         setErrors({});
         setSuccess(null);
-    
+
         // Password confirmation validation
         if (formData.password !== formData.confirmPassword) {
-          setErrors({ confirmPassword: 'Passwords do not match' });
-          return;
+            setErrors({ confirmPassword: 'Passwords do not match' });
+            return;
         }
-    
+
         try {
-          await register(formData);
-          setSuccess('Registration successful! You can now log in.');
-          setFormData({ name: '', email: '', password: '', confirmPassword: '' });
-        } catch (err) {
-            if (err.errors) {
+            const response = await fetch('/api/auth/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: formData.name,
+                    email: formData.email,
+                    password: formData.password
+                })
+            });
+            const data = await response.json();
+            if (data.success) {
+                setSuccess('Registration successful! You can now log in.');
+                setFormData({ name: '', email: '', password: '', confirmPassword: '' });
+            } else if (data.errors) {
                 const newErrors = {};
-                err.errors.forEach(e => {
-                    newErrors[e.field] = e.message;
-                });
+                data.errors.forEach(e => { newErrors[e.field] = e.message; });
                 setErrors(newErrors);
             } else {
-                setErrors({ form: err.message });
+                setErrors({ form: data.message || 'Registration failed' });
             }
+        } catch (err) {
+            setErrors({ form: err.message });
         }
-      };
+    };
 
   return (
     <div className="auth-container">
@@ -56,22 +66,18 @@ function RegisterForm() {
         {success && <p className="success-message">{success}</p>}
         <form className="auth-form" onSubmit={handleSubmit}>
           <div className="form-group">
-           
             <input type="text" id="register-name" name="name" placeholder="Enter your full name" required value={formData.name} onChange={handleChange} />
             {errors.name && <p className="field-error-message">{errors.name}</p>}
           </div>
           <div className="form-group">
-      
             <input type="email" id="register-email" name="email" placeholder="Enter your email" required value={formData.email} onChange={handleChange} />
             {errors.email && <p className="field-error-message">{errors.email}</p>}
           </div>
           <div className="form-group">
-            
             <input type="password" id="register-password" name="password" placeholder="Choose a password" required value={formData.password} onChange={handleChange} />
             {errors.password && <p className="field-error-message">{errors.password}</p>}
           </div>
           <div className="form-group">
-           
             <input type="password" id="register-confirm-password" name="confirmPassword" placeholder="Confirm your password" required value={formData.confirmPassword} onChange={handleChange} />
             {errors.confirmPassword && <p className="field-error-message">{errors.confirmPassword}</p>}
           </div>
