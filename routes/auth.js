@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { auth } = require('../middleware/auth');
 
+const { logAudit } = require('../utils/auditLog');
 const router = express.Router();
 
 /**
@@ -70,9 +71,9 @@ const generateToken = (user) => {
  */
 router.post('/register', registerValidation, async (req, res) => {
   try {
-    // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      await logAudit({ action: 'user_register', description: `Failed registration for ${req.body.email}`, status: 'failure', ip: req.ip });
       return res.status(400).json({
         success: false,
         message: 'Validation failed',
@@ -82,32 +83,20 @@ router.post('/register', registerValidation, async (req, res) => {
         }))
       });
     }
-
     const { name, email, password, role = 'user' } = req.body;
-
-    // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
+      await logAudit({ action: 'user_register', description: `Failed registration for ${email} (already exists)`, status: 'failure', ip: req.ip });
       return res.status(409).json({
         success: false,
         message: 'User already exists with this email',
         error: 'USER_ALREADY_EXISTS'
       });
     }
-
-    // Create new user
-    const user = new User({
-      name,
-      email,
-      password,
-      role
-    });
-
+    const user = new User({ name, email, password, role });
     await user.save();
-
-    // Generate JWT token
     const token = generateToken(user);
-
+    await logAudit({ action: 'user_register', description: `User ${user.email} registered`, user, ip: req.ip });
     res.status(201).json({
       success: true,
       message: 'User registered successfully',
@@ -122,10 +111,9 @@ router.post('/register', registerValidation, async (req, res) => {
         }
       }
     });
-
   } catch (error) {
     console.error('Registration error:', error);
-    
+    await logAudit({ action: 'user_register', description: `Failed registration for ${req.body.email}`, status: 'failure', ip: req.ip });
     if (error.code === 11000) {
       return res.status(409).json({
         success: false,
@@ -133,7 +121,6 @@ router.post('/register', registerValidation, async (req, res) => {
         error: 'DUPLICATE_EMAIL'
       });
     }
-
     res.status(500).json({
       success: false,
       message: 'Server error during registration',
@@ -149,9 +136,9 @@ router.post('/register', registerValidation, async (req, res) => {
  */
 router.post('/login', loginValidation, async (req, res) => {
   try {
-    // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      await logAudit({ action: 'user_login', description: `Failed login for ${req.body.identifier}`, status: 'failure', ip: req.ip });
       return res.status(400).json({
         success: false,
         message: 'Validation failed',
@@ -161,22 +148,18 @@ router.post('/login', loginValidation, async (req, res) => {
         }))
       });
     }
-
     const { identifier, password } = req.body;
-
-    // Find user by email or username (including password for comparison)
     const user = await User.findByEmailOrUsernameForAuth(identifier);
-    
     if (!user) {
+      await logAudit({ action: 'user_login', description: `Failed login for ${req.body.identifier} (user not found)`, status: 'failure', ip: req.ip });
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials',
         error: 'INVALID_CREDENTIALS'
       });
     }
-
-    // Check if account is locked
     if (user.isLocked) {
+      await logAudit({ action: 'user_login', description: `Locked account login attempt for ${user.email}`, user, status: 'failure', ip: req.ip });
       return res.status(423).json({
         success: false,
         message: 'Account is temporarily locked due to multiple failed login attempts',
@@ -184,36 +167,27 @@ router.post('/login', loginValidation, async (req, res) => {
         lockUntil: user.lockUntil
       });
     }
-
-    // Check if account is active
     if (!user.isActive) {
+      await logAudit({ action: 'user_login', description: `Inactive account login attempt for ${user.email}`, user, status: 'failure', ip: req.ip });
       return res.status(401).json({
         success: false,
         message: 'Account is deactivated',
         error: 'ACCOUNT_INACTIVE'
       });
     }
-
-    // Verify password
     const isPasswordValid = await user.comparePassword(password);
-    
     if (!isPasswordValid) {
-      // Increment login attempts
       await user.incLoginAttempts();
-      
+      await logAudit({ action: 'user_login', description: `Failed login for ${user.email} (bad password)`, user, status: 'failure', ip: req.ip });
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials',
         error: 'INVALID_CREDENTIALS'
       });
     }
-
-    // Reset login attempts on successful login
     await user.resetLoginAttempts();
-
-    // Generate JWT token
     const token = generateToken(user);
-
+    await logAudit({ action: 'user_login', description: `User ${user.email} logged in`, user, ip: req.ip });
     res.json({
       success: true,
       message: 'Login successful',
@@ -228,9 +202,9 @@ router.post('/login', loginValidation, async (req, res) => {
         }
       }
     });
-
   } catch (error) {
     console.error('Login error:', error);
+    await logAudit({ action: 'user_login', description: `Failed login for ${req.body.identifier}`, status: 'failure', ip: req.ip });
     res.status(500).json({
       success: false,
       message: 'Server error during login',

@@ -2,19 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Search, Filter, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import styles from './AuditLogs.module.css';
 
-// Mock data
-const mockLogs = [
-  {
-    id: 1,
-    action: 'user_login',
-    description: 'User logged in from 192.168.1.1',
-    user: { id: 1, name: 'John Doe', email: 'john@example.com' },
-    status: 'success',
-    timestamp: new Date(Date.now() - 1000 * 60 * 5), // 5 minutes ago
-  },
-  // Add more mock logs...
-];
-
 const AuditLogs = () => {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -24,13 +11,28 @@ const AuditLogs = () => {
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
-    // Simulate API call
-    const timer = setTimeout(() => {
-      setLogs(mockLogs);
+    const fetchLogs = async () => {
+      setLoading(true);
+      try {
+        const token = localStorage.getItem('token');
+        const params = new URLSearchParams({ search: searchTerm, page: currentPage, limit: itemsPerPage });
+        const response = await fetch(`/api/protected/admin/audit-logs?${params.toString()}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await response.json();
+        if (result.success) {
+          setLogs(result.data);
+        } else {
+          setLogs([]);
+        }
+      } catch (err) {
+        setLogs([]);
+      }
       setLoading(false);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, []);
+    };
+    fetchLogs();
+    // eslint-disable-next-line
+  }, [searchTerm, currentPage]);
 
   const filteredLogs = logs.filter(log => 
     log.description.toLowerCase().includes(searchTerm.toLowerCase()) ||

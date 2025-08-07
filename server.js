@@ -108,6 +108,8 @@ connectDB();
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/protected', protectedRoutes);
+const auditLogsRoutes = require('./routes/auditLogs');
+app.use('/api/protected', auditLogsRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/accounts', accountRoutes);

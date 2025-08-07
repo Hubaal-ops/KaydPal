@@ -2,6 +2,7 @@ const User = require('../models/User');
 const express = require('express');
 const { verifyToken, isAdmin, isUser } = require('../middleware/auth');
 
+const { logAudit } = require('../utils/auditLog');
 const router = express.Router();
 
 /**
@@ -117,8 +118,21 @@ router.post('/admin/users', verifyToken, isAdmin, async (req, res) => {
     await user.save();
     const userObj = user.toObject();
     delete userObj.password;
+    await logAudit({
+      action: 'user_create',
+      description: `Created user ${user.email}`,
+      user: req.user,
+      ip: req.ip
+    });
     res.status(201).json({ success: true, message: 'User created successfully', data: userObj });
   } catch (error) {
+    await logAudit({
+      action: 'user_create',
+      description: `Failed to create user: ${req.body.email}`,
+      user: req.user,
+      status: 'failure',
+      ip: req.ip
+    });
     res.status(500).json({ success: false, message: 'Failed to create user', error: error.message });
   }
 });
@@ -133,21 +147,31 @@ router.put('/admin/users/:id', verifyToken, isAdmin, async (req, res) => {
     const { id } = req.params;
     const { name, email, password, role, isActive } = req.body;
     const update = { name, email, role, isActive };
-    // Only update password if provided
     if (password) update.password = password;
-    // Remove undefined fields
     Object.keys(update).forEach(key => update[key] === undefined && delete update[key]);
     const user = await User.findById(id);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
-    // If password is being updated, let pre-save hash it
     Object.assign(user, update);
     await user.save();
     const userObj = user.toObject();
     delete userObj.password;
+    await logAudit({
+      action: 'user_update',
+      description: `Updated user ${user.email}`,
+      user: req.user,
+      ip: req.ip
+    });
     res.json({ success: true, message: 'User updated successfully', data: userObj });
   } catch (error) {
+    await logAudit({
+      action: 'user_update',
+      description: `Failed to update user: ${req.body.email}`,
+      user: req.user,
+      status: 'failure',
+      ip: req.ip
+    });
     res.status(500).json({ success: false, message: 'Failed to update user', error: error.message });
   }
 });
@@ -164,8 +188,21 @@ router.delete('/admin/users/:id', verifyToken, isAdmin, async (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
+    await logAudit({
+      action: 'user_delete',
+      description: `Deleted user ${user.email}`,
+      user: req.user,
+      ip: req.ip
+    });
     res.json({ success: true, message: 'User deleted successfully' });
   } catch (error) {
+    await logAudit({
+      action: 'user_delete',
+      description: `Failed to delete user: ${req.params.id}`,
+      user: req.user,
+      status: 'failure',
+      ip: req.ip
+    });
     res.status(500).json({ success: false, message: 'Failed to delete user', error: error.message });
   }
 });
