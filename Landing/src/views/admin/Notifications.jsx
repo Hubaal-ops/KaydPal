@@ -5,59 +5,11 @@ import {
 } from 'lucide-react';
 import styles from './Notifications.module.css';
 
-// Mock data for notifications
-const mockNotifications = [
-  {
-    id: 1,
-    title: 'New user registered',
-    description: 'John Doe has created a new account with the email john@example.com',
-    type: 'info',
-    read: false,
-    timestamp: new Date(Date.now() - 1000 * 60 * 5), // 5 minutes ago
-    icon: <User size={20} />,
-    category: 'users'
-  },
-  {
-    id: 2,
-    title: 'Payment received',
-    description: 'Payment of $99.99 has been successfully processed for order #12345',
-    type: 'success',
-    read: false,
-    timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
-    icon: <CreditCard size={20} />,
-    category: 'payments'
-  },
-  {
-    id: 3,
-    title: 'System update available',
-    description: 'A new system update (v2.1.0) is available for installation',
-    type: 'warning',
-    read: true,
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-    icon: <Settings size={20} />,
-    category: 'system'
-  },
-  {
-    id: 4,
-    title: 'Failed login attempt',
-    description: 'There was a failed login attempt for admin@example.com from 192.168.1.100',
-    type: 'error',
-    read: true,
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5), // 5 hours ago
-    icon: <AlertCircle size={20} />,
-    category: 'security'
-  },
-  {
-    id: 5,
-    title: 'New message received',
-    description: 'You have a new message from Sarah in the support channel',
-    type: 'info',
-    read: true,
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
-    icon: <Mail size={20} />,
-    category: 'messages'
-  },
-];
+const iconMap = {
+  info: <Info size={20} />, success: <CheckCircle size={20} />, warning: <AlertTriangle size={20} />, error: <AlertCircle size={20} />,
+  users: <User size={20} />, payments: <CreditCard size={20} />, system: <Settings size={20} />, security: <AlertCircle size={20} />, messages: <Mail size={20} />
+};
+
 
 const Notifications = () => {
   const [notifications, setNotifications] = useState([]);
@@ -68,14 +20,29 @@ const Notifications = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedType, setSelectedType] = useState('all');
 
-  // Load notifications
+  // Load notifications from backend
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setNotifications(mockNotifications);
+    const fetchNotifications = async () => {
+      setLoading(true);
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/protected/admin/notifications', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (data.success) {
+          setNotifications(data.data.map(n => ({
+            ...n,
+            icon: iconMap[n.category] || iconMap[n.type] || <Info size={20} />,
+            timestamp: n.timestamp || n.createdAt
+          })));
+        }
+      } catch (e) {
+        // fallback: show nothing
+      }
       setLoading(false);
-    }, 800);
-
-    return () => clearTimeout(timer);
+    };
+    fetchNotifications();
   }, []);
 
   // Filter notifications based on search and filters
@@ -107,29 +74,53 @@ const Notifications = () => {
     return Array.from(categories);
   };
 
-  // Mark notification as read
-  const markAsRead = (id) => {
-    setNotifications(notifications.map(notification => 
-      notification.id === id ? { ...notification, read: true } : notification
-    ));
+
+  // Mark notification as read (API)
+  const markAsRead = async (id) => {
+    try {
+      const token = localStorage.getItem('token');
+      await fetch(`/api/protected/admin/notifications/${id}/read`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      setNotifications(notifications.map(n => n._id === id ? { ...n, read: true } : n));
+    } catch {}
   };
 
-  // Mark all as read
-  const markAllAsRead = () => {
-    setNotifications(notifications.map(notification => ({
-      ...notification,
-      read: true
-    })));
+  // Mark all as read (API)
+  const markAllAsRead = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      await fetch('/api/protected/admin/notifications/mark-all-read', {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      setNotifications(notifications.map(n => ({ ...n, read: true })));
+    } catch {}
   };
 
-  // Delete notification
-  const deleteNotification = (id) => {
-    setNotifications(notifications.filter(notification => notification.id !== id));
+  // Delete notification (API)
+  const deleteNotification = async (id) => {
+    try {
+      const token = localStorage.getItem('token');
+      await fetch(`/api/protected/admin/notifications/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      setNotifications(notifications.filter(n => n._id !== id));
+    } catch {}
   };
 
-  // Clear all notifications
-  const clearAll = () => {
-    setNotifications([]);
+  // Clear all notifications (API)
+  const clearAll = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      await fetch('/api/protected/admin/notifications/clear-all', {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      setNotifications([]);
+    } catch {}
   };
 
   // Get notification type icon
@@ -306,7 +297,7 @@ const Notifications = () => {
               </div>
               <div className={styles.notificationContent}>
                 <div className={styles.notificationTitle}>
-                  <span>{notification.title}</span>
+                  <span style={{ fontWeight: 600 }}>{notification.title}</span>
                   <span className={styles.notificationTime}>
                     <Clock size={14} style={{ marginRight: '4px' }} />
                     {formatTimeAgo(notification.timestamp)}
@@ -319,7 +310,7 @@ const Notifications = () => {
                   {!notification.read && (
                     <button 
                       className={styles.actionButton}
-                      onClick={() => markAsRead(notification.id)}
+                      onClick={() => markAsRead(notification._id)}
                     >
                       <Check size={14} />
                       <span>Mark as read</span>
@@ -327,7 +318,7 @@ const Notifications = () => {
                   )}
                   <button 
                     className={`${styles.actionButton} ${styles.danger}`}
-                    onClick={() => deleteNotification(notification.id)}
+                    onClick={() => deleteNotification(notification._id)}
                   >
                     <Trash2 size={14} />
                     <span>Delete</span>

@@ -3,6 +3,7 @@ const express = require('express');
 const { verifyToken, isAdmin, isUser } = require('../middleware/auth');
 
 const { logAudit } = require('../utils/auditLog');
+const { notifyAdmin } = require('../utils/notifyAdmin');
 const router = express.Router();
 
 /**
@@ -124,6 +125,12 @@ router.post('/admin/users', verifyToken, isAdmin, async (req, res) => {
       user: req.user,
       ip: req.ip
     });
+    await notifyAdmin({
+      title: 'User Created',
+      description: `Admin ${req.user.email} created user ${user.email} (${user.role})`,
+      type: 'success',
+      category: 'users'
+    });
     res.status(201).json({ success: true, message: 'User created successfully', data: userObj });
   } catch (error) {
     await logAudit({
@@ -163,6 +170,12 @@ router.put('/admin/users/:id', verifyToken, isAdmin, async (req, res) => {
       user: req.user,
       ip: req.ip
     });
+    await notifyAdmin({
+      title: 'User Updated',
+      description: `Admin ${req.user.email} updated user ${user.email}`,
+      type: 'info',
+      category: 'users'
+    });
     res.json({ success: true, message: 'User updated successfully', data: userObj });
   } catch (error) {
     await logAudit({
@@ -193,6 +206,12 @@ router.delete('/admin/users/:id', verifyToken, isAdmin, async (req, res) => {
       description: `Deleted user ${user.email}`,
       user: req.user,
       ip: req.ip
+    });
+    await notifyAdmin({
+      title: 'User Deleted',
+      description: `Admin ${req.user.email} deleted user ${user.email}`,
+      type: 'error',
+      category: 'users'
     });
     res.json({ success: true, message: 'User deleted successfully' });
   } catch (error) {

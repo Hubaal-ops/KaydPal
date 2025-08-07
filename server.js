@@ -110,6 +110,10 @@ app.use('/api/auth', authRoutes);
 app.use('/api/protected', protectedRoutes);
 const auditLogsRoutes = require('./routes/auditLogs');
 app.use('/api/protected', auditLogsRoutes);
+
+// Notifications route (admin only)
+const notificationsRoutes = require('./routes/notifications');
+app.use('/api/protected/admin/notifications', notificationsRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/accounts', accountRoutes);

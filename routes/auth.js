@@ -5,6 +5,7 @@ const User = require('../models/User');
 const { auth } = require('../middleware/auth');
 
 const { logAudit } = require('../utils/auditLog');
+const { notifyAdmin } = require('../utils/notifyAdmin');
 const router = express.Router();
 
 /**
@@ -74,6 +75,12 @@ router.post('/register', registerValidation, async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       await logAudit({ action: 'user_register', description: `Failed registration for ${req.body.email}`, status: 'failure', ip: req.ip });
+      await notifyAdmin({
+        title: 'User Registration Failed',
+        description: `Registration failed for ${req.body.email}`,
+        type: 'error',
+        category: 'users'
+      });
       return res.status(400).json({
         success: false,
         message: 'Validation failed',
@@ -87,6 +94,12 @@ router.post('/register', registerValidation, async (req, res) => {
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       await logAudit({ action: 'user_register', description: `Failed registration for ${email} (already exists)`, status: 'failure', ip: req.ip });
+      await notifyAdmin({
+        title: 'Duplicate Registration Attempt',
+        description: `Registration failed for ${email} (already exists)` ,
+        type: 'warning',
+        category: 'users'
+      });
       return res.status(409).json({
         success: false,
         message: 'User already exists with this email',
@@ -97,6 +110,12 @@ router.post('/register', registerValidation, async (req, res) => {
     await user.save();
     const token = generateToken(user);
     await logAudit({ action: 'user_register', description: `User ${user.email} registered`, user, ip: req.ip });
+    await notifyAdmin({
+      title: 'New User Registered',
+      description: `${user.name} (${user.email}) registered as ${user.role}`,
+      type: 'success',
+      category: 'users'
+    });
     res.status(201).json({
       success: true,
       message: 'User registered successfully',
@@ -114,6 +133,12 @@ router.post('/register', registerValidation, async (req, res) => {
   } catch (error) {
     console.error('Registration error:', error);
     await logAudit({ action: 'user_register', description: `Failed registration for ${req.body.email}`, status: 'failure', ip: req.ip });
+    await notifyAdmin({
+      title: 'User Registration Error',
+      description: `Registration error for ${req.body.email}`,
+      type: 'error',
+      category: 'users'
+    });
     if (error.code === 11000) {
       return res.status(409).json({
         success: false,
@@ -139,6 +164,12 @@ router.post('/login', loginValidation, async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       await logAudit({ action: 'user_login', description: `Failed login for ${req.body.identifier}`, status: 'failure', ip: req.ip });
+      await notifyAdmin({
+        title: 'Login Validation Failed',
+        description: `Login validation failed for ${req.body.identifier}`,
+        type: 'error',
+        category: 'security'
+      });
       return res.status(400).json({
         success: false,
         message: 'Validation failed',
@@ -152,6 +183,12 @@ router.post('/login', loginValidation, async (req, res) => {
     const user = await User.findByEmailOrUsernameForAuth(identifier);
     if (!user) {
       await logAudit({ action: 'user_login', description: `Failed login for ${req.body.identifier} (user not found)`, status: 'failure', ip: req.ip });
+      await notifyAdmin({
+        title: 'Failed Login Attempt',
+        description: `Failed login for ${req.body.identifier} (user not found)` ,
+        type: 'warning',
+        category: 'security'
+      });
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials',
@@ -160,6 +197,12 @@ router.post('/login', loginValidation, async (req, res) => {
     }
     if (user.isLocked) {
       await logAudit({ action: 'user_login', description: `Locked account login attempt for ${user.email}`, user, status: 'failure', ip: req.ip });
+      await notifyAdmin({
+        title: 'Account Locked',
+        description: `Locked account login attempt for ${user.email}`,
+        type: 'error',
+        category: 'security'
+      });
       return res.status(423).json({
         success: false,
         message: 'Account is temporarily locked due to multiple failed login attempts',
@@ -169,6 +212,12 @@ router.post('/login', loginValidation, async (req, res) => {
     }
     if (!user.isActive) {
       await logAudit({ action: 'user_login', description: `Inactive account login attempt for ${user.email}`, user, status: 'failure', ip: req.ip });
+      await notifyAdmin({
+        title: 'Inactive Account Login',
+        description: `Inactive account login attempt for ${user.email}`,
+        type: 'warning',
+        category: 'security'
+      });
       return res.status(401).json({
         success: false,
         message: 'Account is deactivated',
@@ -179,6 +228,12 @@ router.post('/login', loginValidation, async (req, res) => {
     if (!isPasswordValid) {
       await user.incLoginAttempts();
       await logAudit({ action: 'user_login', description: `Failed login for ${user.email} (bad password)`, user, status: 'failure', ip: req.ip });
+      await notifyAdmin({
+        title: 'Failed Login Attempt',
+        description: `Failed login for ${user.email} (bad password)` ,
+        type: 'warning',
+        category: 'security'
+      });
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials',
@@ -188,6 +243,12 @@ router.post('/login', loginValidation, async (req, res) => {
     await user.resetLoginAttempts();
     const token = generateToken(user);
     await logAudit({ action: 'user_login', description: `User ${user.email} logged in`, user, ip: req.ip });
+    await notifyAdmin({
+      title: 'User Login',
+      description: `User ${user.email} logged in successfully`,
+      type: 'success',
+      category: 'security'
+    });
     res.json({
       success: true,
       message: 'Login successful',
@@ -205,6 +266,12 @@ router.post('/login', loginValidation, async (req, res) => {
   } catch (error) {
     console.error('Login error:', error);
     await logAudit({ action: 'user_login', description: `Failed login for ${req.body.identifier}`, status: 'failure', ip: req.ip });
+    await notifyAdmin({
+      title: 'Login Error',
+      description: `Login error for ${req.body.identifier}`,
+      type: 'error',
+      category: 'security'
+    });
     res.status(500).json({
       success: false,
       message: 'Server error during login',
