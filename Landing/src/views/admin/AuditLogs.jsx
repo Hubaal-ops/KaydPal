@@ -121,7 +121,7 @@ const AuditLogs = () => {
             <tbody>
               {currentLogs.length > 0 ? (
                 currentLogs.map(log => (
-                  <tr key={log.id} className={styles.logRow}>
+                  <tr key={log._id || log.id} className={styles.logRow}>
                     <td>
                       <span className={`${styles.statusBadge} ${styles[log.status]}`}>
                         {log.action.replace('_', ' ')}
@@ -129,8 +129,8 @@ const AuditLogs = () => {
                     </td>
                     <td>{log.description}</td>
                     <td>{log.user?.email || 'System'}</td>
-                    <td title={formatDate(log.timestamp)}>
-                      {timeAgo(log.timestamp)}
+                    <td title={formatDate(log.createdAt)}>
+                      {timeAgo(log.createdAt)}
                     </td>
                   </tr>
                 ))

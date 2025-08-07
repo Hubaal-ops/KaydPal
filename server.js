@@ -1,4 +1,5 @@
 const express = require('express');
+const app = express();
 const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -35,8 +36,8 @@ const stockTransfersRoutes = require('./routes/stockTransfers');
 const purchaseReturnsRoutes = require('./routes/purchaseReturns');
 const salesReturnsRoutes = require('./routes/salesReturns');
 const invoiceRoutes = require('./routes/invoices');
+const systemSettingsRoutes = require('./routes/systemSettings');
 
-const app = express();
 
 // Security middleware
 app.use(helmet());
@@ -137,6 +138,7 @@ app.use('/api/stock-transfers', stockTransfersRoutes);
 app.use('/api/purchase-returns', purchaseReturnsRoutes);
 app.use('/api/sales-returns', salesReturnsRoutes);
 app.use('/api/invoices', invoiceRoutes);
+app.use('/api/protected/admin/system-settings', systemSettingsRoutes);
 
 // Health check endpoint for tests
 app.get('/api/auth/health', (req, res) => {
@@ -300,4 +302,4 @@ const server = app.listen(PORT, () => {
   console.log('🔗 Ready for frontend integration!');
 });
 
-module.exports = server; 
+module.exports = server;

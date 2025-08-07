@@ -289,7 +289,7 @@ const Notifications = () => {
         ) : filteredNotifications.length > 0 ? (
           filteredNotifications.map(notification => (
             <div 
-              key={notification.id} 
+              key={notification._id || notification.id} 
               className={`${styles.notificationItem} ${!notification.read ? styles.unread : ''}`}
             >
               <div className={`${styles.notificationIcon} ${styles[notification.type]}`}>

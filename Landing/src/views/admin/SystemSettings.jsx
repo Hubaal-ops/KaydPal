@@ -1,31 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Settings, User, Lock, Bell, Mail, Database, Globe, CreditCard, Shield, Palette } from 'lucide-react';
 import styles from './SystemSettings.module.css';
 
 const SystemSettings = () => {
   const [activeSection, setActiveSection] = useState('general');
-  const [settings, setSettings] = useState({
-    siteTitle: 'KaydPal',
-    siteDescription: 'Modern Business Management System',
-    timezone: 'Africa/Nairobi',
-    dateFormat: 'DD/MM/YYYY',
-    timeFormat: '24h',
-    enableRegistration: true,
-    requireEmailVerification: true,
-    enable2FA: false,
-    maintenanceMode: false,
-    emailNotifications: true,
-    pushNotifications: true,
-    emailFrom: 'noreply@kaydpal.com',
-    emailDriver: 'smtp',
-    backupFrequency: 'daily',
-    backupRetention: 30,
-    defaultCurrency: 'KES',
-    currencyPosition: 'left',
-    decimalPlaces: 2,
-    thousandSeparator: ',',
-    decimalSeparator: '.',
-  });
+  const [settings, setSettings] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState('');
+
+  // Load settings from backend
+  useEffect(() => {
+    const fetchSettings = async () => {
+      setLoading(true);
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/protected/admin/system-settings', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (data.success) {
+          setSettings(data.data);
+        } else {
+          setError('Failed to load settings');
+        }
+      } catch {
+        setError('Failed to load settings');
+      }
+      setLoading(false);
+    };
+    fetchSettings();
+  }, []);
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -35,10 +41,31 @@ const SystemSettings = () => {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // TODO: Implement settings save logic
-    console.log('Saving settings:', settings);
+    setSaving(true);
+    setSuccess(false);
+    setError('');
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/protected/admin/system-settings', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(settings)
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSuccess(true);
+      } else {
+        setError(data.message || 'Failed to save settings');
+      }
+    } catch {
+      setError('Failed to save settings');
+    }
+    setSaving(false);
   };
 
   const sections = [
@@ -216,37 +243,44 @@ const SystemSettings = () => {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit}>
-        <div className={styles.settingsGrid}>
-          <div className={styles.sidebar}>
-            <h3 className={styles.sidebarTitle}>Settings</h3>
-            <nav className={styles.sidebarNav}>
-              {sections.map((section) => (
-                <button
-                  key={section.id}
-                  type="button"
-                  className={`${styles.navItem} ${
-                    activeSection === section.id ? styles.active : ''
-                  }`}
-                  onClick={() => setActiveSection(section.id)}
-                >
-                  {section.icon}
-                  {section.label}
-                </button>
-              ))}
-            </nav>
-          </div>
+      {loading ? (
+        <div className={styles.loading}>Loading settings...</div>
+      ) : error ? (
+        <div className={styles.error}>{error}</div>
+      ) : (
+        <form onSubmit={handleSubmit}>
+          <div className={styles.settingsGrid}>
+            <div className={styles.sidebar}>
+              <h3 className={styles.sidebarTitle}>Settings</h3>
+              <nav className={styles.sidebarNav}>
+                {sections.map((section) => (
+                  <button
+                    key={section.id}
+                    type="button"
+                    className={`${styles.navItem} ${
+                      activeSection === section.id ? styles.active : ''
+                    }`}
+                    onClick={() => setActiveSection(section.id)}
+                  >
+                    {section.icon}
+                    {section.label}
+                  </button>
+                ))}
+              </nav>
+            </div>
 
-          <div className={styles.settingsContent}>
-            {renderSection()}
-            
-            <button type="submit" className={styles.saveButton}>
-              <Settings size={18} />
-              Save Changes
-            </button>
+            <div className={styles.settingsContent}>
+              {renderSection()}
+              <button type="submit" className={styles.saveButton} disabled={saving}>
+                <Settings size={18} />
+                {saving ? 'Saving...' : 'Save Changes'}
+              </button>
+              {success && <div className={styles.success}>Settings saved successfully!</div>}
+              {error && <div className={styles.error}>{error}</div>}
+            </div>
           </div>
-        </div>
-      </form>
+        </form>
+      )}
     </div>
   );
 };
