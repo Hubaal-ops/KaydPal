@@ -5,7 +5,8 @@ const getNextSequence = require('../getNextSequence');
 // Get all transfers
 exports.getAllTransfers = async (req, res) => {
   try {
-    const transfers = await Transfer.find()
+    const userId = req.user.id;
+    const transfers = await Transfer.find({ userId })
       .populate('from_account', 'name bank')
       .populate('to_account', 'name bank');
     res.json(transfers);
@@ -17,7 +18,8 @@ exports.getAllTransfers = async (req, res) => {
 // Get transfer by ID
 exports.getTransferById = async (req, res) => {
   try {
-    const transfer = await Transfer.findById(req.params.id)
+    const userId = req.user.id;
+    const transfer = await Transfer.findOne({ _id: req.params.id, userId })
       .populate('from_account', 'name bank')
       .populate('to_account', 'name bank');
     if (!transfer) return res.status(404).json({ error: 'Transfer not found' });
@@ -41,7 +43,7 @@ exports.createTransfer = async (req, res) => {
     if (!transfer_id) {
       return res.status(500).json({ error: 'Failed to generate transfer ID' });
     }
-    const transfer = new Transfer({ transfer_id, from_account, to_account, amount, description });
+  const transfer = new Transfer({ transfer_id, from_account, to_account, amount, description, userId: req.user.id });
     await transfer.save();
     // Update balances
     fromAcc.balance -= amount;
@@ -58,8 +60,8 @@ exports.createTransfer = async (req, res) => {
 exports.updateTransfer = async (req, res) => {
   try {
     const { from_account, to_account, amount, description } = req.body;
-    const transfer = await Transfer.findById(req.params.id);
-    if (!transfer) return res.status(404).json({ error: 'Transfer not found' });
+  const transfer = await Transfer.findOne({ _id: req.params.id, userId: req.user.id });
+  if (!transfer) return res.status(404).json({ error: 'Transfer not found' });
     // Reverse old transfer
     const oldFrom = await Account.findById(transfer.from_account);
     const oldTo = await Account.findById(transfer.to_account);
@@ -93,8 +95,8 @@ exports.updateTransfer = async (req, res) => {
 // Delete transfer
 exports.deleteTransfer = async (req, res) => {
   try {
-    const transfer = await Transfer.findByIdAndDelete(req.params.id);
-    if (!transfer) return res.status(404).json({ error: 'Transfer not found' });
+  const transfer = await Transfer.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
+  if (!transfer) return res.status(404).json({ error: 'Transfer not found' });
     // Reverse transfer
     const fromAcc = await Account.findById(transfer.from_account);
     const toAcc = await Account.findById(transfer.to_account);

@@ -1,39 +1,72 @@
-import axios from 'axios';
 
 const API_URL = '/api/purchase-returns';
 
+// Helper function to handle API requests with token
+const apiRequest = async (endpoint, options = {}) => {
+  const token = localStorage.getItem('token');
+  const response = await fetch(`${API_URL}${endpoint}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    },
+    ...options,
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const error = new Error(errorData.message || 'Request failed');
+    error.status = response.status;
+    error.errors = errorData.errors;
+    throw error;
+  }
+
+  if (response.status === 204) {
+    return null;
+  }
+  return response.json();
+};
+
 export const getPurchaseReturns = async () => {
   try {
-    const res = await axios.get(API_URL);
-    return res.data;
-  } catch (err) {
-    throw err.response?.data?.error || err.message || 'Failed to fetch purchase returns';
+    const data = await apiRequest('/');
+    return data.data || [];
+  } catch (error) {
+    throw error;
   }
 };
 
-export const createPurchaseReturn = async (data) => {
+export const createPurchaseReturn = async (purchaseReturnData) => {
   try {
-    const res = await axios.post(API_URL, data);
-    return res.data;
-  } catch (err) {
-    throw err.response?.data?.error || err.message || 'Failed to create purchase return';
+    const data = await apiRequest('/', {
+      method: 'POST',
+      body: JSON.stringify(purchaseReturnData),
+    });
+    return data.data;
+  } catch (error) {
+    throw error;
   }
 };
 
-export const updatePurchaseReturn = async (id, data) => {
+export const updatePurchaseReturn = async (id, purchaseReturnData) => {
   try {
-    const res = await axios.put(`${API_URL}/${id}`, data);
-    return res.data;
-  } catch (err) {
-    throw err.response?.data?.error || err.message || 'Failed to update purchase return';
+    const data = await apiRequest(`/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(purchaseReturnData),
+    });
+    return data.data;
+  } catch (error) {
+    throw error;
   }
 };
 
 export const deletePurchaseReturn = async (id) => {
   try {
-    const res = await axios.delete(`${API_URL}/${id}`);
-    return res.data;
-  } catch (err) {
-    throw err.response?.data?.error || err.message || 'Failed to delete purchase return';
+    await apiRequest(`/${id}`, {
+      method: 'DELETE',
+    });
+    return true;
+  } catch (error) {
+    throw error;
   }
-}; 
+};

@@ -17,7 +17,8 @@ async function insertStockAdjustment(adjustmentData) {
     store_no,
     qty,
     adj_type,
-    adj_desc
+    adj_desc,
+    userId // allow passing userId explicitly for multi-tenancy
   } = adjustmentData;
 
   // Basic validations
@@ -55,7 +56,8 @@ async function insertStockAdjustment(adjustmentData) {
     adj_type: adj_type.toLowerCase(),
     adj_desc,
     created_at: new Date(),
-    updated_at: new Date()
+    updated_at: new Date(),
+    userId // set userId for multi-tenancy
   };
 
   try {
@@ -102,7 +104,10 @@ async function insertStockAdjustment(adjustmentData) {
 
 async function getAllStockAdjustments() {
   const db = await connectDB();
-  const adjustments = await db.collection('Stock_Adjustments').find({}).sort({ created_at: -1 }).toArray();
+  // Only return adjustments for the authenticated user
+  const userId = arguments[0]?.userId || (typeof arguments[0] === 'object' && arguments[0]?.req?.user?.id);
+  const filter = userId ? { userId } : {};
+  const adjustments = await db.collection('Stock_Adjustments').find(filter).sort({ created_at: -1 }).toArray();
   return adjustments;
 }
 

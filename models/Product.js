@@ -1,12 +1,12 @@
 const mongoose = require('mongoose');
 
-const productSchema = new mongoose.Schema({
-  product_no: { type: Number, unique: true, required: true },
-  product_name: { type: String, required: true },
-  product_code: { type: String },
-  price: { type: Number },
+const ProductSchema = new mongoose.Schema({
+  name: String,
+  price: Number,
+  // ...other fields...
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   storing_balance: { type: Number, default: 0 },
   created_at: { type: Date, default: Date.now }
 });
 
-module.exports = mongoose.model('Product', productSchema);
+module.exports = mongoose.model('Product', ProductSchema);

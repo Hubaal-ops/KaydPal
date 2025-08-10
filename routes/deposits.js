@@ -1,20 +1,21 @@
 const express = require('express');
 const router = express.Router();
 const depositController = require('../controllers/depositController');
+const { verifyToken } = require('../middleware/auth');
 
 // Get all deposits
-router.get('/', depositController.getAllDeposits);
+router.get('/', verifyToken, depositController.getAllDeposits);
 
 // Get deposit by ID
-router.get('/:id', depositController.getDepositById);
+router.get('/:id', verifyToken, depositController.getDepositById);
 
 // Create new deposit
-router.post('/', depositController.createDeposit);
+router.post('/', verifyToken, depositController.createDeposit);
 
 // Update deposit
-router.put('/:id', depositController.updateDeposit);
+router.put('/:id', verifyToken, depositController.updateDeposit);
 
 // Delete deposit
-router.delete('/:id', depositController.deleteDeposit);
+router.delete('/:id', verifyToken, depositController.deleteDeposit);
 
 module.exports = router; 

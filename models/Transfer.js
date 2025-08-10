@@ -24,9 +24,15 @@ const transferSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+
   transfer_date: {
     type: Date,
     default: Date.now
+  },
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
   }
 });
 

@@ -14,7 +14,8 @@ async function insertCustomer(customerData) {
     phone: customerData.phone,
     address: customerData.address,
     bal: typeof customerData.bal === 'number' ? customerData.bal : 0,
-    created_at: new Date()
+    created_at: new Date(),
+    userId: customerData.userId
   };
   await Customer.create(newCustomer);
   return {
@@ -40,11 +41,11 @@ async function getCustomerBalance(customer_no) {
   };
 }
 
-async function getAllCustomers() {
-  return await Customer.find().sort({ name: 1 });
+async function getAllCustomers(userId) {
+  return await Customer.find({ userId }).sort({ name: 1 });
 }
 
-async function updateCustomer(customer_no, updateData) {
+async function updateCustomer(customer_no, updateData, userId) {
   const updateFields = {
     name: updateData.name,
     email: updateData.email,
@@ -55,7 +56,7 @@ async function updateCustomer(customer_no, updateData) {
     updateFields.bal = updateData.bal;
   }
   const result = await Customer.findOneAndUpdate(
-    { customer_no: Number(customer_no) },
+    { customer_no: Number(customer_no), userId },
     updateFields,
     { new: true }
   );
@@ -65,8 +66,8 @@ async function updateCustomer(customer_no, updateData) {
   return { message: 'Customer updated successfully' };
 }
 
-async function deleteCustomer(customer_no) {
-  const result = await Customer.findOneAndDelete({ customer_no: Number(customer_no) });
+async function deleteCustomer(customer_no, userId) {
+  const result = await Customer.findOneAndDelete({ customer_no: Number(customer_no), userId });
   if (!result) {
     throw new Error('Customer not found');
   }

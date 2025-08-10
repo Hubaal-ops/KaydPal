@@ -195,7 +195,7 @@ function App() {
             }
           />
           <Route
-            path="/financial/withdrawal"
+            path="/financial/withdrawals"
             element={
               user && user.role === 'user'
                 ? <Withdrawal onBack={() => window.history.back()} />

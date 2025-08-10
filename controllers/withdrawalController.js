@@ -5,7 +5,8 @@ const getNextSequence = require('../getNextSequence');
 // Get all withdrawals
 exports.getAllWithdrawals = async (req, res) => {
   try {
-    const withdrawals = await Withdrawal.find().populate('account', 'name bank');
+    const userId = req.user.id;
+    const withdrawals = await Withdrawal.find({ userId }).populate('account', 'name bank');
     res.json(withdrawals);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -15,7 +16,8 @@ exports.getAllWithdrawals = async (req, res) => {
 // Get withdrawal by ID
 exports.getWithdrawalById = async (req, res) => {
   try {
-    const withdrawal = await Withdrawal.findById(req.params.id).populate('account', 'name bank');
+    const userId = req.user.id;
+    const withdrawal = await Withdrawal.findOne({ _id: req.params.id, userId }).populate('account', 'name bank');
     if (!withdrawal) return res.status(404).json({ error: 'Withdrawal not found' });
     res.json(withdrawal);
   } catch (err) {
@@ -35,7 +37,7 @@ exports.createWithdrawal = async (req, res) => {
     if (!withdrawal_id) {
       return res.status(500).json({ error: 'Failed to generate withdrawal ID' });
     }
-    const withdrawal = new Withdrawal({ withdrawal_id, account, amount });
+  const withdrawal = new Withdrawal({ withdrawal_id, account, amount, userId: req.user.id });
     await withdrawal.save();
     // Update account balance
     accountDoc.balance -= amount;
@@ -50,8 +52,8 @@ exports.createWithdrawal = async (req, res) => {
 exports.updateWithdrawal = async (req, res) => {
   try {
     const { account, amount } = req.body;
-    const withdrawal = await Withdrawal.findById(req.params.id);
-    if (!withdrawal) return res.status(404).json({ error: 'Withdrawal not found' });
+  const withdrawal = await Withdrawal.findOne({ _id: req.params.id, userId: req.user.id });
+  if (!withdrawal) return res.status(404).json({ error: 'Withdrawal not found' });
     // Adjust account balances if amount or account changes
     if (amount !== undefined && (amount !== withdrawal.amount || account !== String(withdrawal.account))) {
       // Refund old account
@@ -79,8 +81,8 @@ exports.updateWithdrawal = async (req, res) => {
 // Delete withdrawal
 exports.deleteWithdrawal = async (req, res) => {
   try {
-    const withdrawal = await Withdrawal.findByIdAndDelete(req.params.id);
-    if (!withdrawal) return res.status(404).json({ error: 'Withdrawal not found' });
+  const withdrawal = await Withdrawal.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
+  if (!withdrawal) return res.status(404).json({ error: 'Withdrawal not found' });
     // Refund account balance
     const account = await Account.findById(withdrawal.account);
     if (account) {

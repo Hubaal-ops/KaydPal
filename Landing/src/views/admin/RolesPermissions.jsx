@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styles from './RolesPermissions.module.css';
 import { Plus, Edit, Trash2, Save, X, Check, Users, Lock, Eye, Settings, UserPlus, FileText, BarChart2, Mail, Bell, Shield } from 'lucide-react';
 
@@ -7,55 +7,30 @@ const RolesPermissions = () => {
   const [editingRole, setEditingRole] = useState(null);
   const [newRoleName, setNewRoleName] = useState('');
   const [showAddRole, setShowAddRole] = useState(false);
+  const [roles, setRoles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Sample roles data
-  const [roles, setRoles] = useState([
-    {
-      id: 1,
-      name: 'Administrator',
-      key: 'admin',
-      description: 'Full access to all features and settings',
-      permissions: {
-        userManagement: ['read', 'create', 'update', 'delete'],
-        content: ['read', 'create', 'update', 'delete', 'publish'],
-        settings: ['read', 'update'],
-        analytics: ['read'],
-        notifications: ['read', 'create', 'update', 'delete'],
-        roles: ['read', 'create', 'update', 'delete']
-      },
-      userCount: 3
-    },
-    {
-      id: 2,
-      name: 'Editor',
-      key: 'editor',
-      description: 'Can create and edit content but cannot manage users',
-      permissions: {
-        userManagement: ['read'],
-        content: ['read', 'create', 'update'],
-        settings: [],
-        analytics: ['read'],
-        notifications: ['read'],
-        roles: []
-      },
-      userCount: 12
-    },
-    {
-      id: 3,
-      name: 'Viewer',
-      key: 'viewer',
-      description: 'Can only view content and analytics',
-      permissions: {
-        userManagement: [],
-        content: ['read'],
-        settings: [],
-        analytics: ['read'],
-        notifications: [],
-        roles: []
-      },
-      userCount: 45
-    }
-  ]);
+  // Fetch roles from backend
+  useEffect(() => {
+    const fetchRoles = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/protected/admin/roles', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (data.success) setRoles(data.data);
+        else setError(data.message || 'Failed to load roles');
+      } catch (err) {
+        setError('Failed to load roles');
+      }
+      setLoading(false);
+    };
+    fetchRoles();
+  }, []);
 
   // All available permissions
   const allPermissions = {
@@ -146,6 +121,9 @@ const RolesPermissions = () => {
       </span>
     );
   };
+
+  if (loading) return <div>Loading roles...</div>;
+  if (error) return <div>Error: {error}</div>;
 
   return (
     <div className={styles.rolesContainer}>

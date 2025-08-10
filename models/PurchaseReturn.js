@@ -12,7 +12,9 @@ const PurchaseReturnSchema = new mongoose.Schema({
   reason: { type: String },
   date: { type: Date, default: Date.now },
   created_at: { type: Date, default: Date.now },
-  updated_at: { type: Date, default: Date.now }
+
+  updated_at: { type: Date, default: Date.now },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
 });
 
 module.exports = mongoose.model('PurchaseReturn', PurchaseReturnSchema); 

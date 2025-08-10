@@ -15,9 +15,15 @@ const depositSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
+
   deposit_date: {
     type: Date,
     default: Date.now
+  },
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
   }
 });
 

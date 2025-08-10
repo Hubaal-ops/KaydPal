@@ -1,20 +1,21 @@
 const express = require('express');
 const router = express.Router();
 const withdrawalController = require('../controllers/withdrawalController');
+const { verifyToken } = require('../middleware/auth');
 
 // Get all withdrawals
-router.get('/', withdrawalController.getAllWithdrawals);
+router.get('/', verifyToken, withdrawalController.getAllWithdrawals);
 
 // Get withdrawal by ID
-router.get('/:id', withdrawalController.getWithdrawalById);
+router.get('/:id', verifyToken, withdrawalController.getWithdrawalById);
 
 // Create new withdrawal
-router.post('/', withdrawalController.createWithdrawal);
+router.post('/', verifyToken, withdrawalController.createWithdrawal);
 
 // Update withdrawal
-router.put('/:id', withdrawalController.updateWithdrawal);
+router.put('/:id', verifyToken, withdrawalController.updateWithdrawal);
 
 // Delete withdrawal
-router.delete('/:id', withdrawalController.deleteWithdrawal);
+router.delete('/:id', verifyToken, withdrawalController.deleteWithdrawal);
 
 module.exports = router; 

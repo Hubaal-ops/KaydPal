@@ -4,7 +4,7 @@ const getNextSequence = require('../getNextSequence');
 // Get all stores
 exports.getAllStores = async (req, res) => {
   try {
-    const stores = await Store.find();
+    const stores = await Store.find({ userId: req.user.id });
     res.json(stores);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch stores' });
@@ -29,7 +29,8 @@ exports.createStore = async (req, res) => {
     const store_no = await getNextSequence('store_no');
     const newStore = new Store({
       ...req.body,
-      store_no
+      store_no,
+      userId: req.user.id
     });
     await newStore.save();
     res.status(201).json(newStore);
@@ -38,10 +39,10 @@ exports.createStore = async (req, res) => {
   }
 };
 
-// Update a store
+// Update a store (user-specific)
 exports.updateStore = async (req, res) => {
   try {
-    const updated = await Store.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const updated = await Store.findOneAndUpdate({ _id: req.params.id, userId: req.user.id }, req.body, { new: true });
     if (!updated) return res.status(404).json({ error: 'Store not found' });
     res.json(updated);
   } catch (err) {
@@ -49,10 +50,10 @@ exports.updateStore = async (req, res) => {
   }
 };
 
-// Delete a store
+// Delete a store (user-specific)
 exports.deleteStore = async (req, res) => {
   try {
-    const deleted = await Store.findByIdAndDelete(req.params.id);
+    const deleted = await Store.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
     if (!deleted) return res.status(404).json({ error: 'Store not found' });
     res.json({ message: 'Store deleted' });
   } catch (err) {

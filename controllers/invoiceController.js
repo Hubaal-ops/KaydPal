@@ -47,7 +47,8 @@ exports.createInvoice = async (req, res) => {
       paid,
       balance_due,
       status,
-      notes: sale.notes || ''
+      notes: sale.notes || '',
+      userId: req.user.id
     });
     await invoice.save();
     res.status(201).json(invoice);
@@ -59,7 +60,7 @@ exports.createInvoice = async (req, res) => {
 // Get all invoices
 exports.getAllInvoices = async (req, res) => {
   try {
-    const invoices = await Invoice.find().sort({ date: -1 });
+    const invoices = await Invoice.find({ userId: req.user.id }).sort({ date: -1 });
     res.json(invoices);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -69,7 +70,7 @@ exports.getAllInvoices = async (req, res) => {
 // Get single invoice
 exports.getInvoiceById = async (req, res) => {
   try {
-    const invoice = await Invoice.findById(req.params.id);
+    const invoice = await Invoice.findOne({ _id: req.params.id, userId: req.user.id });
     if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
     res.json(invoice);
   } catch (err) {
@@ -80,7 +81,11 @@ exports.getInvoiceById = async (req, res) => {
 // Update invoice (optional)
 exports.updateInvoice = async (req, res) => {
   try {
-    const invoice = await Invoice.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const invoice = await Invoice.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user.id },
+      req.body,
+      { new: true }
+    );
     if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
     res.json(invoice);
   } catch (err) {
@@ -91,10 +96,10 @@ exports.updateInvoice = async (req, res) => {
 // Delete invoice (optional)
 exports.deleteInvoice = async (req, res) => {
   try {
-    const invoice = await Invoice.findByIdAndDelete(req.params.id);
+    const invoice = await Invoice.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
     if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
     res.json({ message: 'Invoice deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-}; 
+};

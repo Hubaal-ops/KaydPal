@@ -2,9 +2,11 @@ const API_URL = '/api/categories';
 
 // Helper function to handle API requests
 const apiRequest = async (endpoint, options = {}) => {
+  const token = localStorage.getItem('token');
   const response = await fetch(`${API_URL}${endpoint}`, {
     headers: {
       'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },
     ...options,

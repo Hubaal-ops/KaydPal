@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+
 const { 
   insertProduct, 
   getAllProducts, 
@@ -7,21 +8,22 @@ const {
   updateProduct, 
   deleteProduct 
 } = require('../controllers/productController');
+const { verifyToken } = require('../middleware/auth');
 
-// Get all products
-router.get('/', async (req, res) => {
+// Get all products (user-specific)
+router.get('/', verifyToken, async (req, res) => {
   try {
-    const products = await getAllProducts();
+    const products = await getAllProducts(req.user.id);
     res.json({ success: true, data: products });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
-// Get single product
-router.get('/:id', async (req, res) => {
+// Get single product (user-specific)
+router.get('/:id', verifyToken, async (req, res) => {
   try {
-    const product = await getProductById(req.params.id);
+    const product = await getProductById(req.params.id, req.user.id);
     if (!product) {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
@@ -31,23 +33,23 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Create product
-router.post('/', async (req, res) => {
+// Create product (user-specific)
+router.post('/', verifyToken, async (req, res) => {
   try {
     if (!req.body.product_name) {
       return res.status(400).json({ success: false, message: 'Product name is required' });
     }
-    const result = await insertProduct(req.body);
+    const result = await insertProduct({ ...req.body, userId: req.user.id });
     res.status(201).json({ success: true, data: result });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
   }
 });
 
-// Update product
-router.put('/:id', async (req, res) => {
+// Update product (user-specific)
+router.put('/:id', verifyToken, async (req, res) => {
   try {
-    const result = await updateProduct(req.params.id, req.body);
+    const result = await updateProduct(req.params.id, req.body, req.user.id);
     if (!result) {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
@@ -57,10 +59,10 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// Delete product
-router.delete('/:id', async (req, res) => {
+// Delete product (user-specific)
+router.delete('/:id', verifyToken, async (req, res) => {
   try {
-    const result = await deleteProduct(req.params.id);
+    const result = await deleteProduct(req.params.id, req.user.id);
     if (!result) {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }

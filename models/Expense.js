@@ -1,11 +1,7 @@
 const mongoose = require('mongoose');
 
+
 const expenseSchema = new mongoose.Schema({
-  expense_id: {
-    type: Number,
-    unique: true,
-    required: true
-  },
   category: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'ExpenseCategory',
@@ -31,6 +27,11 @@ const expenseSchema = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now
+  },
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
   }
 });
 

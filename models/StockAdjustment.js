@@ -8,7 +8,9 @@ const StockAdjustmentSchema = new mongoose.Schema({
   adj_type: { type: String, enum: ['add', 'subtract'], required: true },
   adj_desc: { type: String },
   created_at: { type: Date, default: Date.now },
-  updated_at: { type: Date, default: Date.now }
+
+  updated_at: { type: Date, default: Date.now },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
 });
 
 module.exports = mongoose.model('StockAdjustment', StockAdjustmentSchema); 

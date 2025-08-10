@@ -1,20 +1,21 @@
 const express = require('express');
 const router = express.Router();
 const transferController = require('../controllers/transferController');
+const { verifyToken } = require('../middleware/auth');
 
 // Get all transfers
-router.get('/', transferController.getAllTransfers);
+router.get('/', verifyToken, transferController.getAllTransfers);
 
 // Get transfer by ID
-router.get('/:id', transferController.getTransferById);
+router.get('/:id', verifyToken, transferController.getTransferById);
 
 // Create new transfer
-router.post('/', transferController.createTransfer);
+router.post('/', verifyToken, transferController.createTransfer);
 
 // Update transfer
-router.put('/:id', transferController.updateTransfer);
+router.put('/:id', verifyToken, transferController.updateTransfer);
 
 // Delete transfer
-router.delete('/:id', transferController.deleteTransfer);
+router.delete('/:id', verifyToken, transferController.deleteTransfer);
 
 module.exports = router; 

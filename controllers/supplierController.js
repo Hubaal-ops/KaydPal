@@ -13,7 +13,8 @@ async function insertSupplier(supplierData) {
     email: supplierData.email,
     phone: supplierData.phone,
     balance: typeof supplierData.balance === 'number' ? supplierData.balance : 0,
-    created_at: new Date()
+    created_at: new Date(),
+    userId: supplierData.userId
   };
   await Supplier.create(newSupplier);
   return {
@@ -22,11 +23,11 @@ async function insertSupplier(supplierData) {
   };
 }
 
-async function getAllSuppliers() {
-  return await Supplier.find().sort({ name: 1 });
+async function getAllSuppliers(userId) {
+  return await Supplier.find({ userId }).sort({ name: 1 });
 }
 
-async function updateSupplier(supplier_no, updateData) {
+async function updateSupplier(supplier_no, updateData, userId) {
   const updateFields = {
     name: updateData.name,
     email: updateData.email,
@@ -36,7 +37,7 @@ async function updateSupplier(supplier_no, updateData) {
     updateFields.balance = updateData.balance;
   }
   const result = await Supplier.findOneAndUpdate(
-    { supplier_no: Number(supplier_no) },
+    { supplier_no: Number(supplier_no), userId },
     updateFields,
     { new: true }
   );
@@ -46,8 +47,8 @@ async function updateSupplier(supplier_no, updateData) {
   return { message: 'Supplier updated successfully' };
 }
 
-async function deleteSupplier(supplier_no) {
-  const result = await Supplier.findOneAndDelete({ supplier_no: Number(supplier_no) });
+async function deleteSupplier(supplier_no, userId) {
+  const result = await Supplier.findOneAndDelete({ supplier_no: Number(supplier_no), userId });
   if (!result) {
     throw new Error('Supplier not found');
   }

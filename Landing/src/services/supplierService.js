@@ -1,15 +1,22 @@
 const API_BASE = '/api/suppliers';
 
 export async function getSuppliers() {
-  const res = await fetch(API_BASE);
+  const token = localStorage.getItem('token');
+  const res = await fetch(API_BASE, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {}
+  });
   if (!res.ok) throw new Error('Failed to fetch suppliers');
   return await res.json();
 }
 
 export async function addSupplier(supplier) {
+  const token = localStorage.getItem('token');
   const res = await fetch(API_BASE, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    },
     body: JSON.stringify(supplier),
   });
   if (!res.ok) {
@@ -20,9 +27,13 @@ export async function addSupplier(supplier) {
 }
 
 export async function updateSupplier(supplier_no, supplier) {
+  const token = localStorage.getItem('token');
   const res = await fetch(`${API_BASE}/${supplier_no}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    },
     body: JSON.stringify(supplier),
   });
   if (!res.ok) {
@@ -33,8 +44,10 @@ export async function updateSupplier(supplier_no, supplier) {
 }
 
 export async function deleteSupplier(supplier_no) {
+  const token = localStorage.getItem('token');
   const res = await fetch(`${API_BASE}/${supplier_no}`, {
     method: 'DELETE',
+    headers: token ? { Authorization: `Bearer ${token}` } : {}
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
