@@ -1,17 +1,18 @@
 const express = require('express');
 const router = express.Router();
 const salesReturnController = require('../controllers/salesReturnController');
+const { verifyToken } = require('../middleware/auth');
 
 // Get all sales returns
-router.get('/', salesReturnController.getAllSalesReturns);
+router.get('/', verifyToken, salesReturnController.getAllSalesReturns);
 
 // Create a new sales return
-router.post('/', salesReturnController.createSalesReturn);
+router.post('/', verifyToken, salesReturnController.createSalesReturn);
 
 // Update a sales return
-router.put('/:id', salesReturnController.updateSalesReturn);
+router.put('/:id', verifyToken, salesReturnController.updateSalesReturn);
 
 // Delete a sales return
-router.delete('/:id', salesReturnController.deleteSalesReturn);
+router.delete('/:id', verifyToken, salesReturnController.deleteSalesReturn);
 
 module.exports = router; 

@@ -1,20 +1,22 @@
 const express = require('express');
 const router = express.Router();
+
 const accountController = require('../controllers/accountController');
+const { verifyToken } = require('../middleware/auth');
 
-// Get all accounts
-router.get('/', accountController.getAllAccounts);
+// Get all accounts (user-specific)
+router.get('/', verifyToken, accountController.getAllAccounts);
 
-// Get account by ID
-router.get('/:id', accountController.getAccountById);
+// Get account by ID (user-specific)
+router.get('/:id', verifyToken, accountController.getAccountById);
 
-// Create new account
-router.post('/', accountController.createAccount);
+// Create new account (user-specific)
+router.post('/', verifyToken, accountController.createAccount);
 
-// Update account
-router.put('/:id', accountController.updateAccount);
+// Update account (user-specific)
+router.put('/:id', verifyToken, accountController.updateAccount);
 
-// Delete account
-router.delete('/:id', accountController.deleteAccount);
+// Delete account (user-specific)
+router.delete('/:id', verifyToken, accountController.deleteAccount);
 
 module.exports = router; 

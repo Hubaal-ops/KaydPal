@@ -39,7 +39,7 @@ const StockAdjustment = ({ onBack }) => {
         setStores(Array.isArray(strs) ? strs : (strs.data || []));
         setAdjustments(adjs);
       } catch (err) {
-        setError('Error loading data');
+        setError('Failed to load data');
       } finally {
         setLoading(false);
       }
@@ -143,12 +143,24 @@ const StockAdjustment = ({ onBack }) => {
     return store ? store.store_name : store_no;
   };
 
-  const filteredAdjustments = adjustments.filter(adj =>
-    getProductName(adj.product_no).toLowerCase().includes(searchTerm.toLowerCase()) ||
-    getStoreName(adj.store_no).toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (adj.adj_type || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (adj.adj_desc || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+
+  // Defensive: Only filter if all data is loaded and arrays
+  const isDataReady = Array.isArray(adjustments) && Array.isArray(products) && Array.isArray(stores);
+  const filteredAdjustments = isDataReady
+    ? adjustments.filter(adj =>
+        (String(getProductName(adj.product_no)) || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (String(getStoreName(adj.store_no)) || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (adj.adj_type || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (adj.adj_desc || '').toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    : [];
+
+  if (error) {
+    return <div style={{ color: 'red', fontWeight: 'bold' }}>{error}</div>;
+  }
+  if (!isDataReady || loading) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <div className={styles.stores}>

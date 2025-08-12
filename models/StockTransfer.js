@@ -9,7 +9,9 @@ const StockTransferSchema = new mongoose.Schema({
   transfer_desc: { type: String },
   status: { type: String, default: 'pending' },
   created_at: { type: Date, default: Date.now },
-  updated_at: { type: Date, default: Date.now }
+
+  updated_at: { type: Date, default: Date.now },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
 });
 
 module.exports = mongoose.model('StockTransfer', StockTransferSchema); 

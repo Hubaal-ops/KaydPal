@@ -26,6 +26,7 @@ const invoiceSchema = new mongoose.Schema({
   paid: Number,
   balance_due: Number,
   status: { type: String, default: 'Unpaid' },
-  notes: String
+  notes: String,
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
 });
 module.exports = mongoose.model('Invoice', invoiceSchema); 

@@ -1,274 +1,508 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, Area,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
+} from 'recharts';
+import { 
+  Box, Card, CardContent, CardHeader, Grid, 
+  Typography, Select, MenuItem, FormControl, InputLabel
+} from '@mui/material';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { format } from 'date-fns';
+import { TrendingUp, ShoppingCart, Users, DollarSign } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { useTheme, useMediaQuery } from '@mui/material';
 
-import React, { useEffect, useState } from 'react';
-import styles from './Analytics.module.css';
-import { fetchAnalytics } from '../services/analyticsService';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { AlertCircle } from 'lucide-react';
+// Mock data - replace with actual API calls
+const salesData = [
+  { name: 'Jan', sales: 4000 },
+  { name: 'Feb', sales: 3000 },
+  { name: 'Mar', sales: 5000 },
+  { name: 'Apr', sales: 2780 },
+  { name: 'May', sales: 1890 },
+  { name: 'Jun', sales: 2390 },
+];
 
-const colorMap = {
-  good: '#22c55e',
-  warning: '#facc15',
-  critical: '#ef4444',
-  fast: '#22c55e',
-  slow: '#f59e42',
-};
+const productData = [
+  { name: 'Product A', value: 400 },
+  { name: 'Product B', value: 300 },
+  { name: 'Product C', value: 300 },
+  { name: 'Product D', value: 200 },
+];
+
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
 
 const Analytics = () => {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [nlQuery, setNlQuery] = useState('');
-  const [nlResult, setNlResult] = useState(null);
-  const [range, setRange] = useState('month');
-
-  useEffect(() => {
-    setLoading(true);
-    fetchAnalytics({ range }).then(setData).finally(() => setLoading(false));
-  }, [range]);
-
-  // Simulate AI/NLQ result
-  const handleNLQuery = (e) => {
-    e.preventDefault();
-    // In real app, call backend AI endpoint
-    setNlResult(`Showing results for: "${nlQuery}"`);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const [timeRange, setTimeRange] = useState('month');
+  const [startDate, setStartDate] = useState(new Date());
+  const [endDate, setEndDate] = useState(new Date());
+  const [isLoading, setIsLoading] = useState(true);
+  
+  const cardStyle = {
+    p: 3,
+    height: '100%',
+    backgroundColor: theme.palette.background.paper,
+    backdropFilter: 'blur(10px)',
+    border: `1px solid ${theme.palette.divider}`,
+    borderRadius: '12px',
+    overflow: 'visible',
+    transition: 'all 0.3s ease-in-out',
+    '&:hover': {
+      boxShadow: theme.shadows[4],
+    },
   };
 
-  if (loading) return <div className={styles.analyticsContainer}>Loading...</div>;
+  // Simulate data loading
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, []);
 
-  // Demo data fallback for UI
-  const salesTrends = data?.salesTrends || [
-    { period: 'Week 1', value: 12000 },
-    { period: 'Week 2', value: 18000 },
-    { period: 'Week 3', value: 22000 },
-    { period: 'Week 4', value: 52300 },
+  const stats = [
+    {
+      title: 'Total Sales',
+      value: '$24,780',
+      change: '+12.5%',
+      icon: <DollarSign size={24} />,
+      color: '#4CAF50'
+    },
+    {
+      title: 'Orders',
+      value: '1,245',
+      change: '+8.2%',
+      icon: <ShoppingCart size={24} />,
+      color: '#2196F3'
+    },
+    {
+      title: 'Customers',
+      value: '845',
+      change: '+5.3%',
+      icon: <Users size={24} />,
+      color: '#9C27B0'
+    },
+    {
+      title: 'Growth',
+      value: '18.7%',
+      change: '+2.4%',
+      icon: <TrendingUp size={24} />,
+      color: '#FF9800'
+    }
   ];
-  const stockLevels = data?.stockLevels || [
-    { name: 'Item A', qty: 150, status: 'good' },
-    { name: 'Item B', qty: 30, status: 'warning' },
-    { name: 'Item C', qty: 10, status: 'critical' },
-  ];
-  const fastSlowProducts = data?.fastSlowProducts || [
-    { name: 'Product X', status: 'fast' },
-    { name: 'Product Y', status: 'slow' },
-    { name: 'Product Z', status: 'slow' },
-  ];
-  const debtTracking = data?.debtTracking || [
-    { name: 'John Doe', amount: 1200, days: 45 },
-    { name: 'Mary Smith', amount: 1500, days: 38 },
-    { name: 'James Brown', amount: 1100, days: 32 },
-  ];
-  const aiPrediction = data?.aiPrediction || 'Item B is likely to run out in 3 days';
-  const restockRecommendation = data?.restockRecommendation || 'Recommended reorder quantity for Item A: 180';
-  const debtRiskAlerts = data?.debtRiskAlerts || [
-    { name: 'John Doe', risk: 'High' },
-  ];
+
+  const MotionCard = motion(Card);
+
+  if (isLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+        <Typography>Loading analytics data...</Typography>
+      </Box>
+    );
+  }
 
   return (
-    <div className={styles.analyticsContainer}>
-      <h2 className={styles.title}>Smart Inventory Management System</h2>
-      <div style={{ display: 'flex', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
-        <label style={{ fontWeight: 500 }}>Time Range:</label>
-        <select value={range} onChange={e => setRange(e.target.value)} style={{ borderRadius: 8, padding: 6, border: '1px solid #e5e7eb' }}>
-          <option value="day">Today</option>
-          <option value="week">This Week</option>
-          <option value="month">This Month</option>
-          <option value="year">This Year</option>
-        </select>
-      </div>
-      <div className={styles.statsGrid}>
-        {/* Sales Trends */}
-        <div className={styles.statCard}>
-          <div className={styles.statHeader}>
-            <span className={styles.statTitle}>Sales Trends</span>
-          </div>
-          <div className={styles.chartContainer} style={{ height: 60 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={salesTrends}>
-                <Line type="monotone" dataKey="value" stroke="#6366f1" strokeWidth={2} dot={false} />
-                <XAxis dataKey="period" hide />
-                <YAxis hide />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-          <div className={styles.statValue}>
-            ${salesTrends[salesTrends.length - 1]?.value?.toLocaleString() || '0'}
-          </div>
-        </div>
-
-        {/* Stock Levels */}
-        <div className={styles.statCard}>
-          <div className={styles.statHeader}>
-            <span className={styles.statTitle}>Stock Levels</span>
-          </div>
-          <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
-            {stockLevels.map((item) => (
-              <li key={item.name} style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
-                <span style={{
-                  display: 'inline-block',
-                  width: 10,
-                  height: 10,
-                  borderRadius: '50%',
-                  background: colorMap[item.status],
-                  marginRight: 8,
-                }} />
-                <span style={{ flex: 1 }}>{item.name}</span>
-                <span style={{ fontWeight: 600 }}>{item.qty}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {/* Fast-moving vs. Slow-moving Products (Bar) */}
-        <div className={styles.statCard}>
-          <div className={styles.statHeader}>
-            <span className={styles.statTitle}>Fast-moving vs. Slow-moving Products</span>
-          </div>
-          <div className={styles.chartContainer} style={{ height: 40 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={[
-                { name: 'Fast-moving', value: fastSlowProducts.filter(p => p.status === 'fast').length },
-                { name: 'Slow-moving', value: fastSlowProducts.filter(p => p.status === 'slow').length },
-              ]}>
-                <Bar dataKey="value" fill="#22c55e" radius={[8, 8, 8, 8]} />
-                <XAxis dataKey="name" hide />
-                <YAxis hide />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Debt Tracking */}
-        <div className={styles.statCard}>
-          <div className={styles.statHeader}>
-            <span className={styles.statTitle}>Debt Tracking</span>
-            <span style={{ marginLeft: 'auto', color: colorMap.critical, fontSize: 32 }}>
-              <AlertCircle />
-            </span>
-          </div>
-          <div className={styles.statValue} style={{ color: colorMap.critical, fontWeight: 700, fontSize: 28 }}>
-            {debtTracking.length} Customers
-          </div>
-        </div>
-      </div>
-
-      {/* Fast/Slow Table & Debt Table */}
-      <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', marginBottom: 24 }}>
-        <div style={{ flex: 1, minWidth: 320 }}>
-          <div className={styles.chartCard}>
-            <div className={styles.chartHeader}>
-              <span className={styles.chartTitle}>Fast-moving vs. Slow-moving Products</span>
-            </div>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: 'left', padding: 6 }}>Product</th>
-                  <th style={{ textAlign: 'left', padding: 6 }}>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {fastSlowProducts.map((p) => (
-                  <tr key={p.name}>
-                    <td style={{ padding: 6 }}>{p.name}</td>
-                    <td style={{ padding: 6 }}>
-                      <span style={{
-                        background: p.status === 'fast' ? colorMap.fast : colorMap.slow,
-                        color: '#fff',
-                        borderRadius: 8,
-                        padding: '2px 10px',
-                        fontSize: 13,
-                        fontWeight: 500,
-                      }}>{p.status === 'fast' ? 'Fast-moving' : 'Slow-moving'}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div style={{ flex: 1, minWidth: 320 }}>
-          <div className={styles.chartCard}>
-            <div className={styles.chartHeader}>
-              <span className={styles.chartTitle}>Debt Tracking</span>
-            </div>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: 'left', padding: 6 }}>Customer</th>
-                  <th style={{ textAlign: 'right', padding: 6 }}>Amount</th>
-                  <th style={{ textAlign: 'right', padding: 6 }}>Days And</th>
-                </tr>
-              </thead>
-              <tbody>
-                {debtTracking.map((c) => (
-                  <tr key={c.name}>
-                    <td style={{ padding: 6 }}>{c.name}</td>
-                    <td style={{ padding: 6, textAlign: 'right' }}>${c.amount.toLocaleString()}</td>
-                    <td style={{ padding: 6, textAlign: 'right' }}>{c.days} day</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      {/* AI Features */}
-      <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-        <div style={{ flex: 1, minWidth: 320 }}>
-          <div className={styles.chartCard}>
-            <div className={styles.chartHeader}>
-              <span className={styles.chartTitle}>AI Prediction</span>
-            </div>
-            <div style={{ background: '#f1f5f9', borderRadius: 8, padding: 12, fontWeight: 500, color: '#222' }}>
-              {aiPrediction}
-            </div>
-          </div>
-        </div>
-        <div style={{ flex: 1, minWidth: 320 }}>
-          <div className={styles.chartCard}>
-            <div className={styles.chartHeader}>
-              <span className={styles.chartTitle}>Smart Restock Recommendations</span>
-            </div>
-            <div style={{ background: '#e7fbe7', borderRadius: 8, padding: 12, fontWeight: 500, color: '#166534' }}>
-              {restockRecommendation}
-            </div>
-          </div>
-        </div>
-        <div style={{ flex: 1, minWidth: 320 }}>
-          <div className={styles.chartCard}>
-            <div className={styles.chartHeader}>
-              <span className={styles.chartTitle}>Debt Risk Alerts</span>
-            </div>
-            <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
-              {debtRiskAlerts.map((a) => (
-                <li key={a.name} style={{ color: colorMap.critical, fontWeight: 600, marginBottom: 4 }}>
-                  {a.name} - {a.risk} risk
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-        <div style={{ flex: 1, minWidth: 320 }}>
-          <div className={styles.chartCard}>
-            <div className={styles.chartHeader}>
-              <span className={styles.chartTitle}>Natural Language Query</span>
-            </div>
-            <form onSubmit={handleNLQuery} style={{ display: 'flex', gap: 8 }}>
-              <input
-                type="text"
-                value={nlQuery}
-                onChange={e => setNlQuery(e.target.value)}
-                placeholder="Top selling products this month"
-                style={{ flex: 1, borderRadius: 8, border: '1px solid #e5e7eb', padding: 8 }}
+    <Box sx={{ 
+      p: { xs: 2, sm: 3, md: 4 },
+      bgcolor: 'background.default',
+      minHeight: '100vh',
+      color: 'text.primary',
+      transition: 'background-color 0.3s ease-in-out',
+    }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
+          Analytics Dashboard
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel>Time Range</InputLabel>
+            <Select
+              value={timeRange}
+              label="Time Range"
+              onChange={(e) => setTimeRange(e.target.value)}
+            >
+              <MenuItem value="day">Today</MenuItem>
+              <MenuItem value="week">This Week</MenuItem>
+              <MenuItem value="month">This Month</MenuItem>
+              <MenuItem value="year">This Year</MenuItem>
+              <MenuItem value="custom">Custom Range</MenuItem>
+            </Select>
+          </FormControl>
+          
+          {timeRange === 'custom' && (
+            <LocalizationProvider dateAdapter={AdapterDateFns}>
+              <DatePicker
+                label="Start Date"
+                value={startDate}
+                onChange={(newValue) => setStartDate(newValue)}
+                renderInput={(params) => <TextField {...params} size="small" sx={{ width: 150 }} />}
               />
-              <button type="submit" style={{ borderRadius: 8, background: '#6366f1', color: '#fff', border: 'none', padding: '8px 16px', fontWeight: 600 }}>
-                Search
-              </button>
-            </form>
-            {nlResult && <div style={{ marginTop: 8, color: '#222', fontWeight: 500 }}>{nlResult}</div>}
-          </div>
-        </div>
-      </div>
-    </div>
+              <DatePicker
+                label="End Date"
+                value={endDate}
+                onChange={(newValue) => setEndDate(newValue)}
+                renderInput={(params) => <TextField {...params} size="small" sx={{ width: 150 }} />}
+              />
+            </LocalizationProvider>
+          )}
+        </Box>
+      </Box>
+
+      {/* Stats Cards */}
+      <Grid container spacing={3} sx={{ mb: 3 }}>
+        {stats.map((stat, index) => (
+          <Grid item xs={12} sm={6} md={3} key={index}>
+            <MotionCard
+              component={Card}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: index * 0.1 }}
+              elevation={0}
+              sx={{
+                p: 3,
+                height: '100%',
+                backgroundColor: theme.palette.mode === 'dark' 
+                  ? 'rgba(30, 41, 59, 0.5)' 
+                  : 'rgba(255, 255, 255, 0.5)',
+                backdropFilter: 'blur(10px)',
+              }}
+            >
+              <CardContent>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Box>
+                    <Typography color="textSecondary" variant="subtitle2">
+                      {stat.title}
+                    </Typography>
+                    <Typography variant="h5" sx={{ mt: 1, fontWeight: 'bold' }}>
+                      {stat.value}
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+                      <Box
+                        component="span"
+                        sx={{
+                          color: stat.change.startsWith('+') ? '#4CAF50' : '#F44336',
+                          display: 'flex',
+                          alignItems: 'center',
+                          fontSize: '0.875rem',
+                        }}
+                      >
+                        {stat.change}
+                        <TrendingUp 
+                          size={16} 
+                          style={{
+                            marginLeft: 4,
+                            transform: stat.change.startsWith('+') ? 'rotate(0deg)' : 'rotate(180deg)'
+                          }} 
+                        />
+                      </Box>
+                      <Typography variant="caption" color="textSecondary" sx={{ ml: 1 }}>
+                        vs last period
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Box
+                    sx={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: '12px',
+                      backgroundColor: `${stat.color}20`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: stat.color,
+                    }}
+                  >
+                    {stat.icon}
+                  </Box>
+                </Box>
+              </CardContent>
+            </MotionCard>
+          </Grid>
+        ))}
+      </Grid>
+
+      {/* Charts */}
+      <Grid container spacing={3}>
+        {/* Sales Trend */}
+        <Grid item xs={12} md={8}>
+          <MotionCard
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.4, delay: 0.2 }}
+            sx={cardStyle}
+          >
+            <CardHeader 
+              title="Sales Trend" 
+              titleTypographyProps={{ 
+                fontWeight: 'bold',
+                color: theme.palette.text.primary,
+              }}
+              subheader="Monthly sales performance"
+              subheaderTypographyProps={{
+                color: theme.palette.text.secondary,
+              }}
+            />
+            <CardContent sx={{ height: 400 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={salesData}>
+                  <defs>
+                    <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.1}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme.palette.divider} />
+                  <XAxis 
+                    dataKey="name" 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: theme.palette.text.secondary, fontSize: 12 }}
+                  />
+                  <YAxis 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: theme.palette.text.secondary, fontSize: 12 }}
+                  />
+                  <Tooltip 
+                    contentStyle={{
+                      backgroundColor: theme.palette.background.paper,
+                      border: `1px solid ${theme.palette.divider}`,
+                      borderRadius: '8px',
+                      boxShadow: theme.shadows[2],
+                      color: theme.palette.text.primary,
+                      padding: '8px 12px',
+                    }}
+                  />
+                  <Legend />
+                  <Area 
+                    type="monotone" 
+                    dataKey="sales" 
+                    fill="url(#colorSales)" 
+                    stroke="#3b82f6"
+                    strokeWidth={2}
+                    fillOpacity={0.2}
+                    name="Sales ($)"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </MotionCard>
+        </Grid>
+
+        {/* Product Distribution */}
+        <Grid item xs={12} md={4}>
+          <MotionCard
+            component={Card}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.4, delay: 0.3 }}
+            elevation={0}
+            sx={{
+              p: 3,
+              height: '100%',
+              backgroundColor: theme.palette.mode === 'dark' 
+                ? 'rgba(30, 41, 59, 0.5)' 
+                : 'rgba(255, 255, 255, 0.5)',
+              backdropFilter: 'blur(10px)',
+              border: `1px solid ${theme.palette.divider}`,
+            }}
+          >
+            <CardHeader 
+              title="Product Distribution" 
+              subheader="Top selling products" 
+              titleTypographyProps={{ 
+                fontWeight: 'bold',
+                color: theme.palette.text.primary,
+              }}
+              subheaderTypographyProps={{
+                color: theme.palette.text.secondary,
+              }}
+            />
+            <CardContent sx={{ p: 0 }}>
+              <Box sx={{ height: 350, width: '100%', mt: 2 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={productData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={90}
+                      paddingAngle={5}
+                      dataKey="value"
+                      label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
+                      labelLine={false}
+                    >
+                      {productData.map((entry, index) => (
+                        <Cell 
+                          key={`cell-${index}`} 
+                          fill={[
+                            '#3b82f6',
+                            '#8b5cf6',
+                            '#ec4899',
+                            '#f59e0b'
+                          ][index % 4]}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      formatter={(value, name, props) => [
+                        `$${value}`,
+                        props.payload.name
+                      ]}
+                      contentStyle={{
+                        backgroundColor: theme.palette.background.paper,
+                        border: `1px solid ${theme.palette.divider}`,
+                        borderRadius: '8px',
+                        boxShadow: theme.shadows[2],
+                        color: theme.palette.text.primary,
+                        padding: '8px 12px',
+                      }}
+                    />
+                    <Legend 
+                      layout="horizontal"
+                      verticalAlign="bottom"
+                      align="center"
+                      wrapperStyle={{
+                        paddingTop: '20px',
+                        color: theme.palette.text.primary,
+                        fontSize: '0.875rem',
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Box>
+            </CardContent>
+          </MotionCard>
+        </Grid>
+
+        {/* Recent Transactions */}
+        <Grid item xs={12}>
+          <MotionCard
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.4 }}
+            sx={cardStyle}
+          >
+            <CardHeader 
+              title="Recent Transactions" 
+              titleTypographyProps={{ 
+                fontWeight: 'bold',
+                color: theme.palette.text.primary,
+              }}
+              action={
+                <Typography 
+                  color="primary" 
+                  sx={{ 
+                    cursor: 'pointer', 
+                    '&:hover': { 
+                      textDecoration: 'underline',
+                      color: theme.palette.primary.light,
+                    } 
+                  }}
+                >
+                  View All
+                </Typography>
+              }
+            />
+            <CardContent sx={{ p: 0, '&:last-child': { p: 0 } }}>
+              <Box sx={{ overflowX: 'auto' }}>
+                <Box 
+                  component="table" 
+                  sx={{ 
+                    width: '100%', 
+                    borderCollapse: 'collapse',
+                    '& th, & td': {
+                      p: 1.5,
+                      borderBottom: `1px solid`,
+                      borderColor: 'divider',
+                    },
+                    '& th': {
+                      textAlign: 'left',
+                      fontWeight: 600,
+                      color: 'text.primary',
+                      backgroundColor: theme.palette.mode === 'dark' 
+                        ? 'rgba(255, 255, 255, 0.05)' 
+                        : 'rgba(0, 0, 0, 0.02)',
+                    },
+                    '& tr:hover': {
+                      backgroundColor: theme.palette.action.hover,
+                    },
+                  }}
+                >
+                  <thead>
+                    <tr>
+                      <th>Order ID</th>
+                      <th>Customer</th>
+                      <th sx={{ textAlign: 'right' }}>Amount</th>
+                      <th sx={{ textAlign: 'center' }}>Status</th>
+                      <th sx={{ textAlign: 'right' }}>Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[1, 2, 3, 4, 5].map((item) => {
+                      const statusType = item % 3;
+                      const statusConfig = {
+                        0: { 
+                          text: 'Processing', 
+                          bgColor: theme.palette.mode === 'dark' ? 'rgba(25, 118, 210, 0.2)' : '#e3f2fd',
+                          textColor: theme.palette.mode === 'dark' ? '#90caf9' : '#1976d2'
+                        },
+                        1: { 
+                          text: 'Completed', 
+                          bgColor: theme.palette.mode === 'dark' ? 'rgba(46, 125, 50, 0.2)' : '#e8f5e9',
+                          textColor: theme.palette.mode === 'dark' ? '#a5d6a7' : '#2e7d32'
+                        },
+                        2: { 
+                          text: 'Pending', 
+                          bgColor: theme.palette.mode === 'dark' ? 'rgba(230, 81, 0, 0.2)' : '#fff3e0',
+                          textColor: theme.palette.mode === 'dark' ? '#ffb74d' : '#e65100'
+                        }
+                      };
+                      const status = statusConfig[statusType];
+                      
+                      return (
+                        <tr key={item}>
+                          <td sx={{ color: 'text.primary' }}>#ORD-{1000 + item}</td>
+                          <td sx={{ color: 'text.primary' }}>Customer {item}</td>
+                          <td sx={{ textAlign: 'right', color: 'text.primary', fontWeight: 500 }}>
+                            ${(Math.random() * 1000).toFixed(2)}
+                          </td>
+                          <td sx={{ textAlign: 'center' }}>
+                            <Box
+                              component="span"
+                              sx={{
+                                px: 1.5,
+                                py: 0.5,
+                                borderRadius: 4,
+                                fontSize: '0.75rem',
+                                fontWeight: 500,
+                                display: 'inline-block',
+                                backgroundColor: status.bgColor,
+                                color: status.textColor,
+                              }}
+                            >
+                              {status.text}
+                            </Box>
+                          </td>
+                          <td sx={{ textAlign: 'right', color: 'text.secondary' }}>
+                            {format(new Date(2023, 5, item), 'MMM d, yyyy')}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </Box>
+              </Box>
+            </CardContent>
+          </MotionCard>
+        </Grid>
+      </Grid>
+    </Box>
   );
 };
 

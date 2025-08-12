@@ -3,20 +3,20 @@ const Deposit = require('../models/Deposit');
 const Account = require('../models/Account');
 const getNextSequence = require('../getNextSequence');
 
-// Get all deposits
+// Get all deposits (user-specific)
 exports.getAllDeposits = async (req, res) => {
   try {
-    const deposits = await Deposit.find().populate('account', 'name bank');
+    const deposits = await Deposit.find({ userId: req.user.id }).populate('account', 'name bank');
     res.json(deposits);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
 
-// Get deposit by ID
+// Get deposit by ID (user-specific)
 exports.getDepositById = async (req, res) => {
   try {
-    const deposit = await Deposit.findById(req.params.id).populate('account', 'name bank');
+    const deposit = await Deposit.findOne({ _id: req.params.id, userId: req.user.id }).populate('account', 'name bank');
     if (!deposit) return res.status(404).json({ error: 'Deposit not found' });
     res.json(deposit);
   } catch (err) {
@@ -24,7 +24,7 @@ exports.getDepositById = async (req, res) => {
   }
 };
 
-// Create new deposit
+// Create new deposit (user-specific)
 exports.createDeposit = async (req, res) => {
   try {
     const { account, amount } = req.body;
@@ -35,7 +35,7 @@ exports.createDeposit = async (req, res) => {
     if (!deposit_id) {
       return res.status(500).json({ error: 'Failed to generate deposit ID' });
     }
-    const deposit = new Deposit({ deposit_id, account, amount });
+    const deposit = new Deposit({ deposit_id, account, amount, userId: req.user.id });
     await deposit.save();
     // Update account balance
     accountDoc.balance += amount;
@@ -46,11 +46,11 @@ exports.createDeposit = async (req, res) => {
   }
 };
 
-// Update deposit
+// Update deposit (user-specific)
 exports.updateDeposit = async (req, res) => {
   try {
     const { account, amount } = req.body;
-    const deposit = await Deposit.findById(req.params.id);
+    const deposit = await Deposit.findOne({ _id: req.params.id, userId: req.user.id });
     if (!deposit) return res.status(404).json({ error: 'Deposit not found' });
     // Adjust account balance if amount or account changes
     if (amount !== undefined && amount !== deposit.amount) {
@@ -74,10 +74,10 @@ exports.updateDeposit = async (req, res) => {
   }
 };
 
-// Delete deposit
+// Delete deposit (user-specific)
 exports.deleteDeposit = async (req, res) => {
   try {
-    const deposit = await Deposit.findByIdAndDelete(req.params.id);
+    const deposit = await Deposit.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
     if (!deposit) return res.status(404).json({ error: 'Deposit not found' });
     // Adjust account balance
     const account = await Account.findById(deposit.account);

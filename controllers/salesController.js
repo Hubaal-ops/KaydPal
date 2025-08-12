@@ -71,7 +71,8 @@ async function insertSale(sale) {
     tax: totalTax,
     sel_date: new Date(),
     created_at: new Date(),
-    updated_at: new Date()
+    updated_at: new Date(),
+    userId: sale.userId
   };
 
   // Create the sale
@@ -147,9 +148,9 @@ async function insertSale(sale) {
   return { message: 'Sale inserted successfully', sel_no };
 }
 
-async function updateSale(sel_no, updatedSale) {
+async function updateSale(sel_no, updatedSale, userId) {
   const db = await connectDB();
-  const oldSale = await Sale.findOne({ sel_no });
+  const oldSale = await Sale.findOne({ sel_no, userId });
   if (!oldSale) throw new Error('Sale not found.');
   const {
     product_no = oldSale.product_no,
@@ -228,7 +229,7 @@ async function updateSale(sel_no, updatedSale) {
     );
   }
   await Sale.findOneAndUpdate(
-    { sel_no },
+    { sel_no, userId },
     {
       product_no,
       customer_no,
@@ -246,9 +247,9 @@ async function updateSale(sel_no, updatedSale) {
   return { message: 'Sale updated successfully' };
 }
 
-async function deleteSale(sel_no) {
+async function deleteSale(sel_no, userId) {
   const db = await connectDB();
-  const oldSale = await Sale.findOne({ sel_no });
+  const oldSale = await Sale.findOne({ sel_no, userId });
   if (!oldSale) throw new Error('Sale not found.');
   const unpaid = oldSale.amount - oldSale.paid;
   // Reverse inventory in StoreProduct
@@ -279,14 +280,14 @@ async function deleteSale(sel_no) {
       { $inc: { balance: -oldSale.paid } }
     );
   }
-  await Sale.deleteOne({ sel_no });
+  await Sale.deleteOne({ sel_no, userId });
   return { message: 'Sale deleted successfully' };
 }
 
 async function getAllSales(req, res) {
   try {
-    // Use Mongoose to get all sales
-    const sales = await Sale.find().sort({ sel_date: -1 });
+    // Use Mongoose to get all sales for the user
+    const sales = await Sale.find({ userId: req.user.id }).sort({ sel_date: -1 });
     // Fetch all related data in bulk for efficiency
     const db = await connectDB();
     const productNos = [...new Set(sales.map(s => s.product_no))];

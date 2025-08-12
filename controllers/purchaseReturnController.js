@@ -9,7 +9,8 @@ const Account = require('../models/Account');
 // Get all purchase returns with names
 exports.getAllPurchaseReturns = async (req, res) => {
   try {
-    const returns = await PurchaseReturn.find().sort({ created_at: -1 });
+    const userId = req.user.id;
+    const returns = await PurchaseReturn.find({ userId }).sort({ created_at: -1 });
     const productNos = [...new Set(returns.map(r => r.product_no))];
     const supplierNos = [...new Set(returns.map(r => r.supplier_no))];
     const storeNos = [...new Set(returns.map(r => r.store_no))];
@@ -67,7 +68,8 @@ exports.createPurchaseReturn = async (req, res) => {
       amount,
       date: req.body.date || new Date(),
       created_at: new Date(),
-      updated_at: new Date()
+      updated_at: new Date(),
+      userId: req.user.id
     });
     await newReturn.save();
     // Update inventory and balances

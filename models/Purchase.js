@@ -14,7 +14,9 @@ const purchaseSchema = new mongoose.Schema({
   paid: { type: Number, default: 0 },
   account_id: { type: Number, required: true },
   created_at: { type: Date, default: Date.now },
-  updated_at: { type: Date }
+
+  updated_at: { type: Date },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
 });
 
 module.exports = mongoose.model('Purchase', purchaseSchema); 

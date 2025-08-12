@@ -1,6 +1,9 @@
 const express = require('express');
+
 const router = express.Router();
+const { verifyToken } = require('../middleware/auth');
 const storeController = require('../controllers/storeController');
+router.use(verifyToken);
 
 // Get all stores
 router.get('/', storeController.getAllStores);

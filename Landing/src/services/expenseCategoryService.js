@@ -1,45 +1,58 @@
+
 const API_URL = '/api/expense-categories';
 
+// Helper function to handle API requests with token
+const apiRequest = async (endpoint, options = {}) => {
+  const token = localStorage.getItem('token');
+  const response = await fetch(`${API_URL}${endpoint}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    },
+    ...options,
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const error = new Error(errorData.message || 'Request failed');
+    error.status = response.status;
+    error.errors = errorData.errors;
+    throw error;
+  }
+
+  if (response.status === 204) {
+    return null;
+  }
+  return response.json();
+};
+
 export async function getExpenseCategories() {
-  const res = await fetch(API_URL);
-  if (!res.ok) throw new Error('Failed to fetch expense categories');
-  return res.json();
+  return apiRequest('/');
 }
 
 export async function getExpenseCategoryById(id) {
-  const res = await fetch(`${API_URL}/${id}`);
-  if (!res.ok) throw new Error('Failed to fetch expense category');
-  return res.json();
+  return apiRequest(`/${id}`);
 }
 
 export async function createExpenseCategory(category) {
-  // Only send name, description
   const { name, description } = category;
-  const res = await fetch(API_URL, {
+  return apiRequest('/', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, description })
   });
-  if (!res.ok) throw new Error('Failed to create expense category');
-  return res.json();
 }
 
 export async function updateExpenseCategory(id, category) {
-  // Only send name, description
   const { name, description } = category;
-  const res = await fetch(`${API_URL}/${id}`, {
+  return apiRequest(`/${id}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, description })
   });
-  if (!res.ok) throw new Error('Failed to update expense category');
-  return res.json();
 }
 
 export async function deleteExpenseCategory(id) {
-  const res = await fetch(`${API_URL}/${id}`, {
+  return apiRequest(`/${id}`, {
     method: 'DELETE'
   });
-  if (!res.ok) throw new Error('Failed to delete expense category');
-  return res.json();
-} 
+}

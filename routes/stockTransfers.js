@@ -1,11 +1,15 @@
+
 const express = require('express');
 const router = express.Router();
 const { insertStockTransfer, getAllStockTransfers } = require('../controllers/stockTransferController');
+const { verifyToken } = require('../middleware/auth');
+
 
 // POST /api/stock-transfers
-router.post('/', async (req, res) => {
+router.post('/', verifyToken, async (req, res) => {
   try {
-    const result = await insertStockTransfer(req.body);
+    const userId = req.user.id;
+    const result = await insertStockTransfer({ ...req.body, userId });
     res.status(201).json(result);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -13,9 +17,10 @@ router.post('/', async (req, res) => {
 });
 
 // GET /api/stock-transfers
-router.get('/', async (req, res) => {
+router.get('/', verifyToken, async (req, res) => {
   try {
-    const transfers = await getAllStockTransfers();
+    const userId = req.user.id;
+    const transfers = await getAllStockTransfers({ userId });
     res.json(transfers);
   } catch (err) {
     res.status(500).json({ error: err.message });

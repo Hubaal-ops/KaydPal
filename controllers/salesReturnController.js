@@ -10,7 +10,8 @@ const StoreProduct = require('../models/StoreProduct');
 // Get all sales returns with names
 exports.getAllSalesReturns = async (req, res) => {
   try {
-    const returns = await SalesReturn.find().sort({ created_at: -1 });
+    const userId = req.user.id;
+    const returns = await SalesReturn.find({ userId }).sort({ created_at: -1 });
     const productNos = [...new Set(returns.map(r => r.product_no))];
     const customerNos = [...new Set(returns.map(r => r.customer_no))];
     const storeNos = [...new Set(returns.map(r => r.store_no))];
@@ -69,7 +70,8 @@ exports.createSalesReturn = async (req, res) => {
       amount,
       date: req.body.date || new Date(),
       created_at: new Date(),
-      updated_at: new Date()
+      updated_at: new Date(),
+      userId: req.user.id
     });
     await newReturn.save();
     // Update inventory and balances

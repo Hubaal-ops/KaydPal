@@ -83,13 +83,14 @@ async function recalculateStoreTotal(store_no) {
   );
 }
 
-// Create a new store product
+// Create a new store product (user-specific)
 exports.createStoreProduct = async (req, res) => {
   try {
     const store_product_no = await getNextSequence('store_product_no');
     const newStoreProduct = new StoreProduct({
       ...req.body,
-      store_product_no
+      store_product_no,
+      userId: req.user.id
     });
     await newStoreProduct.save();
     // Recalculate affected product and store
@@ -109,11 +110,11 @@ exports.createStoreProduct = async (req, res) => {
   }
 };
 
-// Update a store product
+// Update a store product (user-specific)
 exports.updateStoreProduct = async (req, res) => {
   try {
     const updated = await StoreProduct.findOneAndUpdate(
-      { store_product_no: req.params.id },
+      { store_product_no: req.params.id, userId: req.user.id },
       req.body,
       { new: true }
     );
@@ -128,10 +129,10 @@ exports.updateStoreProduct = async (req, res) => {
   }
 };
 
-// Delete a store product
+// Delete a store product (user-specific)
 exports.deleteStoreProduct = async (req, res) => {
   try {
-    const deleted = await StoreProduct.findOneAndDelete({ store_product_no: req.params.id });
+    const deleted = await StoreProduct.findOneAndDelete({ store_product_no: req.params.id, userId: req.user.id });
     if (!deleted) return res.status(404).json({ error: 'Store product not found' });
     // Recalculate affected product and store
     await recalculateProductBalance(deleted.product_no);

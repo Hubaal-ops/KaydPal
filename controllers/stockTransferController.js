@@ -16,7 +16,8 @@ async function insertStockTransfer(transferData) {
     to_store,
     product_no,
     qty,
-    transfer_desc
+    transfer_desc,
+    userId // allow passing userId explicitly for multi-tenancy
   } = transferData;
 
   // Basic validations
@@ -55,7 +56,8 @@ async function insertStockTransfer(transferData) {
     transfer_desc,
     status: 'completed',
     created_at: new Date(),
-    updated_at: new Date()
+    updated_at: new Date(),
+    userId // set userId for multi-tenancy
   });
 
   try {
@@ -122,7 +124,10 @@ async function getAllStockTransfers() {
   const StockTransfer = require('../models/StockTransfer');
   const Product = require('../models/Product');
   const Store = require('../models/Store');
-  const transfers = await StockTransfer.find().sort({ created_at: -1 });
+  // Only return transfers for the authenticated user
+  const userId = arguments[0]?.userId || (typeof arguments[0] === 'object' && arguments[0]?.req?.user?.id);
+  const filter = userId ? { userId } : {};
+  const transfers = await StockTransfer.find(filter).sort({ created_at: -1 });
   const products = await Product.find();
   const stores = await Store.find();
   const productMap = Object.fromEntries(products.map(p => [p.product_no, p.product_name]));

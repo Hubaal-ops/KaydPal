@@ -1,28 +1,22 @@
 const express = require('express');
 const router = express.Router();
 const purchaseController = require('../controllers/purchaseController');
+const { verifyToken } = require('../middleware/auth');
 
 // Get all purchases
-router.get('/', async (req, res) => {
+router.get('/', verifyToken, async (req, res) => {
   try {
-    const purchases = await purchaseController.getAllPurchases();
-    console.log('API /api/purchases returning:', purchases);
-    if (Array.isArray(purchases)) {
-      res.json(purchases);
-    } else if (purchases && purchases.data && Array.isArray(purchases.data)) {
-      res.json(purchases.data);
-    } else {
-      res.json([]);
-    }
+    const purchases = await purchaseController.getAllPurchases(req.user.id);
+    res.json(purchases);
   } catch (err) {
     res.status(500).json({ message: err.message || 'Failed to fetch purchases' });
   }
 });
 
 // Add a new purchase
-router.post('/', async (req, res) => {
+router.post('/', verifyToken, async (req, res) => {
   try {
-    const result = await purchaseController.insertPurchase(req.body);
+    const result = await purchaseController.insertPurchase(req.body, req.user.id);
     res.status(201).json(result);
   } catch (err) {
     res.status(400).json({ message: err.message || 'Failed to add purchase' });
@@ -30,7 +24,7 @@ router.post('/', async (req, res) => {
 });
 
 // Update a purchase
-router.put('/:purchase_no', async (req, res) => {
+router.put('/:purchase_no', verifyToken, async (req, res) => {
   try {
     const result = await purchaseController.updatePurchase(req.params.purchase_no, req.body);
     res.json(result);
@@ -40,7 +34,7 @@ router.put('/:purchase_no', async (req, res) => {
 });
 
 // Delete a purchase
-router.delete('/:purchase_no', async (req, res) => {
+router.delete('/:purchase_no', verifyToken, async (req, res) => {
   try {
     const result = await purchaseController.deletePurchase(req.params.purchase_no);
     res.json(result);

@@ -38,7 +38,8 @@ async function insertProduct(productData) {
     barcode: productData.barcode || '',
     storing_balance: productData.storing_balance !== undefined ? productData.storing_balance : 0,
     created_at: new Date(),
-    updated_at: new Date()
+    updated_at: new Date(),
+    userId: productData.userId
   };
 
   await products.insertOne(newProduct);
@@ -50,34 +51,29 @@ async function insertProduct(productData) {
 }
 
 // Get all products
-async function getAllProducts() {
+async function getAllProducts(userId) {
   const db = await connectDB();
-  
   const products = await db.collection('products')
-    .find({})
+    .find({ userId })
     .sort({ product_name: 1 })
     .toArray();
-
   return products;
 }
 
 // Get single product by ID
-async function getProductById(product_no) {
+async function getProductById(product_no, userId) {
   const db = await connectDB();
-  
-  const product = await db.collection('products').findOne({ product_no: parseInt(product_no) });
+  const product = await db.collection('products').findOne({ product_no: parseInt(product_no), userId });
   if (!product) {
     throw new Error('Product not found.');
   }
-
   return product;
 }
 
 // Update product
-async function updateProduct(product_no, updatedData) {
+async function updateProduct(product_no, updatedData, userId) {
   const db = await connectDB();
-  
-  const existingProduct = await db.collection('products').findOne({ product_no: parseInt(product_no) });
+  const existingProduct = await db.collection('products').findOne({ product_no: parseInt(product_no), userId });
   if (!existingProduct) {
     throw new Error('Product not found.');
   }
@@ -112,7 +108,7 @@ async function updateProduct(product_no, updatedData) {
   };
 
   await db.collection('products').updateOne(
-    { product_no: parseInt(product_no) },
+    { product_no: parseInt(product_no), userId },
     { $set: updateFields }
   );
 
@@ -123,15 +119,12 @@ async function updateProduct(product_no, updatedData) {
 }
 
 // Delete product
-async function deleteProduct(product_no) {
+async function deleteProduct(product_no, userId) {
   const db = await connectDB();
-  
-  const result = await db.collection('products').deleteOne({ product_no: parseInt(product_no) });
-  
+  const result = await db.collection('products').deleteOne({ product_no: parseInt(product_no), userId });
   if (result.deletedCount === 0) {
     throw new Error('Product not found.');
   }
-
   return {
     message: "✅ Product deleted successfully.",
     product_no: parseInt(product_no)

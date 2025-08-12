@@ -3,10 +3,10 @@ const Account = require('../models/Account');
 const ExpenseCategory = require('../models/ExpenseCategory');
 const getNextSequence = require('../getNextSequence');
 
-// Get all expenses
+// Get all expenses (user-specific)
 exports.getAllExpenses = async (req, res) => {
   try {
-    const expenses = await Expense.find()
+    const expenses = await Expense.find({ userId: req.user.id })
       .populate('category', 'name')
       .populate('account', 'name bank');
     res.json(expenses);
@@ -15,10 +15,10 @@ exports.getAllExpenses = async (req, res) => {
   }
 };
 
-// Get expense by ID
+// Get expense by ID (user-specific)
 exports.getExpenseById = async (req, res) => {
   try {
-    const expense = await Expense.findById(req.params.id)
+    const expense = await Expense.findOne({ _id: req.params.id, userId: req.user.id })
       .populate('category', 'name')
       .populate('account', 'name bank');
     if (!expense) return res.status(404).json({ error: 'Expense not found' });
@@ -28,7 +28,7 @@ exports.getExpenseById = async (req, res) => {
   }
 };
 
-// Create new expense
+// Create new expense (user-specific)
 exports.createExpense = async (req, res) => {
   try {
     const { category, account, amount, description, expense_date } = req.body;
@@ -42,7 +42,7 @@ exports.createExpense = async (req, res) => {
     if (!expense_id) {
       return res.status(500).json({ error: 'Failed to generate expense ID' });
     }
-    const expense = new Expense({ expense_id, category, account, amount, description, expense_date });
+    const expense = new Expense({ expense_id, category, account, amount, description, expense_date, userId: req.user.id });
     await expense.save();
     // Update account balance
     accountDoc.balance -= amount;
@@ -53,11 +53,11 @@ exports.createExpense = async (req, res) => {
   }
 };
 
-// Update expense
+// Update expense (user-specific)
 exports.updateExpense = async (req, res) => {
   try {
     const { category, account, amount, description, expense_date } = req.body;
-    const expense = await Expense.findById(req.params.id);
+    const expense = await Expense.findOne({ _id: req.params.id, userId: req.user.id });
     if (!expense) return res.status(404).json({ error: 'Expense not found' });
     // Reverse old expense
     const oldAccount = await Account.findById(expense.account);
@@ -83,10 +83,10 @@ exports.updateExpense = async (req, res) => {
   }
 };
 
-// Delete expense
+// Delete expense (user-specific)
 exports.deleteExpense = async (req, res) => {
   try {
-    const expense = await Expense.findByIdAndDelete(req.params.id);
+    const expense = await Expense.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
     if (!expense) return res.status(404).json({ error: 'Expense not found' });
     // Refund account balance
     const account = await Account.findById(expense.account);
@@ -98,4 +98,4 @@ exports.deleteExpense = async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-}; 
+};
