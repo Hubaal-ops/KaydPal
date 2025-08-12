@@ -68,6 +68,9 @@ function LoginForm({ setUser }) {
                         <span>Don't have an account?</span>
                         <Link to="/register" className="switch-btn">Sign up</Link>
                     </div>
+                    <div className="forgot-password-link" style={{ marginTop: '1rem', textAlign: 'right' }}>
+                        <Link to="/forgot-password">Forgot password?</Link>
+                    </div>
                 </form>
             </div>
         </div>

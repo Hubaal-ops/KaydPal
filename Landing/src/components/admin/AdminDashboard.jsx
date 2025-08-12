@@ -51,14 +51,7 @@ const adminModules = [
     color: '#7c3aed',
     gradient: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)'
   },
-  {
-    id: 'support',
-    title: 'Support',
-    description: 'Access help and contact support',
-    icon: LifeBuoy,
-    color: '#06b6d4',
-    gradient: 'linear-gradient(135deg, #06b6d4 0%, #0e7490 100%)'
-  }
+  // ...removed support module from admin dashboard...
 ];
 
 const routeMap = {
@@ -67,7 +60,7 @@ const routeMap = {
   'audit-logs': '/admin/audit-logs',
   'notifications': '/admin/notifications',
   'roles-permissions': '/admin/roles-permissions',
-  'support': '/admin/support',
+  // ...removed support route from admin dashboard...
 };
 
 const AdminDashboard = () => {

@@ -1,3 +1,5 @@
+import ResetPasswordForm from './components/ResetPasswordForm';
+          <Route path="/reset-password/:token" element={<ResetPasswordForm />} />
 import React, { useState, useEffect, createContext, useMemo } from 'react';
 import { ThemeProvider as MuiThemeProvider, createTheme } from '@mui/material/styles';
 import { Routes, Route, Navigate } from 'react-router-dom';
@@ -24,13 +26,15 @@ import Account from './views/Account';
 import Deposit from './views/Deposit';
 import Withdrawal from './views/Withdrawal';
 import Analytics from './views/Analytics';
+import ErrorBoundary from './components/ErrorBoundary';
 import Reports from './views/Reports';
 import UserManagement from './views/admin/UserManagement';
 import SystemSettings from './views/admin/SystemSettings';
 import AuditLogs from './views/admin/AuditLogs';
 import Notifications from './views/admin/Notifications';
 import RolesPermissions from './views/admin/RolesPermissions';
-import Support from './views/admin/Support';
+import UserSupport from './views/user/Support';
+import ForgotPasswordForm from './components/ForgotPasswordForm';
 // import { fetchUserProfile } from '../../APIs/auth';
 
 export const ColorModeContext = createContext({ toggleColorMode: () => {} });
@@ -121,6 +125,7 @@ function App() {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <LoginForm setUser={setUser} />} />
+          <Route path="/forgot-password" element={<ForgotPasswordForm />} />
           <Route path="/register" element={user ? <Navigate to="/dashboard" /> : <RegisterForm />} />
           <Route
             path="/dashboard"
@@ -206,7 +211,11 @@ function App() {
             path="/analytics"
             element={
               user && user.role === 'user'
-                ? <Analytics />
+                ? (
+                    <ErrorBoundary>
+                      <Analytics />
+                    </ErrorBoundary>
+                  )
                 : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
             }
           />
@@ -307,8 +316,8 @@ function App() {
             element={user && user.role === 'admin' ? <RolesPermissions /> : <Navigate to="/login" />}
           />
           <Route
-            path="/admin/support"
-            element={user && user.role === 'admin' ? <Support /> : <Navigate to="/login" />}
+            path="/support"
+            element={user ? <UserSupport /> : <Navigate to="/login" />}
           />
         </Routes>
           </main>

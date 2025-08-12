@@ -213,6 +213,42 @@ const Sales = ({ onBack }) => {
     (sale.store_name && sale.store_name.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
+  // --- Sale Items State and Logic ---
+  const [saleItems, setSaleItems] = useState([
+    { store: '', product: '', qty: 1, price: 0, discount: 0, tax: 0, total: 0 }
+  ]);
+
+  // Helper to filter products by store
+  const getProductsForStore = (storeNo) => products.filter(p => p.store_no === storeNo);
+
+  // Handle changes in sale item fields
+  const handleSaleItemChange = (idx, field, value) => {
+    setSaleItems(items => items.map((item, i) => {
+      if (i !== idx) return item;
+      const updated = { ...item, [field]: value };
+      // Autofill price when product changes
+      if (field === 'product') {
+        const prod = products.find(p => p.product_no === value);
+        if (prod) updated.price = prod.unit_price || 0;
+      }
+      updated.total = (updated.qty * updated.price - updated.discount + +updated.tax).toFixed(2);
+      return updated;
+    }));
+  };
+
+  // Add new sale item row
+  const handleAddSaleItem = () => {
+    setSaleItems(items => ([...items, { store: '', product: '', qty: 1, price: 0, discount: 0, tax: 0, total: 0 }]));
+  };
+
+  // Remove sale item row
+  const handleRemoveSaleItem = idx => {
+    setSaleItems(items => items.filter((_, i) => i !== idx));
+  };
+
+  // Calculate grand total
+  const grandTotal = saleItems.reduce((sum, item) => sum + parseFloat(item.total || 0), 0).toFixed(2);
+
   // Tab UI
   return (
     <div className={styles.sales}>
@@ -417,6 +453,77 @@ const Sales = ({ onBack }) => {
                     </button>
                   </div>
                 </form>
+              </div>
+            )}
+            {viewMode === 'form' && (
+              <div style={{ margin: '2rem 0', padding: '1rem', border: '1px solid #eee', borderRadius: 8, background: '#fafbfc' }}>
+                <h3>Sale Items</h3>
+                <table style={{ width: '100%', marginBottom: '1rem' }}>
+                  <thead>
+                    <tr>
+                      <th>Store</th>
+                      <th>Product</th>
+                      <th>Qty</th>
+                      <th>Price</th>
+                      <th>Discount</th>
+                      <th>Tax</th>
+                      <th>Total</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {saleItems.map((item, idx) => (
+                      <tr key={idx}>
+                        {/* Store selector */}
+                        <td>
+                          <select value={item.store} onChange={e => handleSaleItemChange(idx, 'store', e.target.value)}>
+                            <option value="">Store</option>
+                            {stores.map(store => (
+                              <option key={store.store_no} value={store.store_no}>{store.name || store.store_no}</option>
+                            ))}
+                          </select>
+                        </td>
+                        {/* Product selector, filtered by store */}
+                        <td>
+                          <select value={item.product} onChange={e => handleSaleItemChange(idx, 'product', e.target.value)}>
+                            <option value="">Product</option>
+                            {getProductsForStore(item.store).map(product => (
+                              <option key={product.product_no} value={product.product_no}>{product.name || product.product_no}</option>
+                            ))}
+                          </select>
+                        </td>
+                        {/* Qty */}
+                        <td>
+                          <input type="number" min="1" value={item.qty} onChange={e => handleSaleItemChange(idx, 'qty', +e.target.value)} />
+                        </td>
+                        {/* Price */}
+                        <td>
+                          <input type="number" min="0" value={item.price} onChange={e => handleSaleItemChange(idx, 'price', +e.target.value)} />
+                        </td>
+                        {/* Discount */}
+                        <td>
+                          <input type="number" min="0" value={item.discount} onChange={e => handleSaleItemChange(idx, 'discount', +e.target.value)} />
+                        </td>
+                        {/* Tax */}
+                        <td>
+                          <input type="number" min="0" value={item.tax} onChange={e => handleSaleItemChange(idx, 'tax', +e.target.value)} />
+                        </td>
+                        {/* Total (read only) */}
+                        <td>
+                          <input type="text" value={item.total} readOnly />
+                        </td>
+                        {/* Remove button */}
+                        <td>
+                          <button type="button" onClick={() => handleRemoveSaleItem(idx)}>×</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <button type="button" onClick={handleAddSaleItem}>+ Add Item</button>
+                <div style={{ marginTop: '1rem', textAlign: 'right', fontWeight: 'bold', fontSize: 18 }}>
+                  Total: <input type="text" value={grandTotal} readOnly style={{ width: 120, background: '#f0f0f0', textAlign: 'right', fontWeight: 'bold', fontSize: 18 }} />
+                </div>
               </div>
             )}
           </>

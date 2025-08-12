@@ -1,5 +1,11 @@
 const express = require('express');
 const app = express();
+const reportsRoutes = require('./routes/reports');
+app.use('/api/reports', reportsRoutes);
+// Remove these two lines
+// const aiRoutes = require('./routes/ai');
+// app.use('/api/ai', aiRoutes);
+ const passwordRoutes = require('./routes/password');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -106,11 +112,22 @@ const connectDB = async () => {
 // Connect to database
 connectDB();
 
+
 // API Routes
 app.use('/api/auth', authRoutes);
+// Register password reset routes after all other /api/auth routes
+app.use('/api/auth', passwordRoutes);
 app.use('/api/protected', protectedRoutes);
 const auditLogsRoutes = require('./routes/auditLogs');
 app.use('/api/protected', auditLogsRoutes);
+
+// Analytics API
+const analyticsRoutes = require('./routes/analytics');
+app.use('/api/analytics', analyticsRoutes);
+
+// Add AI routes here with other API routes
+const aiRoutes = require('./routes/ai');
+app.use('/api/ai', aiRoutes);
 
 // Notifications route (admin only)
 const notificationsRoutes = require('./routes/notifications');

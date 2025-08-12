@@ -7,7 +7,8 @@ import {
   TrendingUp, 
   Users, 
   BarChart3, 
-  FileText 
+  FileText, 
+  LifeBuoy
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -70,11 +71,19 @@ const Dashboard = () => {
       icon: FileText,
       color: '#06b6d4',
       gradient: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)'
+    },
+    {
+      id: 'support',
+      title: 'Support',
+      description: 'Access help and contact support',
+      icon: LifeBuoy,
+      color: '#0ea5e9',
+      gradient: 'linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%)'
     }
   ];
 
   const handleCardClick = (moduleId) => {
-    console.log(`Navigating to ${moduleId} module`);
+    console.log(`Attempting to navigate to ${moduleId} module`);
     const routes = {
       'inventory': '/inventory',
       'transactions': '/transactions',
@@ -82,10 +91,12 @@ const Dashboard = () => {
       'stocks': '/stocks',
       'employees': '/employees',
       'analytics': '/analytics',
-      'reports': '/reports'
+      'reports': '/reports',
+      'support': '/support'
     };
-
+  
     if (routes[moduleId]) {
+      console.log(`Navigating to route: ${routes[moduleId]}`);
       navigate(routes[moduleId]);
     }
   };
@@ -106,6 +117,9 @@ const Dashboard = () => {
                 key={module.id}
                 className={styles['module-card']}
                 onClick={() => handleCardClick(module.id)}
+                onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && handleCardClick(module.id)}
+                tabIndex={0}
+                role="button"
                 style={{ '--card-gradient': module.gradient }}
               >
                 <div className={styles['card-header']}>
@@ -128,4 +142,4 @@ const Dashboard = () => {
   );
 };
 
-export default Dashboard; 
+export default Dashboard;
