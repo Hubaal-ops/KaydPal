@@ -6,7 +6,9 @@ const getNextSequence = require('../getNextSequence');
 // Get all salaries
 exports.getAllSalaries = async (req, res) => {
   try {
-    const salaries = await Salary.find()
+    // Only return salaries created by the current user
+    const userId = req.user?._id || req.user?.id;
+    const salaries = await Salary.find({ userId })
       .populate('employee', 'name position')
       .populate('account', 'name bank');
     res.json(salaries);
@@ -42,7 +44,9 @@ exports.createSalary = async (req, res) => {
     if (!salary_id) {
       return res.status(500).json({ error: 'Failed to generate salary ID' });
     }
-    const salary = new Salary({ salary_id, employee, account, amount, pay_date, description });
+    // Attach userId to salary
+    const userId = req.user?._id || req.user?.id;
+    const salary = new Salary({ salary_id, employee, account, amount, pay_date, description, userId });
     await salary.save();
     // Update account balance
     accountDoc.balance -= amount;
