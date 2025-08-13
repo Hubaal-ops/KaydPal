@@ -11,6 +11,7 @@ const saleItemSchema = new mongoose.Schema({
 
 
 const saleSchema = new mongoose.Schema({
+  sel_no: { type: Number, required: true, unique: true },
   items: [saleItemSchema],
   amount: { type: Number, required: true },
   paid: { type: Number, default: 0 },

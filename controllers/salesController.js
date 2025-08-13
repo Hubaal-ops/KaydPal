@@ -57,8 +57,9 @@ async function insertSale(sale) {
 
   if (paid > totalAmount) throw new Error('Paid amount cannot exceed total amount.');
 
-  // Get next sel_no
-  const sel_no = await getNextSequenceValue('sales');
+  // Get next sel_no using unified sequence logic
+  const getNextSequence = require('../getNextSequence');
+  const sel_no = await getNextSequence('sale_no');
   const newSale = {
     sel_no,
     customer_no: Number(customer_no),
@@ -112,7 +113,7 @@ async function insertSale(sale) {
     for (const item of processedItems) {
       if (!productMap[item.product_no]) {
         const productDoc = await Product.findOne({ product_no: item.product_no });
-        productMap[item.product_no] = productDoc ? productDoc.product_name : '';
+        productMap[item.product_no] = productDoc ? productDoc.name : (item.name || '');
       }
     }
     const invoiceItems = processedItems.map(item => ({
@@ -126,10 +127,10 @@ async function insertSale(sale) {
       date: new Date(),
       customer: {
         customer_no: createdSale.customer_no,
-        name: customerDoc ? customerDoc.name : '',
-        address: customerDoc ? customerDoc.address : '',
-        phone: customerDoc ? customerDoc.phone : '',
-        email: customerDoc ? customerDoc.email : ''
+        name: customerDoc ? (customerDoc.name || customerDoc.customer_name) : (createdSale.customer_name || ''),
+        address: customerDoc ? customerDoc.address : (createdSale.customer_address || ''),
+        phone: customerDoc ? customerDoc.phone : (createdSale.customer_phone || ''),
+        email: customerDoc ? customerDoc.email : (createdSale.customer_email || '')
       },
       items: invoiceItems,
       subtotal: totalAmount,
@@ -145,7 +146,7 @@ async function insertSale(sale) {
     console.error('Failed to create invoice for sale:', err.message);
   }
 
-  return { message: 'Sale inserted successfully', sel_no };
+  return { message: 'Sale inserted successfully', sel_no, _id: createdSale._id, sale: createdSale };
 }
 
 async function updateSale(sel_no, updatedSale, userId) {

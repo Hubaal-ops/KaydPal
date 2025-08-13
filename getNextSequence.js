@@ -2,11 +2,11 @@ const connectDB = require('./db');
 
 async function getNextSequence(name) {
   const db = await connectDB();
-  const counters = db.collection('Counters');
+  const counters = db.collection('Counters'); // Confirmed correct from MongoDB screenshot
 
   // Since your result is already the updated document (not wrapped in `value`)
   const result = await counters.findOneAndUpdate(
-    { _id: name },
+  { _id: name },
     { $inc: { seq: 1 } },
     {
       returnDocument: 'after',  // Try this first

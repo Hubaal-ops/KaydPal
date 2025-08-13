@@ -26,7 +26,8 @@ const Purchases = ({ onBack }) => {
     tax: 0,
     amount: 0,
     paid: 0,
-    account_id: ''
+    account_id: '',
+    userId: ''
   });
   const [editingPurchase, setEditingPurchase] = useState(null);
   const [error, setError] = useState('');
@@ -77,7 +78,8 @@ const Purchases = ({ onBack }) => {
       tax: 0,
       amount: 0,
       paid: 0,
-      account_id: ''
+      account_id: '',
+      userId: ''
     });
     setError('');
     setSuccess('');
@@ -96,7 +98,8 @@ const Purchases = ({ onBack }) => {
       tax: 0,
       amount: 0,
       paid: 0,
-      account_id: ''
+      account_id: '',
+      userId: ''
     });
     setError('');
     setSuccess('');
@@ -114,7 +117,8 @@ const Purchases = ({ onBack }) => {
       tax: purchase.tax,
       amount: purchase.amount,
       paid: purchase.paid,
-      account_id: purchase.account_id
+      account_id: purchase.account_id,
+      userId: purchase.userId || ''
     });
     setViewMode('form');
     setError('');
@@ -165,6 +169,7 @@ const Purchases = ({ onBack }) => {
       supplier_no: Number(formData.supplier_no),
       store_no: Number(formData.store_no),
       account_id: Number(formData.account_id)
+      // userId removed
     };
     // Only validate paid amount if it's greater than 0 and exceeds the calculated amount
     if (formData.paid > 0 && parseFloat(formData.paid) > parseFloat(calcAmount)) {
@@ -191,7 +196,8 @@ const Purchases = ({ onBack }) => {
         tax: 0,
         amount: 0,
         paid: 0,
-        account_id: ''
+        account_id: '',
+        userId: ''
       });
       setEditingPurchase(null);
       setTimeout(() => {
@@ -464,7 +470,15 @@ const Purchases = ({ onBack }) => {
                   <select
                     name="account_id"
                     value={formData.account_id || ''}
-                    onChange={e => setFormData(f => ({ ...f, account_id: Number(e.target.value) }))}
+                    onChange={e => {
+                      const selectedId = Number(e.target.value);
+                      const selectedAccount = accounts.find(a => a.account_id === selectedId);
+                      setFormData(f => ({
+                        ...f,
+                        account_id: selectedId,
+                        userId: selectedAccount ? selectedAccount.userId : ''
+                      }));
+                    }}
                     required
                     className={styles['form-select']}
                   >
@@ -491,4 +505,4 @@ const Purchases = ({ onBack }) => {
   );
 };
 
-export default Purchases; 
+export default Purchases;

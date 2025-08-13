@@ -27,7 +27,14 @@ async function insertPurchase(purchase, userId) {
   if (qty <= 0 || price <= 0) throw new Error('❌ Invalid quantity or price.');
 
   // Check account balance before proceeding
-  const account = await db.collection('accounts').findOne({ account_id, userId });
+  const { ObjectId } = require('mongodb');
+  let userObjectId = userId;
+  if (typeof userId === 'string' && userId.length === 24) {
+    try {
+      userObjectId = new ObjectId(userId);
+    } catch (e) {}
+  }
+  const account = await db.collection('accounts').findOne({ account_id, userId: userObjectId });
   if (!account) throw new Error('Account not found.');
   if (paid > 0 && account.balance < paid) {
     throw new Error('Insufficient account balance for this purchase.');
@@ -54,59 +61,46 @@ async function insertPurchase(purchase, userId) {
 
   // Update StoreProduct using mongoose model
   let storeProduct = await StoreProduct.findOne({ product_no, store_no });
-  const session = await mongoose.startSession();
-  session.startTransaction();
-  
-  try {
-    if (!storeProduct) {
-      const store_product_no = await getNextSequence('store_product_no');
-      storeProduct = new StoreProduct({
-        store_product_no,
-        product_no,
-        store_no,
-        qty,
-        created_at: new Date(),
-        updated_at: new Date()
-      });
-      await storeProduct.save({ session });
-    } else {
-      storeProduct.qty = (storeProduct.qty || 0) + qty;
-      storeProduct.updated_at = new Date();
-      await storeProduct.save({ session });
-    }
+  if (!storeProduct) {
+    const store_product_no = await getNextSequence('store_product_no');
+    storeProduct = new StoreProduct({
+      store_product_no,
+      product_no,
+      store_no,
+      qty,
+      userId: userObjectId,
+      created_at: new Date(),
+      updated_at: new Date()
+    });
+    await storeProduct.save();
+  } else {
+    storeProduct.qty = (storeProduct.qty || 0) + qty;
+    storeProduct.updated_at = new Date();
+    await storeProduct.save();
+  }
 
-    // Update product's storing_balance
-    await db.collection('products').updateOne(
-      { product_no },
-      [
-        {
-          $set: {
-            storing_balance: {
-              $add: [
-                { $toDouble: { $ifNull: ["$storing_balance", 0] } },
-                qty
-              ]
-            }
+  // Update product's storing_balance
+  await db.collection('products').updateOne(
+    { product_no },
+    [
+      {
+        $set: {
+          storing_balance: {
+            $add: [
+              { $toDouble: { $ifNull: ["$storing_balance", 0] } },
+              qty
+            ]
           }
         }
-      ],
-      { session }
-    );
+      }
+    ]
+  );
 
-    // Update store's total_items
-    await db.collection('stores').updateOne(
-      { store_no },
-      { $inc: { total_items: qty } },
-      { session }
-    );
-
-    await session.commitTransaction();
-  } catch (error) {
-    await session.abortTransaction();
-    throw error;
-  } finally {
-    session.endSession();
-  }
+  // Update store's total_items
+  await db.collection('stores').updateOne(
+    { store_no },
+    { $inc: { total_items: qty } }
+  );
   await recalculateProductBalance(product_no);
   await recalculateStoreTotal(store_no);
 

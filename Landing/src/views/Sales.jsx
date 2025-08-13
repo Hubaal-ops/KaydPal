@@ -143,6 +143,24 @@ const Sales = ({ onBack }) => {
     setLoading(true);
     setError('');
     setSuccess('');
+    // Frontend validation
+    if (!formData.customer_no || !formData.store_no || !formData.account_id) {
+      setError('Please select customer, store, and account.');
+      setLoading(false);
+      return;
+    }
+    if (!formData.items || !Array.isArray(formData.items) || formData.items.length === 0) {
+      setError('Please add at least one sale item.');
+      setLoading(false);
+      return;
+    }
+    for (const item of formData.items) {
+      if (!item.product_no || Number(item.qty) <= 0 || Number(item.price) <= 0) {
+        setError('Each item must have a product, quantity > 0, and price > 0.');
+        setLoading(false);
+        return;
+      }
+    }
     try {
       let result;
       const payload = {
@@ -166,13 +184,22 @@ const Sales = ({ onBack }) => {
       } else {
         result = await addSale(payload);
         setSuccess('Sale added successfully');
-        const invoices = await getInvoices();
-        const latestInvoice = invoices
-          .filter(inv => inv.customer?.customer_no === Number(formData.customer_no))
-          .sort((a, b) => b.invoice_no - a.invoice_no)[0];
-        if (latestInvoice) {
-          setTab('invoices');
-          setSelectedInvoice(latestInvoice);
+        // Fetch the invoice for this sale and display it
+        try {
+          let invoiceResult = null;
+          if (result && result._id) {
+            // Try to create invoice (if not already created)
+            await createInvoice({ sale_id: result._id });
+            // Fetch invoice by sale_id
+            const invoices = await getInvoices();
+            invoiceResult = invoices.find(inv => inv.sale_id === result._id || inv.sel_no === result.sel_no);
+          }
+          if (invoiceResult) {
+            setTab('invoices');
+            setSelectedInvoice(invoiceResult);
+          }
+        } catch (invErr) {
+          console.error('Invoice creation failed:', invErr);
         }
       }
       fetchAll();
@@ -207,7 +234,37 @@ const Sales = ({ onBack }) => {
     });
   };
 
-  const filteredSales = sales.filter(sale =>
+  // Map sales to include product_name, customer_name, store_name if missing
+  const mappedSales = sales.map(sale => {
+    // Map product names
+    let productNames = '';
+    if (Array.isArray(sale.items)) {
+      productNames = sale.items.map(i => {
+        const prod = products.find(p => p.product_no === i.product_no);
+        return prod ? prod.product_name : i.product_no;
+      }).join(', ');
+    } else {
+      productNames = sale.product_name || '';
+    }
+    // Map customer name
+    const customerObj = customers.find(c => c.customer_no === sale.customer_no);
+    const customerName = customerObj ? (customerObj.name || customerObj.customer_name) : sale.customer_name || sale.customer_no;
+    // Map store name
+    const storeObj = stores.find(s => s.store_no === sale.store_no);
+    const storeName = storeObj ? storeObj.store_name : sale.store_name || sale.store_no;
+    // Map account name
+    const accountObj = accounts.find(a => a.account_id === sale.account_id);
+    const accountName = accountObj ? (accountObj.name || accountObj.account_name) : sale.account_name || sale.account_id;
+    return {
+      ...sale,
+      product_name: productNames,
+      customer_name: customerName,
+      store_name: storeName,
+      account_name: accountName
+    };
+  });
+
+  const filteredSales = mappedSales.filter(sale =>
     (sale.product_name && sale.product_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (sale.customer_name && sale.customer_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (sale.store_name && sale.store_name.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -270,6 +327,7 @@ const Sales = ({ onBack }) => {
             <button
               className={`${styles['action-btn']} ${viewMode === 'table' ? styles.active : ''}`}
               onClick={handleViewTable}
+              title="View Table"
             >
               <Eye size={20} />
               View Table
@@ -277,6 +335,7 @@ const Sales = ({ onBack }) => {
             <button
               className={`${styles['action-btn']} ${viewMode === 'form' ? styles.active : ''}`}
               onClick={handleAddNew}
+              title="Add New Sale"
             >
               <Plus size={20} />
               Add New Sale
@@ -352,14 +411,14 @@ const Sales = ({ onBack }) => {
                                 <button
                                   onClick={() => handleEdit(sale)}
                                   className={styles['icon-btn']}
-                                  title="Edit"
+                                  title="Edit Sale"
                                 >
                                   <Edit size={16} />
                                 </button>
                                 <button
                                   onClick={() => handleDelete(sale.sel_no)}
                                   className={`${styles['icon-btn']} ${styles.delete}`}
-                                  title="Delete"
+                                  title="Delete Sale"
                                 >
                                   <Trash2 size={16} />
                                 </button>
@@ -384,65 +443,89 @@ const Sales = ({ onBack }) => {
                 <form onSubmit={handleSubmit} className={`${styles.form} ${styles['form-grid']}`}>
                   <div style={{ gridColumn: '1 / -1', marginBottom: 16 }}>
                     <b>Sale Items</b>
-                    {/* Header row for sale item inputs */}
-                    <div style={{ display: 'flex', gap: 8, fontWeight: 600, marginBottom: 4 }}>
-                      <span style={{ minWidth: 120 }}>Product</span>
-                      <span style={{ width: 60 }}>Qty</span>
-                      <span style={{ width: 80 }}>Price</span>
-                      <span style={{ width: 80 }}>Discount</span>
-                      <span style={{ width: 80 }}>Tax</span>
-                    </div>
-                    {formData.items.map((item, idx) => (
-                      <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-                        <select name="product_no" value={item.product_no} onChange={e => handleItemChange(idx, e)} required className={styles['form-select']} style={{ minWidth: 120 }}>
-                          <option value="">Product</option>
-                          {products.map(p => (<option key={p.product_no} value={p.product_no}>{p.product_name}</option>))}
-                        </select>
-                        <input type="number" name="qty" value={item.qty} onChange={e => handleItemChange(idx, e)} min="1" placeholder="Qty" className={styles['form-input']} style={{ width: 60 }} />
-                        <input type="number" name="price" value={item.price} onChange={e => handleItemChange(idx, e)} min="0" placeholder="Price" className={styles['form-input']} style={{ width: 80 }} />
-                        <input type="number" name="discount" value={item.discount} onChange={e => handleItemChange(idx, e)} min="0" placeholder="Discount" className={styles['form-input']} style={{ width: 80 }} />
-                        <input type="number" name="tax" value={item.tax} onChange={e => handleItemChange(idx, e)} min="0" placeholder="Tax" className={styles['form-input']} style={{ width: 80 }} />
-                        {formData.items.length > 1 && <button type="button" onClick={() => handleRemoveItem(idx)} style={{ color: 'red', fontWeight: 700, border: 'none', background: 'none', cursor: 'pointer' }}>×</button>}
-                      </div>
-                    ))}
+                    <table className={styles.table} style={{ marginBottom: 8 }}>
+                      <thead>
+                        <tr>
+                          <th>Product</th>
+                          <th>Qty</th>
+                          <th>Price</th>
+                          <th>Discount</th>
+                          <th>Subtotal</th>
+                          <th></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {formData.items.map((item, idx) => {
+                          const subtotal = (Number(item.qty) * Number(item.price) - Number(item.discount)).toFixed(2);
+                          return (
+                            <tr key={idx}>
+                              <td>
+                                <select name="product_no" value={item.product_no} onChange={e => handleItemChange(idx, e)} required className={styles['form-select']} style={{ minWidth: 120 }}>
+                                  <option value="">Product</option>
+                                  {products.map(p => (<option key={p.product_no} value={p.product_no}>{p.product_name}</option>))}
+                                </select>
+                              </td>
+                              <td><input type="number" name="qty" value={item.qty} onChange={e => handleItemChange(idx, e)} min="1" placeholder="Qty" className={styles['form-input']} style={{ width: 60 }} /></td>
+                              <td><input type="number" name="price" value={item.price} onChange={e => handleItemChange(idx, e)} min="0" placeholder="Price" className={styles['form-input']} style={{ width: 80 }} /></td>
+                              <td><input type="number" name="discount" value={item.discount} onChange={e => handleItemChange(idx, e)} min="0" placeholder="Discount" className={styles['form-input']} style={{ width: 80 }} /></td>
+                              <td style={{ fontWeight: 600 }}>{subtotal}</td>
+                              <td>{formData.items.length > 1 && <button type="button" onClick={() => handleRemoveItem(idx)} style={{ color: 'red', fontWeight: 700, border: 'none', background: 'none', cursor: 'pointer' }}>×</button>}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                     <button type="button" onClick={handleAddItem} style={{ marginTop: 4, marginBottom: 8 }}>+ Add Item</button>
                   </div>
                   <div className={styles['form-group']}>
-                    <label htmlFor="customer_no">Customer *</label>
-                    <select id="customer_no" name="customer_no" value={formData.customer_no} onChange={handleInputChange} required className={styles['form-select']}>
-                      <option value="">Select a customer</option>
-                      {customers.map((customer) => (
-                        <option key={customer.customer_no} value={customer.customer_no}>
-                          {customer.name || customer.customer_name}
-                        </option>
-                      ))}
-                    </select>
+                    <div style={{ display: 'flex', gap: 32 }}>
+                      <div className={styles['form-group']}>
+                        <label htmlFor="customer_no">Customer *</label>
+                        <select id="customer_no" name="customer_no" value={formData.customer_no} onChange={handleInputChange} required className={styles['form-select']}>
+                          <option value="">Select a customer</option>
+                          {customers.map((customer) => (
+                            <option key={customer.customer_no} value={customer.customer_no}>
+                              {customer.name || customer.customer_name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className={styles['form-group']}>
+                        <label htmlFor="store_no">Store *</label>
+                        <select id="store_no" name="store_no" value={formData.store_no} onChange={handleInputChange} required className={styles['form-select']}>
+                          <option value="">Select a store</option>
+                          {stores.map((store) => (
+                            <option key={store.store_no} value={store.store_no}>
+                              {store.store_name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className={styles['form-group']}>
+                        <label htmlFor="account_id">Account *</label>
+                        <select id="account_id" name="account_id" value={formData.account_id} onChange={handleInputChange} required className={styles['form-select']}>
+                          <option value="">Select an account</option>
+                          {accounts.map((account) => (
+                            <option key={account.account_id} value={account.account_id}>
+                              {account.name || account.account_name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  <div className={styles['form-group']}>
+                    {/* Removed duplicate Account dropdown for design consistency */}
+                  </div>
+                  </div>
+                  {/* Total, Tax, Paid at the last row */}
+                  <div style={{ gridColumn: '1 / -1', marginTop: 24, display: 'flex', justifyContent: 'center', gap: 48, alignItems: 'center', fontWeight: 700, fontSize: 18 }}>
+                    <span>Total Items: {formData.items.reduce((sum, item) => sum + Number(item.qty), 0)}</span>
+                    <span>Total Discount: {formData.items.reduce((sum, item) => sum + Number(item.discount), 0).toFixed(2)}</span>
+                    <span>Total Amount: {formData.items.reduce((sum, item) => sum + (Number(item.qty) * Number(item.price) - Number(item.discount)), 0).toFixed(2)}</span>
+                    <span>Paid: <input type="number" id="paid" name="paid" value={formData.paid} onChange={handleInputChange} min="0" className={styles['form-input']} style={{ width: 120, fontWeight: 700, fontSize: 18 }} /></span>
                   </div>
                   <div className={styles['form-group']}>
-                    <label htmlFor="store_no">Store *</label>
-                    <select id="store_no" name="store_no" value={formData.store_no} onChange={handleInputChange} required className={styles['form-select']}>
-                      <option value="">Select a store</option>
-                      {stores.map((store) => (
-                        <option key={store.store_no} value={store.store_no}>
-                          {store.store_name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className={styles['form-group']}>
-                    <label htmlFor="paid">Paid</label>
-                    <input type="number" id="paid" name="paid" value={formData.paid} onChange={handleInputChange} min="0" className={styles['form-input']} />
-                  </div>
-                  <div className={styles['form-group']}>
-                    <label htmlFor="account_id">Account *</label>
-                    <select id="account_id" name="account_id" value={formData.account_id} onChange={handleInputChange} required className={styles['form-select']}>
-                      <option value="">Select an account</option>
-                      {accounts.map((account) => (
-                        <option key={account.account_id} value={account.account_id}>
-                          {account.name || account.account_name}
-                        </option>
-                      ))}
-                    </select>
+                    {/* Removed bottom Account dropdown for design consistency */}
                   </div>
                   <div className={styles['form-actions']} style={{ gridColumn: '1 / -1' }}>
                     <button type="button" onClick={handleViewTable} className={styles['cancel-btn']}>
@@ -453,77 +536,6 @@ const Sales = ({ onBack }) => {
                     </button>
                   </div>
                 </form>
-              </div>
-            )}
-            {viewMode === 'form' && (
-              <div style={{ margin: '2rem 0', padding: '1rem', border: '1px solid #eee', borderRadius: 8, background: '#fafbfc' }}>
-                <h3>Sale Items</h3>
-                <table style={{ width: '100%', marginBottom: '1rem' }}>
-                  <thead>
-                    <tr>
-                      <th>Store</th>
-                      <th>Product</th>
-                      <th>Qty</th>
-                      <th>Price</th>
-                      <th>Discount</th>
-                      <th>Tax</th>
-                      <th>Total</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {saleItems.map((item, idx) => (
-                      <tr key={idx}>
-                        {/* Store selector */}
-                        <td>
-                          <select value={item.store} onChange={e => handleSaleItemChange(idx, 'store', e.target.value)}>
-                            <option value="">Store</option>
-                            {stores.map(store => (
-                              <option key={store.store_no} value={store.store_no}>{store.name || store.store_no}</option>
-                            ))}
-                          </select>
-                        </td>
-                        {/* Product selector, filtered by store */}
-                        <td>
-                          <select value={item.product} onChange={e => handleSaleItemChange(idx, 'product', e.target.value)}>
-                            <option value="">Product</option>
-                            {getProductsForStore(item.store).map(product => (
-                              <option key={product.product_no} value={product.product_no}>{product.name || product.product_no}</option>
-                            ))}
-                          </select>
-                        </td>
-                        {/* Qty */}
-                        <td>
-                          <input type="number" min="1" value={item.qty} onChange={e => handleSaleItemChange(idx, 'qty', +e.target.value)} />
-                        </td>
-                        {/* Price */}
-                        <td>
-                          <input type="number" min="0" value={item.price} onChange={e => handleSaleItemChange(idx, 'price', +e.target.value)} />
-                        </td>
-                        {/* Discount */}
-                        <td>
-                          <input type="number" min="0" value={item.discount} onChange={e => handleSaleItemChange(idx, 'discount', +e.target.value)} />
-                        </td>
-                        {/* Tax */}
-                        <td>
-                          <input type="number" min="0" value={item.tax} onChange={e => handleSaleItemChange(idx, 'tax', +e.target.value)} />
-                        </td>
-                        {/* Total (read only) */}
-                        <td>
-                          <input type="text" value={item.total} readOnly />
-                        </td>
-                        {/* Remove button */}
-                        <td>
-                          <button type="button" onClick={() => handleRemoveSaleItem(idx)}>×</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <button type="button" onClick={handleAddSaleItem}>+ Add Item</button>
-                <div style={{ marginTop: '1rem', textAlign: 'right', fontWeight: 'bold', fontSize: 18 }}>
-                  Total: <input type="text" value={grandTotal} readOnly style={{ width: 120, background: '#f0f0f0', textAlign: 'right', fontWeight: 'bold', fontSize: 18 }} />
-                </div>
               </div>
             )}
           </>

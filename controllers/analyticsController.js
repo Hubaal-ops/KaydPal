@@ -70,16 +70,27 @@ exports.getAnalytics = async (req, res) => {
       { $group: { _id: "$product_no", qty: { $sum: "$qty" } } }
     ]);
     const stockLevels = storeProducts.map(sp => {
-      const prod = allProducts.find(p => p.product_no === sp._id);
-      let status = 'good';
-      if (sp.qty <= (prod?.min_stock || 10)) status = sp.qty === 0 ? 'critical' : 'warning';
-      if (topProductNos.includes(sp._id)) status = 'good';
-      return {
-        name: prod?.product_name || sp._id,
-        qty: sp.qty,
-        status
-      };
+    const prod = allProducts.find(p => p.product_no === sp._id);
+    let status = 'good';
+    if (sp.qty <= (prod?.min_stock || 10)) status = sp.qty === 0 ? 'critical' : 'warning';
+    if (topProductNos.includes(sp._id)) status = 'good';
+    return {
+      name: prod?.product_name || sp._id,
+      qty: sp.qty,
+      status
+    };
+  });
+
+  // Add products with no StoreProduct record (qty = 0)
+  const storeProductIds = storeProducts.map(sp => sp._id);
+  const missingProducts = allProducts.filter(p => !storeProductIds.includes(p.product_no));
+  missingProducts.forEach(prod => {
+    stockLevels.push({
+      name: prod.product_name,
+      qty: 0,
+      status: 'critical'
     });
+  });
 
     // FAST/SLOW MOVING PRODUCTS
     const fastSlowProducts = [];
