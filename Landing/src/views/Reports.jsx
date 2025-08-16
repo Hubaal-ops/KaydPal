@@ -23,116 +23,50 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { format, subDays } from 'date-fns';
 import { motion } from 'framer-motion';
+// Simple error boundary for this component
 
-// Color palette for charts
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
+// Table columns for each report type
+const salesColumns = [
+  { id: 'sel_no', label: 'Sale No' },
+  { id: 'date', label: 'Date', format: (value) => value ? new Date(value).toLocaleDateString() : '' },
+  { id: 'customer_name', label: 'Customer' },
+  { id: 'product_name', label: 'Product' },
+  { id: 'qty', label: 'Qty' },
+  { id: 'price', label: 'Price' },
+  { id: 'discount', label: 'Discount' },
+  { id: 'tax', label: 'Tax' },
+  { id: 'total', label: 'Total' },
+  { id: 'account_id', label: 'Account' },
+];
 
-// Mock data generator for demonstration
-const generateMockData = (type) => {
-  const now = new Date();
-  const data = {
-    summary: {},
-    chartData: [],
-    tableData: [],
-    columns: []
-  };
+const purchaseColumns = [
+  { id: 'purchase_id', label: 'Purchase No' },
+  { id: 'date', label: 'Date', format: (value) => value ? new Date(value).toLocaleDateString() : '' },
+  { id: 'supplier_name', label: 'Supplier' },
+  { id: 'product_name', label: 'Product' },
+  { id: 'qty', label: 'Qty' },
+  { id: 'price', label: 'Price' },
+  { id: 'amount', label: 'Amount' },
+  { id: 'store_name', label: 'Store' },
+];
 
-  switch (type) {
-    case 'sales':
-      data.summary = {
-        totalSales: 1245,
-        totalRevenue: 28450.75,
-        avgOrderValue: 228.5,
-        growthRate: 12.5
-      };
-      data.chartData = Array.from({ length: 12 }, (_, i) => ({
-        name: new Date(now.getFullYear(), i).toLocaleString('default', { month: 'short' }),
-        sales: Math.floor(Math.random() * 100) + 50,
-        revenue: Math.floor(Math.random() * 5000) + 1000,
-      }));
-      data.tableData = Array.from({ length: 15 }, (_, i) => ({
-        id: `ORD-${1000 + i}`,
-        date: subDays(now, i).toISOString(),
-        customer: `Customer ${i + 1}`,
-        amount: (Math.random() * 1000 + 50).toFixed(2),
-        status: ['Completed', 'Pending', 'Cancelled'][Math.floor(Math.random() * 3)],
-      }));
-      data.columns = [
-        { id: 'id', label: 'Order ID' },
-        { id: 'date', label: 'Date', format: (value) => new Date(value).toLocaleDateString() },
-        { id: 'customer', label: 'Customer' },
-        { id: 'amount', label: 'Amount', format: (value) => `$${parseFloat(value).toFixed(2)}` },
-        { 
-          id: 'status', 
-          label: 'Status',
-          format: (value) => (
-            <Chip 
-              label={value} 
-              size="small" 
-              color={
-                value === 'Completed' ? 'success' : 
-                value === 'Pending' ? 'warning' : 'error'
-              } 
-            />
-          )
-        }
-      ];
-      break;
-    
-    case 'inventory':
-      data.summary = {
-        totalProducts: 156,
-        totalStock: 2458,
-        outOfStock: 8,
-        lowStock: 24
-      };
-      data.chartData = [
-        { name: 'In Stock', value: 75 },
-        { name: 'Low Stock', value: 15 },
-        { name: 'Out of Stock', value: 10 },
-      ];
-      data.tableData = Array.from({ length: 15 }, (_, i) => ({
-        id: `SKU-${1000 + i}`,
-        name: `Product ${i + 1}`,
-        category: ['Electronics', 'Clothing', 'Home', 'Books'][Math.floor(Math.random() * 4)],
-        stock: Math.floor(Math.random() * 100),
-        price: (Math.random() * 200 + 10).toFixed(2),
-        status: ['In Stock', 'Low Stock', 'Out of Stock'][Math.max(0, Math.min(2, Math.floor(Math.random() * 4)))]
-      }));
-      data.columns = [
-        { id: 'id', label: 'SKU' },
-        { id: 'name', label: 'Product Name' },
-        { id: 'category', label: 'Category' },
-        { id: 'stock', label: 'In Stock', align: 'right' },
-        { id: 'price', label: 'Price', format: (value) => `$${parseFloat(value).toFixed(2)}`, align: 'right' },
-        { 
-          id: 'status', 
-          label: 'Status',
-          format: (value) => (
-            <Chip 
-              label={value} 
-              size="small" 
-              color={
-                value === 'In Stock' ? 'success' : 
-                value === 'Low Stock' ? 'warning' : 'error'
-              } 
-            />
-          )
-        }
-      ];
-      break;
-      
-    default:
-      data.summary = {
-        totalItems: 42,
-        totalValue: 12500,
-        average: 297.62,
-        growth: 5.2
-      };
-  }
-  
-  return data;
-};
+const expenseColumns = [
+  { id: 'expense_id', label: 'Expense No' },
+  { id: 'date', label: 'Date', format: (value) => value ? new Date(value).toLocaleDateString() : '' },
+  { id: 'category', label: 'Category' },
+  { id: 'amount', label: 'Amount' },
+  { id: 'description', label: 'Description' },
+];
+
+const lowStockColumns = [
+  { id: 'product_no', label: 'Product No' },
+  { id: 'name', label: 'Product Name' },
+  { id: 'stock', label: 'Stock' },
+  { id: 'minStock', label: 'Min Stock' },
+  { id: 'status', label: 'Status' },
+];
+// Simple error boundary for this component
+
 
 const Reports = () => {
   const theme = useTheme();
@@ -148,15 +82,36 @@ const Reports = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [viewType, setViewType] = useState('chart'); // 'chart' or 'table'
+  // State for top/bottom toggle in Top/Bottom Products report
+  const [topBottomType, setTopBottomType] = useState('top'); // 'top' or 'bottom'
 
   const reportTypes = [
     { value: 'sales', label: 'Sales Report', icon: '📊' },
+    { value: 'stock-movement', label: 'Stock Movement/History', icon: '🔄' },
     { value: 'inventory', label: 'Inventory Report', icon: '📦' },
+    { value: 'stock-valuation', label: 'Stock Valuation', icon: '💲' },
+    { value: 'low-stock', label: 'Low Stock/Out-of-Stock', icon: '⚠️' },
+    { value: 'top-products', label: 'Top/Bottom Products', icon: '🏆' },
     { value: 'purchases', label: 'Purchases Report', icon: '🛒' },
     { value: 'expenses', label: 'Expenses Report', icon: '💰' },
     { value: 'profit-loss', label: 'Profit & Loss', icon: '📈' },
     { value: 'tax', label: 'Tax Report', icon: '🏛️' },
   ];
+
+  // State for stock valuation method
+  const [valuationMethod, setValuationMethod] = useState('fifo');
+  // Table columns for stock movement (define at top level, not using safeRows)
+  const stockMovementColumns = [
+    { id: 'date', label: 'Date', format: (value) => value ? new Date(value).toLocaleDateString() : '' },
+    { id: 'product_name', label: 'Product' },
+    { id: 'store_name', label: 'Store' },
+    { id: 'type', label: 'Type' },
+    { id: 'direction', label: 'Direction' },
+    { id: 'qty', label: 'Qty' },
+    { id: 'ref', label: 'Reference' },
+  ];
+
+  // ...existing code...
 
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
@@ -184,15 +139,30 @@ const Reports = () => {
       setLoading(true);
       setError('');
       setPage(0);
-      let url = `/api/reports/${reportType}?startDate=${formatDate(dateRange.startDate)}&endDate=${formatDate(dateRange.endDate)}`;
-      // Add more filters here if needed (e.g., product_no, customer_no)
-      const res = await fetch(url);
+      let url;
+      if (reportType === 'top-products') {
+        url = `/api/reports/top-products?startDate=${formatDate(dateRange.startDate)}&endDate=${formatDate(dateRange.endDate)}&limit=10&type=${topBottomType}`;
+      } else if (reportType === 'stock-valuation') {
+        url = `/api/reports/stock-valuation?method=${valuationMethod}`;
+      } else {
+        url = `/api/reports/${reportType}?startDate=${formatDate(dateRange.startDate)}&endDate=${formatDate(dateRange.endDate)}`;
+      }
+      const token = localStorage.getItem('token');
+      const res = await fetch(url, {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json'
+        }
+      });
       const result = await res.json();
       if (!result.success) throw new Error(result.message || 'API error');
-      // Transform backend data to fit frontend expectations if needed
       setReportData({
         ...result.data,
-        title: `${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report`,
+        title: reportType === 'stock-valuation'
+          ? `Stock Valuation (${valuationMethod.toUpperCase()})`
+          : (reportType === 'top-products'
+            ? (topBottomType === 'top' ? 'Top' : 'Bottom') + ' Products'
+            : reportType.charAt(0).toUpperCase() + reportType.slice(1) + ' Report'),
         generatedAt: new Date().toISOString(),
       });
     } catch (err) {
@@ -202,6 +172,15 @@ const Reports = () => {
       setLoading(false);
     }
   };
+  // Table columns for stock valuation
+  const stockValuationColumns = [
+    { id: 'product_no', label: 'Product No' },
+    { id: 'product_name', label: 'Product Name' },
+    { id: 'stock', label: 'Stock' },
+    { id: 'valuation', label: 'Valuation', format: (v) => `$${v}` },
+    { id: 'method', label: 'Method' },
+  ];
+  // ...existing code...
 
   const handleExport = async (format) => {
     try {
@@ -222,8 +201,57 @@ const Reports = () => {
       const content = `This is a sample ${reportType} report in ${format} format.\n\n` +
         `Date Range: ${formatDate(dateRange.startDate)} to ${formatDate(dateRange.endDate)}\n` +
         `Generated on: ${new Date().toLocaleString()}`;
-      
-      const blob = new Blob([content], { type: 'text/plain' });
+      // Table View for Stock Movement
+      if (!isChartView && reportData) {
+        return (
+          <Box sx={{ width: '100%', overflow: 'hidden' }}>
+            <TableContainer component={Paper} elevation={0} variant="outlined">
+              <Table size="small" stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    {stockMovementColumns.map((column) => (
+                      <TableCell
+                        key={column.id}
+                        align={column.align || 'left'}
+                        sx={{ fontWeight: 'bold' }}
+                      >
+                        {column.label}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {safeRows
+                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                    .map((row, idx) => (
+                      <TableRow hover key={row._id || idx}>
+                        {stockMovementColumns.map((column) => {
+                          let value = row[column.id];
+                          if (column.format) value = column.format(value);
+                          return (
+                            <TableCell key={column.id} align={column.align || 'left'}>
+                              {value}
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            <TablePagination
+              rowsPerPageOptions={[5, 10, 25]}
+              component="div"
+              count={safeRows.length}
+              rowsPerPage={rowsPerPage}
+              page={page}
+              onPageChange={handleChangePage}
+              onRowsPerPageChange={handleChangeRowsPerPage}
+            />
+          </Box>
+        );
+      }
+      return null;
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -243,34 +271,117 @@ const Reports = () => {
 
   // Render the main report content (charts and tables)
   const renderReportContent = () => {
-    if (!reportData) return null;
-    const isChartView = viewType === 'chart';
-    if (!reportData || !Array.isArray(reportData.rows) || reportData.rows.length === 0) {
+  // Top/Bottom Products Report
+  if (reportType === 'top-products') {
+    const safeRows = reportData && Array.isArray(reportData.rows) ? reportData.rows : [];
+    // Chart data
+    const chartData = safeRows.map(row => ({
+      name: row.product_name || row.product_no,
+      qty: row.qty,
+      amount: row.amount,
+    }));
+    return (
+      <>
+        <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+          <ButtonGroup size="small" variant="outlined">
+            <Button
+              onClick={() => setTopBottomType('top')}
+              variant={topBottomType === 'top' ? 'contained' : 'outlined'}
+            >Top Products</Button>
+            <Button
+              onClick={() => setTopBottomType('bottom')}
+              variant={topBottomType === 'bottom' ? 'contained' : 'outlined'}
+            >Bottom Products</Button>
+          </ButtonGroup>
+        </Box>
+        {/* Chart */}
+        <Box sx={{ mb: 4, width: '100%', height: 350, background: '#fafbfc', borderRadius: 2, p: 2 }}>
+          {chartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={chartData}>
+                <XAxis dataKey="name" stroke="#8884d8" />
+                <YAxis stroke="#8884d8" />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="qty" name="Quantity Sold" fill="#8884d8" />
+                <Bar dataKey="amount" name="Total Sales" fill="#82ca9d" />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <Typography color="text.secondary">No product sales data available for chart.</Typography>
+          )}
+        </Box>
+        {/* Table */}
+        <Box sx={{ width: '100%', overflow: 'hidden' }}>
+          <TableContainer component={Paper} elevation={0} variant="outlined">
+            <Table size="small" stickyHeader>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Product</TableCell>
+                  <TableCell>Quantity Sold</TableCell>
+                  <TableCell>Total Sales</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {safeRows.map((row, idx) => (
+                  <TableRow hover key={row.product_no || idx}>
+                    <TableCell>{row.product_name || row.product_no}</TableCell>
+                    <TableCell>{row.qty}</TableCell>
+                    <TableCell>{row.amount}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Box>
+      </>
+    );
+  }
+  if (!reportData) return null;
+  const isChartView = viewType === 'chart';
+  const safeRows = reportData && Array.isArray(reportData.rows) ? reportData.rows : [];
+
+  // Stock Movement Report
+  if (reportType === 'stock-movement') {
+    let chartData = [];
+    if (isChartView) {
+      const dateMap = {};
+      safeRows.forEach(row => {
+        const date = row.date ? new Date(row.date).toLocaleDateString() : '-';
+        if (!dateMap[date]) dateMap[date] = { date, inbound: 0, outbound: 0 };
+        if (row.direction === 'Inbound') dateMap[date].inbound += Number(row.qty) || 0;
+        if (row.direction === 'Outbound') dateMap[date].outbound += Number(row.qty) || 0;
+      });
+      chartData = Object.entries(dateMap).map(([date, vals]) => ({ date, ...vals })).sort((a, b) => new Date(a.date) - new Date(b.date));
+    }
+    // Chart View for Stock Movement
+    if (isChartView) {
       return (
-        <Box sx={{ p: 4, textAlign: 'center' }}>
-          <Typography variant="h6" color="text.secondary">
-            No data available for this report.
-          </Typography>
-          <Box sx={{ mt: 2, textAlign: 'left', bgcolor: '#f5f5f5', p: 2, borderRadius: 1, fontSize: 13 }}>
-            <strong>Debug API response:</strong>
-            <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{JSON.stringify(reportData, null, 2)}</pre>
-          </Box>
+        <Box sx={{ mb: 4, width: '100%', height: 350, background: '#fafbfc', borderRadius: 2, p: 2 }}>
+          {chartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={chartData}>
+                <XAxis dataKey="date" stroke="#8884d8" />
+                <YAxis stroke="#8884d8" />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="inbound" name="Inbound" fill="#8884d8" />
+                <Bar dataKey="outbound" name="Outbound" fill="#ef4444" />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <Typography color="text.secondary">No stock movement data available for chart.</Typography>
+          )}
         </Box>
       );
     }
-    const safeRows = reportData.rows;
-    // Prepare chart data: group by date
+
+    // Simple error boundary for this component
+  }
+  // Purchases Report
+  if (reportType === 'purchases') {
     let chartData = [];
-    if (reportType === 'sales') {
-      const dateMap = {};
-      safeRows.forEach(row => {
-        const date = row.sel_date ? new Date(row.sel_date).toLocaleDateString() : '-';
-        if (!dateMap[date]) dateMap[date] = { date, total: 0, revenue: 0 };
-        dateMap[date].total += 1;
-        dateMap[date].revenue += Number(row.amount) || 0;
-      });
-      chartData = Object.values(dateMap).sort((a, b) => new Date(a.date) - new Date(b.date));
-    } else if (reportType === 'purchases') {
+    if (isChartView) {
       const dateMap = {};
       safeRows.forEach(row => {
         const date = row.created_at ? new Date(row.created_at).toLocaleDateString() : '-';
@@ -279,7 +390,86 @@ const Reports = () => {
         dateMap[date].amount += Number(row.amount) || 0;
       });
       chartData = Object.values(dateMap).sort((a, b) => new Date(a.date) - new Date(b.date));
-    } else if (reportType === 'expenses') {
+    }
+    // Table View for Purchases
+    if (!isChartView && reportData) {
+      return (
+        <Box sx={{ width: '100%', overflow: 'hidden' }}>
+          <TableContainer component={Paper} elevation={0} variant="outlined">
+            <Table size="small" stickyHeader>
+              <TableHead>
+                <TableRow>
+                  {purchaseColumns.map((column) => (
+                    <TableCell
+                      key={column.id}
+                      align={column.align || 'left'}
+                      sx={{ fontWeight: 'bold' }}
+                    >
+                      {column.label}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {safeRows
+                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                  .map((row, idx) => (
+                    <TableRow hover key={row.purchase_id || idx}>
+                      {purchaseColumns.map((column) => {
+                        let value = row[column.id];
+                        if (["product_name","supplier_name","store_name"].includes(column.id)) {
+                          value = row[column.id] || '';
+                        }
+                        if (column.format) value = column.format(value);
+                        return (
+                          <TableCell key={column.id} align={column.align || 'left'}>
+                            {value}
+                          </TableCell>
+                        );
+                      })}
+                    </TableRow>
+                  ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          <TablePagination
+            rowsPerPageOptions={[5, 10, 25]}
+            component="div"
+            count={safeRows.length}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onPageChange={handleChangePage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+          />
+        </Box>
+      );
+    }
+    // Chart View for Purchases
+    if (isChartView) {
+      return (
+        <Box sx={{ mb: 4, width: '100%', height: 350, background: '#fafbfc', borderRadius: 2, p: 2 }}>
+          {chartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={chartData}>
+                <XAxis dataKey="date" stroke="#8884d8" />
+                <YAxis stroke="#8884d8" />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="total" name="Total Purchases" fill="#8884d8" />
+                <Bar dataKey="amount" name="Total Amount" fill="#82ca9d" />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <Typography color="text.secondary">No purchase data available for chart.</Typography>
+          )}
+        </Box>
+      );
+    }
+  }
+  // Expenses Report
+  if (reportType === 'expenses') {
+    let chartData = [];
+    if (isChartView) {
       const dateMap = {};
       safeRows.forEach(row => {
         const date = row.date ? new Date(row.date).toLocaleDateString() : (row.expense_date ? new Date(row.expense_date).toLocaleDateString() : '-');
@@ -289,369 +479,268 @@ const Reports = () => {
       });
       chartData = Object.values(dateMap).sort((a, b) => new Date(a.date) - new Date(b.date));
     }
-    // Table columns for sales, purchases, expenses
-    let salesColumns = [
-      { id: 'sel_no', label: 'ID' },
-      { id: 'product_name', label: 'Product Name' },
-      { id: 'customer_name', label: 'Customer Name' },
-      { id: 'store_no', label: 'Store' },
-      { id: 'qty', label: 'Qty' },
-      { id: 'price', label: 'Price' },
-      { id: 'discount', label: 'Discount' },
-      { id: 'tax', label: 'Tax' },
-      { id: 'amount', label: 'Amount' },
-      { id: 'paid', label: 'Paid' },
-      { id: 'account_id', label: 'Account' },
-      { id: 'sel_date', label: 'Date', format: (value) => new Date(value).toLocaleDateString() },
-    ];
-    let purchaseColumns = [
-      { id: 'purchase_id', label: 'ID' },
-      { id: 'product_name', label: 'Product Name' },
-      { id: 'supplier_name', label: 'Supplier Name' },
-      { id: 'store_name', label: 'Store' },
-      { id: 'qty', label: 'Qty' },
-      { id: 'price', label: 'Price' },
-      { id: 'discount', label: 'Discount' },
-      { id: 'tax', label: 'Tax' },
-      { id: 'amount', label: 'Amount' },
-      { id: 'paid', label: 'Paid' },
-      { id: 'account_id', label: 'Account' },
-      { id: 'created_at', label: 'Date', format: (value) => new Date(value).toLocaleDateString() },
-    ];
-    let expenseColumns = [
-      { id: 'expense_id', label: 'ID' },
-      { id: 'category', label: 'Category' },
-      { id: 'account', label: 'Account' },
-      { id: 'amount', label: 'Amount' },
-      { id: 'description', label: 'Description' },
-      { id: 'expense_date', label: 'Date', format: (value) => value ? new Date(value).toLocaleDateString() : '' },
-    ];
-    return (
-      <Box>
-        {/* View Toggle */}
-        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'flex-end' }}>
-          <ButtonGroup size="small" variant="outlined">
-            <Button 
-              onClick={() => setViewType('chart')} 
-              variant={isChartView ? 'contained' : 'outlined'}
-              startIcon={isChartView ? <BarChartIcon /> : null}
-            >
-              {isChartView ? 'Charts' : 'View Charts'}
-            </Button>
-            <Button 
-              onClick={() => setViewType('table')} 
-              variant={!isChartView ? 'contained' : 'outlined'}
-              startIcon={!isChartView ? <TableViewIcon /> : null}
-            >
-              {!isChartView ? 'Table' : 'View Table'}
-            </Button>
-          </ButtonGroup>
+    // Table View for Expenses
+    if (!isChartView && reportData) {
+      return (
+        <Box sx={{ width: '100%', overflow: 'hidden' }}>
+          <TableContainer component={Paper} elevation={0} variant="outlined">
+            <Table size="small" stickyHeader>
+              <TableHead>
+                <TableRow>
+                  {expenseColumns.map((column) => (
+                    <TableCell
+                      key={column.id}
+                      align={column.align || 'left'}
+                      sx={{ fontWeight: 'bold' }}
+                    >
+                      {column.label}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {safeRows
+                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                  .map((row, idx) => (
+                    <TableRow hover key={row.expense_id || idx}>
+                      {expenseColumns.map((column) => {
+                        let value = row[column.id];
+                        if (column.format) value = column.format(value);
+                        return (
+                          <TableCell key={column.id} align={column.align || 'left'}>
+                            {value}
+                          </TableCell>
+                        );
+                      })}
+                    </TableRow>
+                  ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          <TablePagination
+            rowsPerPageOptions={[5, 10, 25]}
+            component="div"
+            count={safeRows.length}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onPageChange={handleChangePage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+          />
         </Box>
-        {/* Chart View for sales */}
-        {isChartView && reportType === 'sales' && (
-          <Box sx={{ mb: 4, width: '100%', height: 350, background: '#fafbfc', borderRadius: 2, p: 2 }}>
-            {chartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={chartData}>
-                  <XAxis dataKey="date" stroke="#8884d8" />
-                  <YAxis stroke="#8884d8" />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="total" name="Total Purchases" fill="#8884d8" />
-                  <Bar dataKey="revenue" name="Revenue" fill="#82ca9d" />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <Typography color="text.secondary">No sales data available for chart.</Typography>
-            )}
-          </Box>
-        )}
-        {/* Chart View for purchases */}
-        {isChartView && reportType === 'purchases' && (
-          <Box sx={{ mb: 4, width: '100%', height: 350, background: '#fafbfc', borderRadius: 2, p: 2 }}>
-            {chartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={chartData}>
-                  <XAxis dataKey="date" stroke="#8884d8" />
-                  <YAxis stroke="#8884d8" />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="total" name="Total Purchases" fill="#8884d8" />
-                  <Bar dataKey="amount" name="Total Amount" fill="#82ca9d" />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <Typography color="text.secondary">No purchase data available for chart.</Typography>
-            )}
-          </Box>
-        )}
-        {/* Chart View for expenses */}
-        {isChartView && reportType === 'expenses' && (
-          <Box sx={{ mb: 4, width: '100%', height: 350, background: '#fafbfc', borderRadius: 2, p: 2 }}>
-            {chartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={chartData}>
-                  <XAxis dataKey="date" stroke="#8884d8" />
-                  <YAxis stroke="#8884d8" />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="total" name="Total Expenses" fill="#8884d8" />
-                  <Bar dataKey="amount" name="Total Amount" fill="#82ca9d" />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <Typography color="text.secondary">No expense data available for chart.</Typography>
-            )}
-          </Box>
-        )}
-        {/* Table View for sales and purchases */}
-        {!isChartView && reportType === 'sales' && reportData && (
-          <Box sx={{ width: '100%', overflow: 'hidden' }}>
-            <TableContainer component={Paper} elevation={0} variant="outlined">
-              <Table size="small" stickyHeader>
-                <TableHead>
-                  <TableRow>
-                    {salesColumns.map((column) => (
-                      <TableCell
-                        key={column.id}
-                        align={column.align || 'left'}
-                        sx={{ fontWeight: 'bold' }}
-                      >
-                        {column.label}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {safeRows
-                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                    .map((row, idx) => (
-                      <TableRow hover key={row.sel_no || idx}>
-                        {salesColumns.map((column) => {
-                          let value = row[column.id];
-                          if (column.id === 'product_name') {
-                            value = row.product_name || (row.items && row.items.length > 0 ? (row.items[0].product_name || row.items[0].name || row.items[0].product_no || '') : '');
-                          }
-                          if (column.id === 'customer_name') {
-                            value = row.customer_name || row.customer || row.customer_no || '';
-                          }
-                          if (["qty","price","discount","tax"].includes(column.id)) {
-                            value = row.items && row.items.length > 0 ? row.items[0][column.id] : '';
-                          }
-                          if (column.id === 'account_id') {
-                            value = row.account_id || '';
-                          }
-                          if (column.format) value = column.format(value);
-                          return (
-                            <TableCell key={column.id} align={column.align || 'left'}>
-                              {value}
-                            </TableCell>
-                          );
-                        })}
-                      </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-            <TablePagination
-              rowsPerPageOptions={[5, 10, 25]}
-              component="div"
-              count={safeRows.length}
-              rowsPerPage={rowsPerPage}
-              page={page}
-              onPageChange={handleChangePage}
-              onRowsPerPageChange={handleChangeRowsPerPage}
-            />
-          </Box>
-        )}
-        {!isChartView && reportType === 'purchases' && reportData && (
-          <Box sx={{ width: '100%', overflow: 'hidden' }}>
-            <TableContainer component={Paper} elevation={0} variant="outlined">
-              <Table size="small" stickyHeader>
-                <TableHead>
-                  <TableRow>
-                    {purchaseColumns.map((column) => (
-                      <TableCell
-                        key={column.id}
-                        align={column.align || 'left'}
-                        sx={{ fontWeight: 'bold' }}
-                      >
-                        {column.label}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {safeRows
-                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                    .map((row, idx) => (
-                      <TableRow hover key={row.purchase_id || idx}>
-                        {purchaseColumns.map((column) => {
-                          let value = row[column.id];
-                          if (["product_name","supplier_name","store_name"].includes(column.id)) {
-                            value = row[column.id] || '';
-                          }
-                          if (column.format) value = column.format(value);
-                          return (
-                            <TableCell key={column.id} align={column.align || 'left'}>
-                              {value}
-                            </TableCell>
-                          );
-                        })}
-                      </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-            <TablePagination
-              rowsPerPageOptions={[5, 10, 25]}
-              component="div"
-              count={safeRows.length}
-              rowsPerPage={rowsPerPage}
-              page={page}
-              onPageChange={handleChangePage}
-              onRowsPerPageChange={handleChangeRowsPerPage}
-            />
-          </Box>
-        )}
-        {/* Table View for expenses */}
-        {!isChartView && reportType === 'expenses' && reportData && (
-          <Box sx={{ width: '100%', overflow: 'hidden' }}>
-            <TableContainer component={Paper} elevation={0} variant="outlined">
-              <Table size="small" stickyHeader>
-                <TableHead>
-                  <TableRow>
-                    {expenseColumns.map((column) => (
-                      <TableCell
-                        key={column.id}
-                        align={column.align || 'left'}
-                        sx={{ fontWeight: 'bold' }}
-                      >
-                        {column.label}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {safeRows
-                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                    .map((row, idx) => (
-                      <TableRow hover key={row.expense_id || idx}>
-                        {expenseColumns.map((column) => {
-                          let value = row[column.id];
-                          if (column.format) value = column.format(value);
-                          return (
-                            <TableCell key={column.id} align={column.align || 'left'}>
-                              {value}
-                            </TableCell>
-                          );
-                        })}
-                      </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-            <TablePagination
-              rowsPerPageOptions={[5, 10, 25]}
-              component="div"
-              count={safeRows.length}
-              rowsPerPage={rowsPerPage}
-              page={page}
-              onPageChange={handleChangePage}
-              onRowsPerPageChange={handleChangeRowsPerPage}
-            />
-          </Box>
-        )}
-      </Box>
-    );
-  };
-
-  // Render summary cards based on report type
-  const renderSummaryCards = () => {
-    if (!reportData?.summary) return null;
-    
-    const summaryItems = [];
-    const summaryData = reportData.summary;
-    
-    switch (reportType) {
-      case 'sales':
-        summaryItems.push(
-          { label: 'Total Sales', value: summaryData?.totalSales != null ? summaryData.totalSales.toLocaleString?.() || summaryData.totalSales : '-', icon: '🛒', color: '#3b82f6' },
-          { label: 'Total Revenue', value: summaryData?.totalRevenue != null ? `$${summaryData.totalRevenue.toLocaleString?.() || summaryData.totalRevenue}` : '-', icon: '💰', color: '#10b981' },
-          { label: 'Avg. Order Value', value: summaryData?.avgOrderValue != null ? `$${summaryData.avgOrderValue.toLocaleString?.() || summaryData.avgOrderValue}` : '-', icon: '📊', color: '#8b5cf6' },
-          { label: 'Growth Rate', value: summaryData?.growthRate != null ? `${summaryData.growthRate}%` : '-', icon: '📈', color: '#f59e0b' }
-        );
-        break;
-      case 'inventory':
-        summaryItems.push(
-          { label: 'Total Products', value: summaryData?.totalProducts ?? '-', icon: '📦', color: '#3b82f6' },
-          { label: 'Total in Stock', value: summaryData?.totalStock ?? '-', icon: '📊', color: '#10b981' },
-          { label: 'Out of Stock', value: summaryData?.outOfStock ?? '-', icon: '⚠️', color: '#ef4444' },
-          { label: 'Low Stock', value: summaryData?.lowStock ?? '-', icon: '🔍', color: '#f59e0b' }
-        );
-        break;
-      case 'expenses':
-        summaryItems.push(
-          { label: 'Total Expenses', value: summaryData?.totalExpenses != null ? summaryData.totalExpenses.toLocaleString?.() || summaryData.totalExpenses : '-', icon: '💸', color: '#ef4444' },
-          { label: 'Total Amount', value: summaryData?.totalAmount != null ? `$${summaryData.totalAmount.toLocaleString?.() || summaryData.totalAmount}` : '-', icon: '💰', color: '#f59e0b' }
-        );
-        break;
-      default:
-        Object.entries(summaryData || {}).forEach(([key, value]) => {
-          summaryItems.push({
-            label: key.split(/(?=[A-Z])/).join(' '),
-            value: typeof value === 'number' ? value.toLocaleString?.() || value : value,
-            icon: '📝',
-            color: '#6b7280'
-          });
-        });
+      );
     }
-    // MUI v6+ Grid: remove item/xs/sm/md props, use columns prop
+    // Chart View for Expenses
+    if (isChartView) {
+      return (
+        <Box sx={{ mb: 4, width: '100%', height: 350, background: '#fafbfc', borderRadius: 2, p: 2 }}>
+          {chartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={chartData}>
+                <XAxis dataKey="date" stroke="#8884d8" />
+                <YAxis stroke="#8884d8" />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="total" name="Total Expenses" fill="#8884d8" />
+                <Bar dataKey="amount" name="Total Amount" fill="#82ca9d" />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <Typography color="text.secondary">No expense data available for chart.</Typography>
+          )}
+        </Box>
+      );
+    }
+  }
+  // Low Stock Table View (no chart)
+  if (!isChartView && reportType === 'low-stock' && reportData) {
     return (
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 3 }}>
-        {summaryItems.map((item, index) => (
-          <Card 
-            key={index}
-            variant="outlined" 
-            sx={{ 
-              flex: '1 1 220px',
-              minWidth: 200,
-              maxWidth: 300,
-              borderLeft: `4px solid ${item.color}`,
-              '&:hover': { boxShadow: 1 }
-            }}
-          >
-            <CardContent>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Box>
-                  <Typography color="text.secondary" variant="body2">
-                    {item.label}
-                  </Typography>
-                  <Typography variant="h6" component="div">
-                    {item.value}
-                  </Typography>
-                </Box>
-                <Box 
-                  sx={{ 
-                    width: 48, 
-                    height: 48, 
-                    borderRadius: '50%', 
-                    bgcolor: `${item.color}15`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 24
-                  }}
-                >
-                  {item.icon}
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        ))}
+      <Box sx={{ width: '100%', overflow: 'hidden' }}>
+        <TableContainer component={Paper} elevation={0} variant="outlined">
+          <Table size="small" stickyHeader>
+            <TableHead>
+              <TableRow>
+                {lowStockColumns.map((column) => (
+                  <TableCell
+                    key={column.id}
+                    align={column.align || 'left'}
+                    sx={{ fontWeight: 'bold' }}
+                  >
+                    {column.label}
+                  </TableCell>
+                ))}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {safeRows
+                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                .map((row, idx) => (
+                  <TableRow hover key={row.product_no || idx}>
+                    {lowStockColumns.map((column) => {
+                      let value = row[column.id];
+                      if (column.id === 'status') {
+                        value = row.stock <= row.minStock ? 'Low Stock' : 'OK';
+                        if (row.stock === 0) value = 'Out of Stock';
+                      }
+                      return (
+                        <TableCell key={column.id} align={column.align || 'left'}>
+                          {value}
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>
+                ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+        <TablePagination
+          rowsPerPageOptions={[5, 10, 25]}
+          component="div"
+          count={safeRows.length}
+          rowsPerPage={rowsPerPage}
+          page={page}
+          onPageChange={handleChangePage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+        />
       </Box>
     );
-  };
+  }
+  // Stock Valuation Table View
+  if (reportType === 'stock-valuation' && reportData) {
+    return (
+      <Box sx={{ width: '100%', overflow: 'hidden' }}>
+        <TableContainer component={Paper} elevation={0} variant="outlined">
+          <Table size="small" stickyHeader>
+            <TableHead>
+              <TableRow>
+                {stockValuationColumns.map((column) => (
+                  <TableCell
+                    key={column.id}
+                    align={column.align || 'left'}
+                    sx={{ fontWeight: 'bold' }}
+                  >
+                    {column.label}
+                  </TableCell>
+                ))}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {safeRows
+                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                .map((row, idx) => (
+                  <TableRow hover key={row.product_no || idx}>
+                    {stockValuationColumns.map((column) => {
+                      let value = row[column.id];
+                      if (column.format) value = column.format(value);
+                      return (
+                        <TableCell key={column.id} align={column.align || 'left'}>
+                          {value}
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>
+                ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+        <TablePagination
+          rowsPerPageOptions={[5, 10, 25]}
+          component="div"
+          count={safeRows.length}
+          rowsPerPage={rowsPerPage}
+          page={page}
+          onPageChange={handleChangePage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+        />
+      </Box>
+    );
+  }
+  // Default fallback for report types not yet implemented
+  return null;
+}
+
+// Render summary cards based on report type
+const renderSummaryCards = (reportType, reportData) => {
+  if (!reportData?.summary) return null;
+  const summaryItems = [];
+  const summaryData = reportData.summary;
+  switch (reportType) {
+    case 'sales':
+      summaryItems.push(
+        { label: 'Total Sales', value: summaryData?.totalSales != null ? summaryData.totalSales.toLocaleString?.() || summaryData.totalSales : '-', icon: '🛒', color: '#3b82f6' },
+        { label: 'Total Revenue', value: summaryData?.totalRevenue != null ? `$${summaryData.totalRevenue.toLocaleString?.() || summaryData.totalRevenue}` : '-', icon: '💰', color: '#10b981' },
+        { label: 'Avg. Order Value', value: summaryData?.avgOrderValue != null ? `$${summaryData.avgOrderValue.toLocaleString?.() || summaryData.avgOrderValue}` : '-', icon: '📊', color: '#8b5cf6' },
+        { label: 'Growth Rate', value: summaryData?.growthRate != null ? `${summaryData.growthRate}%` : '-', icon: '📈', color: '#f59e0b' }
+      );
+      break;
+    case 'inventory':
+      summaryItems.push(
+        { label: 'Total Products', value: summaryData?.totalProducts ?? '-', icon: '📦', color: '#3b82f6' },
+        { label: 'Total in Stock', value: summaryData?.totalStock ?? '-', icon: '📊', color: '#10b981' },
+        { label: 'Out of Stock', value: summaryData?.outOfStock ?? '-', icon: '⚠️', color: '#ef4444' },
+        { label: 'Low Stock', value: summaryData?.lowStock ?? '-', icon: '🔍', color: '#f59e0b' }
+      );
+      break;
+    case 'expenses':
+      summaryItems.push(
+        { label: 'Total Expenses', value: summaryData?.totalExpenses != null ? summaryData.totalExpenses.toLocaleString?.() || summaryData.totalExpenses : '-', icon: '💸', color: '#ef4444' },
+        { label: 'Total Amount', value: summaryData?.totalAmount != null ? `$${summaryData.totalAmount.toLocaleString?.() || summaryData.totalAmount}` : '-', icon: '💰', color: '#f59e0b' }
+      );
+      break;
+    default:
+      Object.entries(summaryData || {}).forEach(([key, value]) => {
+        summaryItems.push({
+          label: key.split(/(?=[A-Z])/).join(' '),
+          value: typeof value === 'number' ? value.toLocaleString?.() || value : value,
+          icon: '📝',
+          color: '#6b7280'
+        });
+      });
+  }
+  return (
+    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 3 }}>
+      {summaryItems.map((item, index) => (
+        <Card 
+          key={index}
+          variant="outlined" 
+          sx={{ 
+            flex: '1 1 220px',
+            minWidth: 200,
+            maxWidth: 300,
+            borderLeft: `4px solid ${item.color}`,
+            '&:hover': { boxShadow: 1 }
+          }}
+        >
+          <CardContent>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Box>
+                <Typography color="text.secondary" variant="body2">
+                  {item.label}
+                </Typography>
+                <Typography variant="h6" component="div">
+                  {item.value}
+                </Typography>
+              </Box>
+              <Box 
+                sx={{ 
+                  width: 48, 
+                  height: 48, 
+                  borderRadius: '50%', 
+                  bgcolor: `${item.color}15`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 24
+                }}
+              >
+                {item.icon}
+              </Box>
+            </Box>
+          </CardContent>
+        </Card>
+      ))}
+    </Box>
+  );
+};
 
   return (
     <Box sx={{ p: isMobile ? 2 : 3, maxWidth: '100%', overflowX: 'hidden' }}>
@@ -725,7 +814,7 @@ const Reports = () => {
                   disabled={!reportData || loading}
                   sx={{ border: '1px solid', borderColor: 'divider' }}
                 >
-                  <PrintIcon />
+                  <LineChartIcon />
                 </IconButton>
               </span>
             </Tooltip>
@@ -815,8 +904,8 @@ const Reports = () => {
         </Grid>
       </Paper>
 
-      {/* Summary Cards */}
-      {reportData && renderSummaryCards()}
+  {/* Summary Cards */}
+  {reportData && renderSummaryCards(reportType, reportData)}
 
       {/* Report Content */}
       {reportData && (
@@ -877,17 +966,7 @@ const Reports = () => {
               </Typography>
             </Box>
             
-            {/* Report content will go here */}
-            <Box sx={{ my: 4, textAlign: 'center' }}>
-              <Typography variant="h6" color="text.secondary">
-                {reportType === 'sales' && 'Sales report data will be displayed here'}
-                {reportType === 'inventory' && 'Inventory report data will be displayed here'}
-                {reportType === 'purchases' && 'Purchases report data will be displayed here'}
-                {reportType === 'expenses' && 'Expenses report data will be displayed here'}
-                {reportType === 'profit-loss' && 'Profit & Loss report data will be displayed here'}
-                {reportType === 'tax' && 'Tax report data will be displayed here'}
-              </Typography>
-            </Box>
+            {renderReportContent()}
 
             {/* TODO: Add actual report content based on reportType */}
           </Paper>
@@ -895,8 +974,7 @@ const Reports = () => {
       )}
     </Box>
   );
-};
-
+}
 // Simple error boundary for this component
 const ReportsWithErrorBoundary = (props) => {
   const [hasError, setHasError] = React.useState(false);

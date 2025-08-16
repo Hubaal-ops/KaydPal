@@ -95,7 +95,7 @@ const InvoiceDetail = ({ invoice, onBack }) => {
       <div style={{display:'flex',justifyContent:'space-between',marginBottom:24}}>
         <div>
           <b>Customer</b><br/>
-          {invoice.customer?.name}<br/>
+          {invoice.customer?.name || invoice.customer_name}<br/>
           {invoice.customer?.address && <>{invoice.customer.address}<br/></>}
           {invoice.customer?.phone && <>{invoice.customer.phone}<br/></>}
           {invoice.customer?.email && <>{invoice.customer.email}<br/></>}
@@ -119,7 +119,7 @@ const InvoiceDetail = ({ invoice, onBack }) => {
         <tbody>
           {invoice.items?.map((item,i) => (
             <tr key={i}>
-              <td style={{padding:'8px',borderTop:'1px solid #eee'}}>{item.name}</td>
+              <td style={{padding:'8px',borderTop:'1px solid #eee'}}>{item.product_name || item.name}</td>
               <td style={{padding:'8px',borderTop:'1px solid #eee',textAlign:'right'}}>{item.qty}</td>
               <td style={{padding:'8px',borderTop:'1px solid #eee',textAlign:'right'}}>{item.price?.toFixed(2)}</td>
               <td style={{padding:'8px',borderTop:'1px solid #eee',textAlign:'right'}}>{item.discount?.toFixed(2)}</td>

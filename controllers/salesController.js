@@ -26,12 +26,18 @@ async function insertSale(sale) {
 
   if (!Array.isArray(items) || items.length === 0) throw new Error('At least one item is required.');
 
+  // Lookup customer and store names
+  const customerDoc = await Customer.findOne({ customer_no: Number(customer_no) });
+  const storeDoc = await (require('../models/Store')).findOne({ store_no: Number(store_no) });
+  const customer_name = customerDoc ? customerDoc.name : '';
+  const store_name = storeDoc ? storeDoc.store_name : '';
+
   let totalAmount = 0;
   let totalDiscount = 0;
   let totalTax = 0;
   const processedItems = [];
 
-  // Check stock and prepare items
+  // Check stock and prepare items, include product_name
   for (const item of items) {
     const nQty = Number(item.qty);
     const nPrice = Number(item.price);
@@ -41,12 +47,16 @@ async function insertSale(sale) {
     if (nPrice <= 0) throw new Error('Sale price must be greater than 0.');
     const storeProduct = await StoreProduct.findOne({ product_no: Number(item.product_no), store_no: Number(store_no) });
     if (!storeProduct || storeProduct.qty < nQty) throw new Error('Insufficient stock for product ' + item.product_no + ' in the selected store.');
+    const ProductModel = require('../models/Product');
+    const productDoc = await ProductModel.findOne({ product_no: Number(item.product_no) });
+    const product_name = productDoc ? (productDoc.name || productDoc.product_name) : '';
     const subtotal = nQty * nPrice - nDiscount + nTax;
     totalAmount += subtotal;
     totalDiscount += nDiscount;
     totalTax += nTax;
     processedItems.push({
       product_no: Number(item.product_no),
+      product_name,
       qty: nQty,
       price: nPrice,
       discount: nDiscount,
@@ -63,7 +73,9 @@ async function insertSale(sale) {
   const newSale = {
     sel_no,
     customer_no: Number(customer_no),
+    customer_name,
     store_no: Number(store_no),
+    store_name,
     items: processedItems,
     amount: totalAmount,
     paid: Number(paid),

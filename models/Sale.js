@@ -21,7 +21,9 @@ const saleSchema = new mongoose.Schema({
   sel_date: { type: Date, default: Date.now },
   created_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now },
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  customer_no: { type: Number },
+  customer_name: { type: String }
 });
 
 module.exports = mongoose.model('Sale', saleSchema); 

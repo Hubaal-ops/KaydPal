@@ -61,7 +61,7 @@ const InvoiceList = ({ onView }) => {
                 <tr key={inv._id}>
                   <td>{inv.invoice_no}</td>
                   <td>{inv.date ? new Date(inv.date).toLocaleDateString() : ''}</td>
-                  <td>{inv.customer?.name || ''}</td>
+                  <td>{inv.customer?.name || inv.customer_name || ''}</td>
                   <td>{inv.total?.toFixed(2)}</td>
                   <td>{inv.status}</td>
                   <td>
