@@ -360,19 +360,28 @@ exports.generateReport = async (req, res) => {
       const filter = {};
       if (userId) filter.userId = userId;
       const products = await Product.find(filter);
+      // Table rows
       data.rows = products.map(p => ({
         product_no: p.product_no,
         product_name: p.product_name,
         category: p.category,
-        stock: p.stock,
+        stock: p.storing_balance,
         price: p.price,
-        status: p.stock === 0 ? 'Out of Stock' : (p.stock < 10 ? 'Low Stock' : 'In Stock'),
+        status: (p.storing_balance === 0) ? 'Out of Stock' : (p.storing_balance < 10 ? 'Low Stock' : 'In Stock'),
       }));
+      // Card value
+      const totalStock = products.reduce((sum, p) => sum + (p.storing_balance || 0), 0);
+      // Graph data (product name and stock)
+      data.graphData = products.map(p => ({
+        product_name: p.product_name,
+        stock: p.storing_balance
+      }));
+      // Summary for cards
       data.summary = {
         totalProducts: products.length,
-        totalStock: products.reduce((sum, p) => sum + (p.stock || 0), 0),
-        outOfStock: products.filter(p => p.stock === 0).length,
-        lowStock: products.filter(p => p.stock < 10 && p.stock > 0).length,
+        totalStock,
+        outOfStock: products.filter(p => (p.storing_balance || 0) === 0).length,
+        lowStock: products.filter(p => (p.storing_balance || 0) < 10 && (p.storing_balance || 0) > 0).length,
       };
     } else if (type === 'low-stock') {
       // Low Stock/Out-of-Stock Report

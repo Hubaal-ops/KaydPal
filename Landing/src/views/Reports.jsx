@@ -22,7 +22,99 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { format, subDays } from 'date-fns';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import { saveAs } from 'file-saver';
 import { motion } from 'framer-motion';
+
+// Utility: Filter inventory rows (currently passthrough, can be extended)
+function getFilteredInventoryRows(rows) {
+  return rows || [];
+}
+
+// Placeholder for inventory filters UI
+function renderInventoryFilters() {
+  return null;
+}
+
+// Placeholder for inventory chart UI
+function renderInventoryChart() {
+  return null;
+}
+
+// Placeholder for inventory table UI
+function renderInventoryTable({
+  reportType,
+  reportData,
+  page,
+  rowsPerPage,
+  handleChangePage,
+  handleChangeRowsPerPage
+}) {
+  // --- Professional Table Section for Reports ---
+  // This is a generic table renderer for all report types
+  // Uses Material-UI Table components, supports pagination, dynamic columns, and rows
+  // Integrates with reportData and adapts to reportType
+  // (Charts and drill-down integration will be added below this section)
+  const columns = (() => {
+    switch (reportType) {
+      case 'sales': return salesColumns;
+      case 'purchases': return purchaseColumns;
+      case 'inventory': return lowStockColumns;
+      case 'expenses': return expenseColumns;
+      default: return salesColumns;
+    }
+  })();
+  const rows = reportData && Array.isArray(reportData.rows) ? reportData.rows : [];
+  if (!rows.length) {
+    return <Typography sx={{ mt: 3, mb: 2 }} color="text.secondary">No data available for this report.</Typography>;
+  }
+  return (
+    <TableContainer component={Paper} sx={{ mt: 3 }}>
+      <Table size="small">
+        <TableHead>
+          <TableRow>
+            {columns.map(col => (
+              <TableCell key={col.id}>{col.label}</TableCell>
+            ))}
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {rows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((row, idx) => (
+            <TableRow hover key={row.id || row._id || idx}>
+              {columns.map(col => (
+                <TableCell key={col.id}>
+                  {col.format ? col.format(row[col.id]) : row[col.id] ?? ''}
+                </TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      <TablePagination
+        component="div"
+        count={rows.length}
+        page={page}
+        onPageChange={handleChangePage}
+        rowsPerPage={rowsPerPage}
+        onRowsPerPageChange={handleChangeRowsPerPage}
+        rowsPerPageOptions={[5, 10, 25, 50]}
+      />
+    </TableContainer>
+  );
+}
+
+// --- PROFESSIONAL REPORTS PAGE STRUCTURE ---
+// 1. Summary Cards Section
+// 2. Filters Section (date range, dropdowns, search)
+// 3. Export Buttons Section (CSV, Excel, PDF)
+// 4. Charts Section (bar, line, pie, etc.)
+// 5. Detailed Table Section (with pagination, sorting)
+// 6. Drill-down/Details Section (future)
+// Each section will be implemented for all report types.
+// --------------------------------------------
+
 // Simple error boundary for this component
 
 // Table columns for each report type
@@ -180,87 +272,44 @@ const Reports = () => {
     { id: 'valuation', label: 'Valuation', format: (v) => `$${v}` },
     { id: 'method', label: 'Method' },
   ];
-  // ...existing code...
 
   const handleExport = async (format) => {
     try {
       setLoading(true);
-      const params = {
-        startDate: formatDate(dateRange.startDate),
-        endDate: formatDate(dateRange.endDate),
-        format,
-      };
-      
-      // In a real app, you would call the API like this:
-      // await exportReport(reportType, format, params);
-      
-      // For now, just simulate the export
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Create a dummy file for download
-      const content = `This is a sample ${reportType} report in ${format} format.\n\n` +
-        `Date Range: ${formatDate(dateRange.startDate)} to ${formatDate(dateRange.endDate)}\n` +
-        `Generated on: ${new Date().toLocaleString()}`;
-      // Table View for Stock Movement
-      if (!isChartView && reportData) {
-        return (
-          <Box sx={{ width: '100%', overflow: 'hidden' }}>
-            <TableContainer component={Paper} elevation={0} variant="outlined">
-              <Table size="small" stickyHeader>
-                <TableHead>
-                  <TableRow>
-                    {stockMovementColumns.map((column) => (
-                      <TableCell
-                        key={column.id}
-                        align={column.align || 'left'}
-                        sx={{ fontWeight: 'bold' }}
-                      >
-                        {column.label}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {safeRows
-                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                    .map((row, idx) => (
-                      <TableRow hover key={row._id || idx}>
-                        {stockMovementColumns.map((column) => {
-                          let value = row[column.id];
-                          if (column.format) value = column.format(value);
-                          return (
-                            <TableCell key={column.id} align={column.align || 'left'}>
-                              {value}
-                            </TableCell>
-                          );
-                        })}
-                      </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-            <TablePagination
-              rowsPerPageOptions={[5, 10, 25]}
-              component="div"
-              count={safeRows.length}
-              rowsPerPage={rowsPerPage}
-              page={page}
-              onPageChange={handleChangePage}
-              onRowsPerPageChange={handleChangeRowsPerPage}
-            />
-          </Box>
-        );
+      let rows = [];
+      if (reportType === 'inventory') {
+        const safeRows = reportData && Array.isArray(reportData.rows) ? reportData.rows : [];
+        rows = getFilteredInventoryRows(safeRows);
+      } else {
+        rows = reportData && Array.isArray(reportData.rows) ? reportData.rows : [];
       }
-      return null;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${reportType}_report_${new Date().toISOString().split('T')[0]}.${format}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      
+      // --- CSV Export ---
+      if (format === 'csv') {
+        const headers = Object.keys(rows[0] || {});
+        const csv = [headers.join(',')].concat(rows.map(row => headers.map(h => JSON.stringify(row[h] ?? '')).join(','))).join('\r\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        saveAs(blob, `${reportType}_report_${new Date().toISOString().split('T')[0]}.csv`);
+      }
+      // --- XLSX Export ---
+      else if (format === 'xlsx') {
+        const ws = XLSX.utils.json_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Report');
+        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([wbout], { type: 'application/octet-stream' });
+        saveAs(blob, `${reportType}_report_${new Date().toISOString().split('T')[0]}.xlsx`);
+      }
+      // --- PDF Export ---
+      else if (format === 'pdf') {
+        const doc = new jsPDF();
+        doc.text(`${reportData.title || 'Inventory Report'}`, 14, 16);
+        doc.text(`Date Range: ${formatDate(dateRange.startDate)} to ${formatDate(dateRange.endDate)}`, 14, 24);
+        doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 32);
+        const headers = [Object.keys(rows[0] || {})];
+        const data = rows.map(row => headers[0].map(h => row[h] ?? ''));
+        doc.autoTable({ head: headers, body: data, startY: 40, styles: { fontSize: 8 } });
+        doc.save(`${reportType}_report_${new Date().toISOString().split('T')[0]}.pdf`);
+      }
     } catch (err) {
       setError('Failed to export report. Please try again.');
       console.error('Error exporting report:', err);
@@ -271,15 +320,62 @@ const Reports = () => {
 
   // Render the main report content (charts and tables)
   const renderReportContent = () => {
-  // Top/Bottom Products Report
-  if (reportType === 'top-products') {
-    const safeRows = reportData && Array.isArray(reportData.rows) ? reportData.rows : [];
-    // Chart data
-    const chartData = safeRows.map(row => ({
-      name: row.product_name || row.product_no,
-      qty: row.qty,
-      amount: row.amount,
-    }));
+    // --- Inventory Report ---
+    if (reportType === 'inventory') {
+      // Use backend-provided rows, graphData, and summary
+      const safeRows = reportData && Array.isArray(reportData.rows) ? reportData.rows : [];
+      const graphData = reportData && Array.isArray(reportData.graphData) ? reportData.graphData : [];
+      return (
+        <>
+          {/* Export Buttons */}
+          <Box sx={{ mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <Tooltip title="Export as CSV"><span><IconButton color="primary" onClick={() => handleExport('csv')}><CsvIcon /></IconButton></span></Tooltip>
+            <Tooltip title="Export as Excel"><span><IconButton color="primary" onClick={() => handleExport('xlsx')}><FileExcel /></IconButton></span></Tooltip>
+            <Tooltip title="Export as PDF"><span><IconButton color="primary" onClick={() => handleExport('pdf')}><FilePdf /></IconButton></span></Tooltip>
+          </Box>
+          {/* Advanced Filters */}
+          {renderInventoryFilters()}
+          {/* Chart Visualization */}
+          {graphData.length > 0 && (
+            <Paper sx={{ mt: 3, mb: 3, p: 2 }}>
+              <Typography variant="subtitle1" sx={{ mb: 2 }}>Stock Levels by Product</Typography>
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={graphData} margin={{ top: 16, right: 24, left: 0, bottom: 0 }}>
+                  <XAxis dataKey="product_name" tick={{ fontSize: 12 }} angle={-30} textAnchor="end" interval={0} height={60} />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <RechartsTooltip />
+                  <Legend />
+                  <Bar dataKey="stock" name="Stock" fill="#3b82f6" />
+                </BarChart>
+              </ResponsiveContainer>
+            </Paper>
+          )}
+          {/* Data Table */}
+          {safeRows.length > 0 && renderInventoryTable({
+            reportType: 'inventory',
+            reportData: { rows: safeRows },
+            page,
+            rowsPerPage,
+            handleChangePage,
+            handleChangeRowsPerPage
+          })}
+          {/* Empty State */}
+          {safeRows.length === 0 && (
+            <Typography color="text.secondary" align="center" sx={{ mt: 4 }}>No inventory data found for the selected filters.</Typography>
+          )}
+        </>
+      );
+    }
+    // Top/Bottom Products Report
+    if (reportType === 'top-products') {
+      const safeRows = reportData && Array.isArray(reportData.rows) ? reportData.rows : [];
+      // Chart data
+      const chartData = safeRows.map(row => ({
+        name: row.product_name || row.product_no,
+        qty: row.qty,
+        amount: row.amount,
+      }));
     return (
       <>
         <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
@@ -950,50 +1046,55 @@ const renderSummaryCards = (reportType, reportData) => {
         </Paper>
       )}
 
-      {reportData && !loading && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <Paper sx={{ p: 3 }} elevation={3}>
-            <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography variant="h5" component="h2">
-                {reportData.title}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Generated on: {new Date(reportData.generatedAt).toLocaleString()}
-              </Typography>
-            </Box>
-            
-            {renderReportContent()}
-
-            {/* TODO: Add actual report content based on reportType */}
-          </Paper>
-        </motion.div>
-      )}
     </Box>
   );
 }
-// Simple error boundary for this component
-const ReportsWithErrorBoundary = (props) => {
-  const [hasError, setHasError] = React.useState(false);
-  const [errorMsg, setErrorMsg] = React.useState("");
-  try {
-    if (hasError) {
+// Error Boundary component
+class ReportsErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('Reports Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
       return (
         <Box sx={{ p: 4, color: 'error.main', textAlign: 'center' }}>
-          <Typography variant="h5" color="error">Something went wrong in the Reports page.</Typography>
-          <Typography variant="body2" color="error">{errorMsg}</Typography>
+          <Typography variant="h5" color="error" gutterBottom>
+            Something went wrong in the Reports page.
+          </Typography>
+          <Typography variant="body2" color="error" gutterBottom>
+            {this.state.error?.message || 'An unknown error occurred'}
+          </Typography>
+          <Button 
+            variant="contained" 
+            color="primary" 
+            onClick={() => this.setState({ hasError: false, error: null })}
+            sx={{ mt: 2 }}
+          >
+            Try Again
+          </Button>
         </Box>
       );
     }
-    return <Reports {...props} />;
-  } catch (err) {
-    setHasError(true);
-    setErrorMsg(err.message || 'Unknown error');
-    return null;
+
+    return this.props.children;
   }
-};
+}
+
+// Wrap the Reports component with the error boundary
+const ReportsWithErrorBoundary = (props) => (
+  <ReportsErrorBoundary>
+    <Reports {...props} />
+  </ReportsErrorBoundary>
+);
 
 export default ReportsWithErrorBoundary;
