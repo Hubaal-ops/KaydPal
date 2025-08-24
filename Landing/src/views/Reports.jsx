@@ -188,6 +188,7 @@ const Reports = () => {
     { value: 'expenses', label: 'Expenses Report', icon: '💰' },
     { value: 'profit-loss', label: 'Profit & Loss', icon: '📈' },
     { value: 'tax', label: 'Tax Report', icon: '🏛️' },
+    { value: 'balance-sheet', label: 'Balance Sheet', icon: '🧾' },
   ];
 
   // State for stock valuation method

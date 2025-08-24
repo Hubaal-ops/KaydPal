@@ -480,6 +480,109 @@ exports.generateReport = async (req, res) => {
         totalExpenses: expenses.length,
         totalAmount: expenses.reduce((sum, e) => sum + (e.amount || 0), 0),
       };
+    } else if (type === 'profit-loss') {
+      // Profit & Loss Report
+      // Revenue: total sales amount
+      // Cost of Goods Sold: total purchase amount
+      // Expenses: total expenses
+      // Gross Profit: Revenue - COGS
+      // Net Profit: Gross Profit - Expenses
+      const Sales = require('../models/Sale');
+      const Purchase = require('../models/Purchase');
+      const Expense = require('../models/Expense');
+      const filter = {};
+      if (start && end) {
+        filter.sel_date = { $gte: start, $lte: end };
+      }
+      if (userId) filter.userId = userId;
+      // Sales
+      const sales = await Sales.find(filter);
+      const revenue = sales.reduce((sum, s) => sum + (s.amount || 0), 0);
+      // Purchases (COGS)
+      const purchaseFilter = {};
+      if (start && end) purchaseFilter.created_at = { $gte: start, $lte: end };
+      if (userId) purchaseFilter.userId = userId;
+      const purchases = await Purchase.find(purchaseFilter);
+      const cogs = purchases.reduce((sum, p) => sum + (p.amount || 0), 0);
+      // Expenses
+      const expenseFilter = {};
+      if (start && end) expenseFilter.expense_date = { $gte: start, $lte: end };
+      if (userId) expenseFilter.userId = userId;
+      const expenses = await Expense.find(expenseFilter);
+      const totalExpenses = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+      const grossProfit = revenue - cogs;
+      const netProfit = grossProfit - totalExpenses;
+      data.summary = {
+        revenue,
+        cogs,
+        grossProfit,
+        totalExpenses,
+        netProfit,
+      };
+      data.rows = [
+        { label: 'Revenue', value: revenue },
+        { label: 'Cost of Goods Sold', value: cogs },
+        { label: 'Gross Profit', value: grossProfit },
+        { label: 'Total Expenses', value: totalExpenses },
+        { label: 'Net Profit', value: netProfit },
+      ];
+    } else if (type === 'tax') {
+      // Tax Report
+      // Sum tax collected from sales and tax paid on purchases
+      const Sales = require('../models/Sale');
+      const Purchase = require('../models/Purchase');
+      const filter = {};
+      if (start && end) filter.sel_date = { $gte: start, $lte: end };
+      if (userId) filter.userId = userId;
+      const sales = await Sales.find(filter);
+      const salesTax = sales.reduce((sum, s) => sum + (s.tax || 0), 0);
+      const purchaseFilter = {};
+      if (start && end) purchaseFilter.created_at = { $gte: start, $lte: end };
+      if (userId) purchaseFilter.userId = userId;
+      const purchases = await Purchase.find(purchaseFilter);
+      const purchaseTax = purchases.reduce((sum, p) => sum + (p.tax || 0), 0);
+      data.summary = {
+        salesTax,
+        purchaseTax,
+        netTax: salesTax - purchaseTax
+      };
+      data.rows = [
+        { label: 'Tax Collected from Sales', value: salesTax },
+        { label: 'Tax Paid on Purchases', value: purchaseTax },
+        { label: 'Net Tax', value: salesTax - purchaseTax },
+      ];
+    } else if (type === 'balance-sheet') {
+      // Balance Sheet Report
+      // Assets: Account balances
+      // Liabilities: Not directly tracked, but can include unpaid purchases, etc.
+      // Equity: Assets - Liabilities
+      const Account = require('../models/Account');
+      const Purchase = require('../models/Purchase');
+      const Sale = require('../models/Sale');
+      const Expense = require('../models/Expense');
+      // Assets: all account balances
+      const accountFilter = {};
+      if (userId) accountFilter.userId = userId;
+      const accounts = await Account.find(accountFilter);
+      const totalAssets = accounts.reduce((sum, a) => sum + (a.balance || 0), 0);
+      // Liabilities: unpaid purchases
+      const purchaseFilter = {};
+      if (start && end) purchaseFilter.created_at = { $gte: start, $lte: end };
+      if (userId) purchaseFilter.userId = userId;
+      const purchases = await Purchase.find(purchaseFilter);
+      const totalLiabilities = purchases.reduce((sum, p) => sum + ((p.amount || 0) - (p.paid || 0)), 0);
+      // Equity: Assets - Liabilities
+      const equity = totalAssets - totalLiabilities;
+      data.summary = {
+        totalAssets,
+        totalLiabilities,
+        equity,
+      };
+      data.rows = [
+        { label: 'Total Assets', value: totalAssets },
+        { label: 'Total Liabilities', value: totalLiabilities },
+        { label: 'Equity', value: equity },
+      ];
     } else if (type === 'customer-sales') {
       // Customer Sales Report: group sales by customer
       const filter = {};
