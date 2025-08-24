@@ -8,21 +8,26 @@ const Expense = require('../models/Expense');
 const Product = require('../models/Product');
 
 // GET /api/analytics
-router.get('/', analyticsController.getAnalytics);
+router.get('/', verifyToken, analyticsController.getAnalytics);
 
 // GET /api/analytics/summary
 router.get('/summary', verifyToken, async (req, res) => {
   try {
     // Total sales
+    const userId = req.user && req.user.userId ? req.user.userId : req.user && req.user._id ? req.user._id : undefined;
+    const matchStage = userId ? [{ $match: { userId } }] : [];
     const totalSales = await Sale.aggregate([
+      ...matchStage,
       { $group: { _id: null, total: { $sum: '$totalAmount' } } }
     ]);
     // Total expenses
     const totalExpenses = await Expense.aggregate([
+      ...matchStage,
       { $group: { _id: null, total: { $sum: '$amount' } } }
     ]);
     // Top 5 products by sales quantity
     const topProducts = await Sale.aggregate([
+      ...matchStage,
       { $unwind: '$items' },
       { $group: { _id: '$items.product', quantity: { $sum: '$items.quantity' } } },
       { $sort: { quantity: -1 } },

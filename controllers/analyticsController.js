@@ -35,6 +35,8 @@ function parseFilters(query) {
 }
 
 exports.getAnalytics = async (req, res) => {
+  // Multi-tenancy: get userId from req.user (set by auth middleware)
+  const userId = req.user && req.user.userId ? req.user.userId : req.user && req.user._id ? req.user._id : undefined;
   try {
     const { start, end, store_no, category } = parseFilters(req.query);
     const saleFilter = {};
@@ -42,6 +44,7 @@ exports.getAnalytics = async (req, res) => {
     if (store_no) saleFilter.store_no = Number(store_no);
 
     // SALES TRENDS (for line chart)
+    if (userId) saleFilter.userId = userId;
     const sales = await Sale.find(saleFilter);
     const salesTrends = [];
     const trendMap = {};
@@ -65,8 +68,14 @@ exports.getAnalytics = async (req, res) => {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
       .map(([pno]) => Number(pno));
-    const allProducts = await Product.find({});
+    const productFilter = {};
+    if (userId) productFilter.userId = userId;
+    const allProducts = await Product.find(productFilter);
+    // Multi-tenancy for StoreProduct aggregation
+    let storeProductMatch = {};
+    if (userId) storeProductMatch.userId = userId;
     const storeProducts = await StoreProduct.aggregate([
+      { $match: storeProductMatch },
       { $group: { _id: "$product_no", qty: { $sum: "$qty" } } }
     ]);
     const stockLevels = storeProducts.map(sp => {
@@ -104,10 +113,14 @@ exports.getAnalytics = async (req, res) => {
 
     // DEBT TRACKING (customers with debt > $1000 and overdue by 1+ month)
     const now = new Date();
-    const arSales = await Sale.find({ $expr: { $gt: ["$amount", "$paid"] } });
+    const arSalesFilter = { $expr: { $gt: ["$amount", "$paid"] } };
+    if (userId) arSalesFilter.userId = userId;
+    const arSales = await Sale.find(arSalesFilter);
     // Collect all customer_nos with debt
     const debtCustomerNos = Array.from(new Set(arSales.map(s => s.customer_no)));
-    const debtCustomers = await Customer.find({ customer_no: { $in: debtCustomerNos } });
+    const customerFilter = { customer_no: { $in: debtCustomerNos } };
+    if (userId) customerFilter.userId = userId;
+    const debtCustomers = await Customer.find(customerFilter);
     const customerMap = Object.fromEntries(debtCustomers.map(c => [c.customer_no, c.name]));
     const arList = arSales.map(s => ({
       name: customerMap[s.customer_no] || s.customer_no,
