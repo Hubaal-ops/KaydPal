@@ -460,4 +460,201 @@
   .table td {
     padding: 0.5rem;
   }
+}
+
+/* New styles for multi-product purchase table */
+.items-summary {
+  position: relative;
+  cursor: pointer;
+  display: inline-block;
+  color: var(--primary-color);
+  font-weight: 500;
+}
+
+.items-summary:hover .items-tooltip {
+  visibility: visible;
+  opacity: 1;
+}
+
+.items-tooltip {
+  visibility: hidden;
+  opacity: 0;
+  position: absolute;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: var(--surface);
+  color: var(--text-primary);
+  padding: 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  z-index: 1000;
+  min-width: 200px;
+  text-align: left;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  transition: opacity 0.3s, visibility 0.3s;
+}
+
+.items-tooltip div {
+  margin-bottom: 0.25rem;
+}
+
+.items-tooltip div:last-child {
+  margin-bottom: 0;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.status-pending {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.status-approved {
+  background: #ddd6fe;
+  color: #7c3aed;
+}
+
+.status-received {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.status-cancelled {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+/* Shopping cart styles */
+.section {
+  background: var(--surface-hover);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--border);
+}
+
+.section h3 {
+  margin: 0 0 1rem 0;
+  color: var(--text-primary);
+  font-size: 1.2rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.add-item-form {
+  background: var(--background);
+  border-radius: 8px;
+  padding: 1rem;
+  border: 1px solid var(--border);
+}
+
+.add-item-btn {
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-self: end;
+  align-self: end;
+}
+
+.add-item-btn:hover {
+  background: #1d3557;
+}
+
+.cart-container {
+  background: var(--background);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.cart-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.cart-table th {
+  background: var(--surface-hover);
+  padding: 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border);
+}
+
+.cart-table td {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+}
+
+.cart-table tbody tr:hover {
+  background: var(--surface-hover);
+}
+
+.total-row {
+  background: var(--surface-hover) !important;
+  font-weight: 600;
+}
+
+.total-row td {
+  border-bottom: none;
+  padding: 1rem 0.75rem;
+}
+
+.remove-btn {
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.4rem;
+  cursor: pointer;
+  transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.remove-btn:hover {
+  background: #b91c1c;
+}
+
+.form-textarea {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  background: var(--background);
+  color: var(--text-primary);
+  transition: border-color 0.2s;
+  resize: vertical;
+  min-height: 80px;
+  font-family: inherit;
+}
+
+.form-textarea:focus {
+  border-color: var(--primary-color);
+  outline: none;
 } 

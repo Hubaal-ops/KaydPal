@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styles from './Purchases.module.css';
-import { Plus, Eye, Edit, Trash2, ArrowLeft, Search } from 'lucide-react';
+import { Plus, Eye, Edit, Trash2, ArrowLeft, Search, X, ShoppingCart } from 'lucide-react';
 import { getPurchases, addPurchase, updatePurchase, deletePurchase } from '../services/purchaseService';
 import { getProducts } from '../services/productService';
 import { getSuppliers } from '../services/supplierService';
@@ -16,18 +16,27 @@ const Purchases = ({ onBack }) => {
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Form data for purchase order header
   const [formData, setFormData] = useState({
-    product_no: '',
     supplier_no: '',
     store_no: '',
+    account_id: '',
+    paid: 0,
+    notes: '',
+    status: 'pending'
+  });
+  
+  // Cart items for multiple products
+  const [cartItems, setCartItems] = useState([]);
+  
+  // Current item being added
+  const [currentItem, setCurrentItem] = useState({
+    product_no: '',
     qty: 1,
     price: 0,
     discount: 0,
-    tax: 0,
-    amount: 0,
-    paid: 0,
-    account_id: '',
-    userId: ''
+    tax: 0
   });
   const [editingPurchase, setEditingPurchase] = useState(null);
   const [error, setError] = useState('');
@@ -60,27 +69,29 @@ const Purchases = ({ onBack }) => {
     fetchAll();
   }, []);
 
-  // Debug: log stores array
-  useEffect(() => {
-    console.log('Stores:', stores);
-  }, [stores]);
+  const resetForm = () => {
+    setFormData({
+      supplier_no: '',
+      store_no: '',
+      account_id: '',
+      paid: 0,
+      notes: '',
+      status: 'pending'
+    });
+    setCartItems([]);
+    setCurrentItem({
+      product_no: '',
+      qty: 1,
+      price: 0,
+      discount: 0,
+      tax: 0
+    });
+  };
 
   const handleViewTable = () => {
     setViewMode('table');
     setEditingPurchase(null);
-    setFormData({
-      product_no: '',
-      supplier_no: '',
-      store_no: '',
-      qty: 1,
-      price: 0,
-      discount: 0,
-      tax: 0,
-      amount: 0,
-      paid: 0,
-      account_id: '',
-      userId: ''
-    });
+    resetForm();
     setError('');
     setSuccess('');
   };
@@ -88,19 +99,7 @@ const Purchases = ({ onBack }) => {
   const handleAddNew = () => {
     setViewMode('form');
     setEditingPurchase(null);
-    setFormData({
-      product_no: '',
-      supplier_no: '',
-      store_no: '',
-      qty: 1,
-      price: 0,
-      discount: 0,
-      tax: 0,
-      amount: 0,
-      paid: 0,
-      account_id: '',
-      userId: ''
-    });
+    resetForm();
     setError('');
     setSuccess('');
   };
@@ -108,103 +107,153 @@ const Purchases = ({ onBack }) => {
   const handleEdit = (purchase) => {
     setEditingPurchase(purchase);
     setFormData({
-      product_no: purchase.product_no,
       supplier_no: purchase.supplier_no,
       store_no: purchase.store_no,
-      qty: purchase.qty,
-      price: purchase.price,
-      discount: purchase.discount,
-      tax: purchase.tax,
-      amount: purchase.amount,
-      paid: purchase.paid,
       account_id: purchase.account_id,
-      userId: purchase.userId || ''
+      paid: purchase.paid,
+      notes: purchase.notes || '',
+      status: purchase.status || 'pending'
     });
+    setCartItems(purchase.items || []);
     setViewMode('form');
     setError('');
     setSuccess('');
   };
 
   const handleDelete = async (purchase_no) => {
-    if (window.confirm('Are you sure you want to delete this purchase?')) {
+    if (window.confirm('Are you sure you want to delete this purchase order?')) {
       setError('');
       setSuccess('');
       setLoading(true);
       try {
         await deletePurchase(purchase_no);
-        await fetchAll(); // Re-fetch all data to update dropdowns
-        setSuccess('Purchase deleted successfully');
+        await fetchAll();
+        setSuccess('Purchase order deleted successfully');
       } catch (err) {
-        setError(err.message || 'Error deleting purchase');
+        setError(err.message || 'Error deleting purchase order');
       } finally {
         setLoading(false);
       }
     }
   };
 
+  // Handle adding item to cart
+  const handleAddItemToCart = () => {
+    if (!currentItem.product_no || currentItem.qty <= 0 || currentItem.price < 0) {
+      setError('Please fill in all required item fields correctly');
+      return;
+    }
+    
+    // Check if product already exists in cart
+    const existingItemIndex = cartItems.findIndex(item => item.product_no === Number(currentItem.product_no));
+    
+    const qty = Number(currentItem.qty);
+    const price = Number(currentItem.price);
+    const discount = Number(currentItem.discount || 0);
+    const tax = Number(currentItem.tax || 0);
+    const subtotal = (qty * price) - discount + tax;
+    
+    const newItem = {
+      product_no: Number(currentItem.product_no),
+      qty,
+      price,
+      discount,
+      tax,
+      subtotal
+    };
+    
+    if (existingItemIndex >= 0) {
+      // Update existing item
+      const updatedItems = [...cartItems];
+      updatedItems[existingItemIndex] = {
+        ...updatedItems[existingItemIndex],
+        qty: updatedItems[existingItemIndex].qty + qty,
+        subtotal: updatedItems[existingItemIndex].subtotal + subtotal
+      };
+      setCartItems(updatedItems);
+    } else {
+      // Add new item
+      setCartItems([...cartItems, newItem]);
+    }
+    
+    // Reset current item
+    setCurrentItem({
+      product_no: '',
+      qty: 1,
+      price: 0,
+      discount: 0,
+      tax: 0
+    });
+    setError('');
+  };
+
+  // Remove item from cart
+  const handleRemoveFromCart = (index) => {
+    const updatedItems = cartItems.filter((_, i) => i !== index);
+    setCartItems(updatedItems);
+  };
+
+  // Calculate totals
+  const calculateTotals = () => {
+    const subtotal = cartItems.reduce((sum, item) => sum + (item.qty * item.price), 0);
+    const totalDiscount = cartItems.reduce((sum, item) => sum + (item.discount || 0), 0);
+    const totalTax = cartItems.reduce((sum, item) => sum + (item.tax || 0), 0);
+    const totalAmount = subtotal - totalDiscount + totalTax;
+    
+    return { subtotal, totalDiscount, totalTax, totalAmount };
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
-    if (isNaN(Number(formData.store_no))) {
-      setError('Store is required');
+    
+    if (!formData.supplier_no || !formData.store_no || !formData.account_id) {
+      setError('Please fill in all required fields');
       return;
     }
-    if (formData.qty <= 0) {
-      setError('Quantity must be greater than 0');
+    
+    if (cartItems.length === 0) {
+      setError('Please add at least one item to the purchase order');
       return;
     }
-    if (formData.price <= 0) {
-      setError('Price must be greater than 0');
-      return;
-    }
-    // Always recalculate amount before submit
-    const calcAmount = formData.qty * formData.price - (formData.discount || 0) + (formData.tax || 0);
-    // Remove the strict check: if (formData.amount !== calcAmount) { ... }
-    // Instead, always use the calculated amount
-    const payload = {
-      ...formData,
-      amount: calcAmount,
-      product_no: Number(formData.product_no),
-      supplier_no: Number(formData.supplier_no),
-      store_no: Number(formData.store_no),
-      account_id: Number(formData.account_id)
-      // userId removed
-    };
-    // Only validate paid amount if it's greater than 0 and exceeds the calculated amount
-    if (formData.paid > 0 && parseFloat(formData.paid) > parseFloat(calcAmount)) {
+    
+    const totals = calculateTotals();
+    const paid = Number(formData.paid || 0);
+    
+    if (paid > totals.totalAmount) {
       setError('Paid amount cannot exceed total amount');
       return;
     }
+    
+    const payload = {
+      supplier_no: Number(formData.supplier_no),
+      store_no: Number(formData.store_no),
+      account_id: Number(formData.account_id),
+      items: cartItems,
+      paid,
+      notes: formData.notes,
+      status: formData.status
+    };
+    
     setLoading(true);
     try {
       if (editingPurchase) {
+        console.log('[DEBUG Frontend] Updating purchase:', editingPurchase.purchase_no);
+        console.log('[DEBUG Frontend] Update payload:', payload);
         await updatePurchase(editingPurchase.purchase_no, payload);
-        setSuccess('Purchase updated successfully');
+        setSuccess('Purchase order updated successfully');
       } else {
         await addPurchase(payload);
-        setSuccess('Purchase added successfully');
+        setSuccess('Purchase order created successfully');
       }
       await fetchAll();
-      setFormData({
-        product_no: '',
-        supplier_no: '',
-        store_no: '',
-        qty: 1,
-        price: 0,
-        discount: 0,
-        tax: 0,
-        amount: 0,
-        paid: 0,
-        account_id: '',
-        userId: ''
-      });
-      setEditingPurchase(null);
+      resetForm();
       setTimeout(() => {
         setViewMode('table');
       }, 1500);
     } catch (err) {
-      setError(err.message || 'Error saving purchase');
+      setError(err.message || 'Error saving purchase order');
     } finally {
       setLoading(false);
     }
@@ -212,24 +261,56 @@ const Purchases = ({ onBack }) => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => {
-      const updated = { ...prev, [name]: value };
-      if (["qty", "price", "discount", "tax"].includes(name)) {
-        const qty = parseInt(updated.qty) || 0;
-        const price = parseFloat(updated.price) || 0;
-        const discount = parseFloat(updated.discount) || 0;
-        const tax = parseFloat(updated.tax) || 0;
-        updated.amount = qty * price - discount + tax;
-      }
-      return updated;
-    });
+    setFormData(prev => ({
+      ...prev,
+      [name]: name === 'paid' ? (value === '' ? 0 : Number(value)) : value
+    }));
+  };
+
+  const handleItemInputChange = (e) => {
+    const { name, value } = e.target;
+    setCurrentItem(prev => ({
+      ...prev,
+      [name]: ['qty', 'price', 'discount', 'tax'].includes(name) 
+        ? (value === '' ? 0 : Number(value)) 
+        : value
+    }));
+  };
+
+  // Auto-fill price when product is selected
+  const handleProductSelect = (e) => {
+    const productNo = e.target.value;
+    const selectedProduct = products.find(p => p.product_no === Number(productNo));
+    
+    setCurrentItem(prev => ({
+      ...prev,
+      product_no: productNo,
+      price: selectedProduct ? selectedProduct.price || 0 : 0
+    }));
+  };
+
+  const getProductName = (product_no) => {
+    const product = products.find(p => p.product_no === product_no);
+    return product ? product.product_name || product.name : '';
+  };
+
+  const getSupplierName = (supplier_no) => {
+    const supplier = suppliers.find(s => s.supplier_no === supplier_no);
+    return supplier ? supplier.name : '';
+  };
+
+  const getStoreName = (store_no) => {
+    const store = stores.find(s => s.store_no === store_no);
+    return store ? store.store_name : '';
   };
 
   const filteredPurchases = purchases.filter(purchase =>
-    (purchase.product_name && purchase.product_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (purchase.supplier_name && purchase.supplier_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (purchase.store_name && purchase.store_name.toLowerCase().includes(searchTerm.toLowerCase()))
+    (purchase.purchase_no && purchase.purchase_no.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (getSupplierName(purchase.supplier_no).toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (getStoreName(purchase.store_no).toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  const totals = calculateTotals();
 
   return (
     <div className={styles.purchases}>
@@ -284,17 +365,14 @@ const Purchases = ({ onBack }) => {
                 <table className={styles.table}>
                   <thead>
                     <tr>
-                      <th>ID</th>
-                      <th>Product</th>
+                      <th>Order ID</th>
                       <th>Supplier</th>
                       <th>Store</th>
-                      <th>Qty</th>
-                      <th>Price</th>
-                      <th>Discount</th>
-                      <th>Tax</th>
-                      <th>Amount</th>
+                      <th>Items</th>
+                      <th>Total Amount</th>
                       <th>Paid</th>
-                      <th>Account</th>
+                      <th>Balance Due</th>
+                      <th>Status</th>
                       <th>Date</th>
                       <th>Actions</th>
                     </tr>
@@ -303,16 +381,32 @@ const Purchases = ({ onBack }) => {
                     {filteredPurchases.map((purchase) => (
                       <tr key={purchase.purchase_no}>
                         <td>{purchase.purchase_no}</td>
-                        <td>{purchase.product_name}</td>
-                        <td>{purchase.supplier_name}</td>
-                        <td>{purchase.store_name}</td>
-                        <td>{purchase.qty}</td>
-                        <td>{purchase.price}</td>
-                        <td>{purchase.discount}</td>
-                        <td>{purchase.tax}</td>
-                        <td>{purchase.amount}</td>
-                        <td>{purchase.paid}</td>
-                        <td>{purchase.account_name}</td>
+                        <td>{getSupplierName(purchase.supplier_no)}</td>
+                        <td>{getStoreName(purchase.store_no)}</td>
+                        <td>
+                          {purchase.items && purchase.items.length > 0 ? (
+                            <div className={styles['items-summary']}>
+                              {purchase.items.length} item{purchase.items.length > 1 ? 's' : ''}
+                              <div className={styles['items-tooltip']}>
+                                {purchase.items.map((item, idx) => (
+                                  <div key={idx}>
+                                    {getProductName(item.product_no)} (x{item.qty})
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : (
+                            '1 item' // Fallback for old single-product purchases
+                          )}
+                        </td>
+                        <td>${purchase.total_amount ? purchase.total_amount.toFixed(2) : (purchase.amount || 0).toFixed(2)}</td>
+                        <td>${(purchase.paid || 0).toFixed(2)}</td>
+                        <td>${((purchase.total_amount || purchase.amount || 0) - (purchase.paid || 0)).toFixed(2)}</td>
+                        <td>
+                          <span className={`${styles['status-badge']} ${styles[`status-${purchase.status || 'pending'}`]}`}>
+                            {(purchase.status || 'pending').charAt(0).toUpperCase() + (purchase.status || 'pending').slice(1)}
+                          </span>
+                        </td>
                         <td>{new Date(purchase.created_at).toLocaleDateString()}</td>
                         <td>
                           <div className={styles['action-icons']}>
@@ -347,154 +441,266 @@ const Purchases = ({ onBack }) => {
         )}
         {viewMode === 'form' && (
           <div className={styles['form-container']}>
-            <h2 className={styles['main-title']}>{editingPurchase ? 'Edit Purchase' : 'Add New Purchase'}</h2>
+            <h2 className={styles['main-title']}>
+              <ShoppingCart size={24} style={{ marginRight: '8px' }} />
+              {editingPurchase ? 'Edit Purchase Order' : 'Create Purchase Order'}
+            </h2>
+            
             <form onSubmit={handleSubmit} className={styles.form}>
-              <div className={styles['form-grid']}>
-                <div className={styles['form-group']}>
-                  <label>Product *</label>
-                  <select
-                    name="product_no"
-                    value={formData.product_no || ''}
-                    onChange={e => setFormData(f => ({ ...f, product_no: Number(e.target.value) }))}
-                    required
-                    className={styles['form-select']}
-                  >
-                    <option value="">Select a product</option>
-                    {products.map(p => (
-                      <option key={p.product_no} value={p.product_no}>{p.product_name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className={styles['form-group']}>
-                  <label>Supplier *</label>
-                  <select
-                    name="supplier_no"
-                    value={formData.supplier_no || ''}
-                    onChange={e => setFormData(f => ({ ...f, supplier_no: Number(e.target.value) }))}
-                    required
-                    className={styles['form-select']}
-                  >
-                    <option value="">Select a supplier</option>
-                    {suppliers.map(s => (
-                      <option key={s.supplier_no} value={s.supplier_no}>{s.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className={styles['form-group']}>
-                  <label>Store *</label>
-                  <select
-                    name="store_no"
-                    value={formData.store_no || ''}
-                    onChange={e => setFormData(f => ({ ...f, store_no: Number(e.target.value) }))}
-                    required
-                    className={styles['form-select']}
-                  >
-                    <option value="">Select a store</option>
-                    {stores.map(s => (
-                      <option key={s.store_no} value={s.store_no}>{s.store_name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className={styles['form-group']}>
-                  <label>Quantity *</label>
-                  <input
-                    type="number"
-                    name="qty"
-                    value={formData.qty}
-                    onChange={handleInputChange}
-                    min="1"
-                    required
-                    className={styles['form-input']}
-                  />
-                </div>
-                <div className={styles['form-group']}>
-                  <label>Price *</label>
-                  <input
-                    type="number"
-                    name="price"
-                    value={formData.price}
-                    onChange={handleInputChange}
-                    min="0"
-                    required
-                    className={styles['form-input']}
-                  />
-                </div>
-                <div className={styles['form-group']}>
-                  <label>Discount</label>
-                  <input
-                    type="number"
-                    name="discount"
-                    value={formData.discount}
-                    onChange={handleInputChange}
-                    min="0"
-                    className={styles['form-input']}
-                  />
-                </div>
-                <div className={styles['form-group']}>
-                  <label>Tax</label>
-                  <input
-                    type="number"
-                    name="tax"
-                    value={formData.tax}
-                    onChange={handleInputChange}
-                    min="0"
-                    className={styles['form-input']}
-                  />
-                </div>
-                <div className={styles['form-group']}>
-                  <label>Amount *</label>
-                  <input
-                    type="number"
-                    name="amount"
-                    value={formData.amount}
-                    onChange={handleInputChange}
-                    min="0"
-                    required
-                    className={styles['form-input']}
-                    readOnly
-                  />
-                </div>
-                <div className={styles['form-group']}>
-                  <label>Paid</label>
-                  <input
-                    type="number"
-                    name="paid"
-                    value={formData.paid}
-                    onChange={handleInputChange}
-                    min="0"
-                    className={styles['form-input']}
-                  />
-                </div>
-                <div className={styles['form-group']}>
-                  <label>Account *</label>
-                  <select
-                    name="account_id"
-                    value={formData.account_id || ''}
-                    onChange={e => {
-                      const selectedId = Number(e.target.value);
-                      const selectedAccount = accounts.find(a => a.account_id === selectedId);
-                      setFormData(f => ({
-                        ...f,
-                        account_id: selectedId,
-                        userId: selectedAccount ? selectedAccount.userId : ''
-                      }));
-                    }}
-                    required
-                    className={styles['form-select']}
-                  >
-                    <option value="">Select an account</option>
-                    {accounts.map(a => (
-                      <option key={a.account_id} value={a.account_id}>{a.account_name || a.bank || a.name}</option>
-                    ))}
-                  </select>
+              {/* Purchase Order Header */}
+              <div className={styles['section']}>
+                <h3>Purchase Order Details</h3>
+                <div className={styles['form-grid']}>
+                  <div className={styles['form-group']}>
+                    <label>Supplier *</label>
+                    <select
+                      name="supplier_no"
+                      value={formData.supplier_no || ''}
+                      onChange={handleInputChange}
+                      required
+                      className={styles['form-select']}
+                    >
+                      <option value="">Select a supplier</option>
+                      {suppliers.map(s => (
+                        <option key={s.supplier_no} value={s.supplier_no}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className={styles['form-group']}>
+                    <label>Store *</label>
+                    <select
+                      name="store_no"
+                      value={formData.store_no || ''}
+                      onChange={handleInputChange}
+                      required
+                      className={styles['form-select']}
+                    >
+                      <option value="">Select a store</option>
+                      {stores.map(s => (
+                        <option key={s.store_no} value={s.store_no}>{s.store_name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className={styles['form-group']}>
+                    <label>Account *</label>
+                    <select
+                      name="account_id"
+                      value={formData.account_id || ''}
+                      onChange={handleInputChange}
+                      required
+                      className={styles['form-select']}
+                    >
+                      <option value="">Select an account</option>
+                      {accounts.map(a => (
+                        <option key={a.account_id} value={a.account_id}>
+                          {a.account_name || a.bank || a.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
+
+              {/* Add Products Section */}
+              <div className={styles['section']}>
+                <h3>Add Products</h3>
+                <div className={styles['add-item-form']}>
+                  <div className={styles['form-grid']}>
+                    <div className={styles['form-group']}>
+                      <label>Product *</label>
+                      <select
+                        name="product_no"
+                        value={currentItem.product_no || ''}
+                        onChange={handleProductSelect}
+                        className={styles['form-select']}
+                      >
+                        <option value="">Select a product</option>
+                        {products.map(p => (
+                          <option key={p.product_no} value={p.product_no}>
+                            {p.product_name || p.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className={styles['form-group']}>
+                      <label>Quantity *</label>
+                      <input
+                        type="number"
+                        name="qty"
+                        value={currentItem.qty}
+                        onChange={handleItemInputChange}
+                        min="1"
+                        className={styles['form-input']}
+                      />
+                    </div>
+                    <div className={styles['form-group']}>
+                      <label>Price *</label>
+                      <input
+                        type="number"
+                        name="price"
+                        value={currentItem.price}
+                        onChange={handleItemInputChange}
+                        min="0"
+                        step="0.01"
+                        className={styles['form-input']}
+                      />
+                    </div>
+                    <div className={styles['form-group']}>
+                      <label>Discount</label>
+                      <input
+                        type="number"
+                        name="discount"
+                        value={currentItem.discount}
+                        onChange={handleItemInputChange}
+                        min="0"
+                        step="0.01"
+                        className={styles['form-input']}
+                      />
+                    </div>
+                    <div className={styles['form-group']}>
+                      <label>Tax</label>
+                      <input
+                        type="number"
+                        name="tax"
+                        value={currentItem.tax}
+                        onChange={handleItemInputChange}
+                        min="0"
+                        step="0.01"
+                        className={styles['form-input']}
+                      />
+                    </div>
+                    <div className={styles['form-group']}>
+                      <button
+                        type="button"
+                        onClick={handleAddItemToCart}
+                        className={styles['add-item-btn']}
+                      >
+                        <Plus size={16} />
+                        Add to Cart
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Shopping Cart */}
+              {cartItems.length > 0 && (
+                <div className={styles['section']}>
+                  <h3>Shopping Cart ({cartItems.length} items)</h3>
+                  <div className={styles['cart-container']}>
+                    <table className={styles['cart-table']}>
+                      <thead>
+                        <tr>
+                          <th>Product</th>
+                          <th>Qty</th>
+                          <th>Price</th>
+                          <th>Discount</th>
+                          <th>Tax</th>
+                          <th>Subtotal</th>
+                          <th>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {cartItems.map((item, index) => (
+                          <tr key={index}>
+                            <td>{getProductName(item.product_no)}</td>
+                            <td>{item.qty}</td>
+                            <td>${item.price.toFixed(2)}</td>
+                            <td>${item.discount.toFixed(2)}</td>
+                            <td>${item.tax.toFixed(2)}</td>
+                            <td>${item.subtotal.toFixed(2)}</td>
+                            <td>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveFromCart(index)}
+                                className={styles['remove-btn']}
+                                title="Remove from cart"
+                              >
+                                <X size={16} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className={styles['total-row']}>
+                          <td colSpan="5"><strong>Total Amount:</strong></td>
+                          <td><strong>${totals.totalAmount.toFixed(2)}</strong></td>
+                          <td></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Payment Details */}
+              {cartItems.length > 0 && (
+                <div className={styles['section']}>
+                  <h3>Payment Details</h3>
+                  <div className={styles['form-grid']}>
+                    <div className={styles['form-group']}>
+                      <label>Paid Amount</label>
+                      <input
+                        type="number"
+                        name="paid"
+                        value={formData.paid}
+                        onChange={handleInputChange}
+                        min="0"
+                        step="0.01"
+                        max={totals.totalAmount}
+                        className={styles['form-input']}
+                        placeholder="Enter paid amount"
+                      />
+                    </div>
+                    <div className={styles['form-group']}>
+                      <label>Balance Due</label>
+                      <input
+                        type="number"
+                        value={(totals.totalAmount - (formData.paid || 0)).toFixed(2)}
+                        readOnly
+                        className={styles['form-input']}
+                      />
+                    </div>
+                    <div className={styles['form-group']}>
+                      <label>Status</label>
+                      <select
+                        name="status"
+                        value={formData.status}
+                        onChange={handleInputChange}
+                        className={styles['form-select']}
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="approved">Approved</option>
+                        <option value="received">Received</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
+                    </div>
+                    <div className={styles['form-group']}>
+                      <label>Notes</label>
+                      <textarea
+                        name="notes"
+                        value={formData.notes}
+                        onChange={handleInputChange}
+                        rows="3"
+                        className={styles['form-textarea']}
+                        placeholder="Add any notes or comments..."
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className={styles['form-actions']}>
                 <button type="button" onClick={handleViewTable} className={styles['cancel-btn']}>
                   Cancel
                 </button>
-                <button type="submit" className={styles['submit-btn']}>
-                  {editingPurchase ? 'Update' : 'Add'} Purchase
+                <button 
+                  type="submit" 
+                  className={styles['submit-btn']}
+                  disabled={cartItems.length === 0}
+                >
+                  {editingPurchase ? 'Update' : 'Create'} Purchase Order
                 </button>
               </div>
             </form>

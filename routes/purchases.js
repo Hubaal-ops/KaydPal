@@ -34,7 +34,7 @@ router.post('/', verifyToken, async (req, res) => {
 // Update a purchase
 router.put('/:purchase_no', verifyToken, async (req, res) => {
   try {
-    const result = await purchaseController.updatePurchase(req.params.purchase_no, req.body);
+    const result = await purchaseController.updatePurchase(req.params.purchase_no, req.body, req.user.id);
     res.json(result);
   } catch (err) {
     res.status(400).json({ message: err.message || 'Failed to update purchase' });
@@ -44,7 +44,7 @@ router.put('/:purchase_no', verifyToken, async (req, res) => {
 // Delete a purchase
 router.delete('/:purchase_no', verifyToken, async (req, res) => {
   try {
-    const result = await purchaseController.deletePurchase(req.params.purchase_no);
+    const result = await purchaseController.deletePurchase(req.params.purchase_no, req.user.id);
     res.json(result);
   } catch (err) {
     res.status(400).json({ message: err.message || 'Failed to delete purchase' });

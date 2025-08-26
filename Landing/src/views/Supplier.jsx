@@ -12,7 +12,7 @@ const Supplier = ({ onBack }) => {
     name: '',
     email: '',
     phone: '',
-    bal: 0
+    balance: 0
   });
   const [editingSupplier, setEditingSupplier] = useState(null);
   const [error, setError] = useState('');
@@ -38,7 +38,7 @@ const Supplier = ({ onBack }) => {
   const handleViewTable = () => {
     setViewMode('table');
     setEditingSupplier(null);
-    setFormData({ name: '', email: '', phone: '', bal: 0 });
+    setFormData({ name: '', email: '', phone: '', balance: 0 });
     setError('');
     setSuccess('');
   };
@@ -46,7 +46,7 @@ const Supplier = ({ onBack }) => {
   const handleAddNew = () => {
     setViewMode('form');
     setEditingSupplier(null);
-    setFormData({ name: '', email: '', phone: '', bal: 0 });
+    setFormData({ name: '', email: '', phone: '', balance: 0 });
     setError('');
     setSuccess('');
   };
@@ -57,7 +57,7 @@ const Supplier = ({ onBack }) => {
       name: supplier.name || '',
       email: supplier.email || '',
       phone: supplier.phone || '',
-      bal: supplier.bal || 0
+      balance: supplier.balance !== null && supplier.balance !== undefined ? Number(supplier.balance) : 0
     });
     setViewMode('form');
     setError('');
@@ -89,6 +89,11 @@ const Supplier = ({ onBack }) => {
       setError('Name is required');
       return;
     }
+    
+    // Debug: Log the form data being sent
+    console.log('Form data being sent:', formData);
+    console.log('Balance value:', formData.balance, 'Type:', typeof formData.balance);
+    
     setLoading(true);
     try {
       if (editingSupplier) {
@@ -99,7 +104,7 @@ const Supplier = ({ onBack }) => {
         setSuccess('Supplier added successfully');
       }
       await fetchSuppliers();
-      setFormData({ name: '', email: '', phone: '', bal: 0 });
+      setFormData({ name: '', email: '', phone: '', balance: 0 });
       setEditingSupplier(null);
       setTimeout(() => {
         setViewMode('table');
@@ -113,7 +118,10 @@ const Supplier = ({ onBack }) => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => ({
+      ...prev,
+      [name]: name === 'balance' ? (value === '' ? 0 : Number(value)) : value
+    }));
   };
 
   const filteredSuppliers = suppliers.filter(supplier =>
@@ -191,7 +199,7 @@ const Supplier = ({ onBack }) => {
                         <td>{supplier.name}</td>
                         <td>{supplier.email}</td>
                         <td>{supplier.phone}</td>
-                        <td>{supplier.bal}</td>
+                        <td>{supplier.balance !== null && supplier.balance !== undefined ? supplier.balance : 0}</td>
                         <td>{supplier.created_at ? new Date(supplier.created_at).toLocaleDateString() : ''}</td>
                         <td>
                           <div className={styles['action-icons']}>
@@ -262,12 +270,12 @@ const Supplier = ({ onBack }) => {
                 />
               </div>
               <div className={styles['form-group']}>
-                <label htmlFor="bal">Balance *</label>
+                <label htmlFor="balance">Balance *</label>
                 <input
                   type="number"
-                  id="bal"
-                  name="bal"
-                  value={formData.bal}
+                  id="balance"
+                  name="balance"
+                  value={formData.balance}
                   onChange={handleInputChange}
                   min="0"
                   required
