@@ -1,7 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import styles from './Sales.module.css';
-import { Plus, Eye, Edit, Trash2, ArrowLeft, Search } from 'lucide-react';
-import { getSales, addSale, updateSale, deleteSale } from '../services/salesService';
+import { Plus, Eye, Edit, Trash2, ArrowLeft, Search, CheckCircle, XCircle, Truck, Clock } from 'lucide-react';
+import { 
+  getSales, 
+  addSale, 
+  updateSale, 
+  deleteSale, 
+  confirmSale, 
+  cancelSale, 
+  deliverSale, 
+  getStatusInfo 
+} from '../services/salesService';
 import { getProducts } from '../services/productService';
 import { getStores } from '../services/storeService';
 import { getAccounts } from '../services/accountService';
@@ -28,7 +37,10 @@ const Sales = ({ onBack }) => {
     customer_no: '',
     store_no: '',
     paid: 0,
-    account_id: ''
+    account_id: '',
+    status: 'draft',
+    notes: '',
+    delivery_date: ''
   });
   const [editingSale, setEditingSale] = useState(null);
   const [error, setError] = useState('');
@@ -71,7 +83,10 @@ const Sales = ({ onBack }) => {
       customer_no: '',
       store_no: '',
       paid: 0,
-      account_id: ''
+      account_id: '',
+      status: 'draft',
+      notes: '',
+      delivery_date: ''
     });
     setError('');
     setSuccess('');
@@ -85,7 +100,10 @@ const Sales = ({ onBack }) => {
       customer_no: '',
       store_no: '',
       paid: 0,
-      account_id: ''
+      account_id: '',
+      status: 'draft',
+      notes: '',
+      delivery_date: ''
     });
     setError('');
     setSuccess('');
@@ -98,24 +116,80 @@ const Sales = ({ onBack }) => {
       customer_no: sale.customer_no,
       store_no: sale.store_no,
       paid: sale.paid,
-      account_id: sale.account_id
+      account_id: sale.account_id,
+      status: sale.status || 'draft',
+      notes: sale.notes || '',
+      delivery_date: sale.delivery_date ? new Date(sale.delivery_date).toISOString().split('T')[0] : ''
     });
     setViewMode('form');
     setError('');
     setSuccess('');
   };
 
-  const handleDelete = async (sel_no) => {
+  const handleDelete = async (sale_no) => {
     if (window.confirm('Are you sure you want to delete this sale?')) {
       setError('');
       setSuccess('');
       setLoading(true);
       try {
-        await deleteSale(sel_no);
+        await deleteSale(sale_no);
         await fetchAll();
         setSuccess('Sale deleted successfully');
       } catch (err) {
         setError(err.message || 'Error deleting sale');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  // Status action handlers
+  const handleConfirmSale = async (sale) => {
+    if (window.confirm('Are you sure you want to confirm this sale? This will apply inventory and financial effects.')) {
+      setError('');
+      setSuccess('');
+      setLoading(true);
+      try {
+        await confirmSale(sale.sale_no || sale.sel_no);
+        await fetchAll();
+        setSuccess('Sale confirmed successfully');
+      } catch (err) {
+        setError(err.message || 'Error confirming sale');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleCancelSale = async (sale) => {
+    if (window.confirm('Are you sure you want to cancel this sale? This will reverse any applied effects.')) {
+      setError('');
+      setSuccess('');
+      setLoading(true);
+      try {
+        await cancelSale(sale.sale_no || sale.sel_no);
+        await fetchAll();
+        setSuccess('Sale cancelled successfully');
+      } catch (err) {
+        setError(err.message || 'Error cancelling sale');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleDeliverSale = async (sale) => {
+    const deliveryDate = prompt('Enter delivery date (YYYY-MM-DD) or leave empty for today:', new Date().toISOString().split('T')[0]);
+    if (deliveryDate !== null) {
+      setError('');
+      setSuccess('');
+      setLoading(true);
+      try {
+        await deliverSale(sale.sale_no || sale.sel_no, deliveryDate || undefined);
+        await fetchAll();
+        setSuccess('Sale marked as delivered successfully');
+      } catch (err) {
+        setError(err.message || 'Error marking sale as delivered');
       } finally {
         setLoading(false);
       }
@@ -176,7 +250,10 @@ const Sales = ({ onBack }) => {
         paid: Number(formData.paid),
         customer_no: Number(formData.customer_no),
         store_no: Number(formData.store_no),
-        account_id: Number(formData.account_id)
+        account_id: Number(formData.account_id),
+        status: formData.status,
+        notes: formData.notes,
+        delivery_date: formData.delivery_date || undefined
       };
       if (editingSale) {
         result = await updateSale(editingSale.sel_no, payload);
@@ -210,7 +287,10 @@ const Sales = ({ onBack }) => {
         customer_no: '',
         store_no: '',
         paid: 0,
-        account_id: ''
+        account_id: '',
+        status: 'draft',
+        notes: '',
+        delivery_date: ''
       });
     } catch (err) {
       setError(err.message || 'Error saving sale');
@@ -380,52 +460,103 @@ const Sales = ({ onBack }) => {
                           <th>Product</th>
                           <th>Customer</th>
                           <th>Store</th>
+                          <th>Status</th>
                           <th>Qty</th>
-                          <th>Price</th>
-                          <th>Discount</th>
+                          <th>Subtotal</th>
                           <th>Tax</th>
-                          <th>Amount</th>
+                          <th>Total</th>
                           <th>Paid</th>
-                          <th>Account</th>
+                          <th>Balance</th>
                           <th>Date</th>
                           <th>Actions</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredSales.map((sale) => (
-                          <tr key={sale.sel_no}>
-                            <td>{sale.sel_no}</td>
-                            <td>{Array.isArray(sale.items) ? sale.items.map(i => products.find(p => p.product_no === i.product_no)?.product_name || i.product_no).join(', ') : sale.product_name}</td>
-                            <td>{sale.customer_name}</td>
-                            <td>{sale.store_name}</td>
-                            <td>{Array.isArray(sale.items) ? sale.items.reduce((sum, i) => sum + (i.qty || 0), 0) : sale.qty}</td>
-                            <td>{Array.isArray(sale.items) ? sale.items.map(i => i.price).join(', ') : sale.price}</td>
-                            <td>{Array.isArray(sale.items) ? sale.items.map(i => i.discount).join(', ') : sale.discount}</td>
-                            <td>{Array.isArray(sale.items) ? sale.items.map(i => i.tax).join(', ') : sale.tax}</td>
-                            <td>{sale.amount}</td>
-                            <td>{sale.paid}</td>
-                            <td>{sale.account_name}</td>
-                            <td>{sale.sel_date ? new Date(sale.sel_date).toLocaleDateString() : ''}</td>
-                            <td>
-                              <div className={styles['action-icons']}>
-                                <button
-                                  onClick={() => handleEdit(sale)}
-                                  className={styles['icon-btn']}
-                                  title="Edit Sale"
+                        {filteredSales.map((sale) => {
+                          const statusInfo = getStatusInfo(sale.status || 'draft');
+                          const saleId = sale.sale_no || sale.sel_no;
+                          
+                          return (
+                            <tr key={saleId}>
+                              <td>{saleId}</td>
+                              <td>{Array.isArray(sale.items) ? sale.items.map(i => products.find(p => p.product_no === i.product_no)?.product_name || i.product_no).join(', ') : sale.product_name}</td>
+                              <td>{sale.customer_name}</td>
+                              <td>{sale.store_name}</td>
+                              <td>
+                                <span 
+                                  style={{
+                                    padding: '4px 8px',
+                                    borderRadius: '12px',
+                                    fontSize: '12px',
+                                    fontWeight: '500',
+                                    color: statusInfo.color,
+                                    backgroundColor: statusInfo.bgColor
+                                  }}
                                 >
-                                  <Edit size={16} />
-                                </button>
-                                <button
-                                  onClick={() => handleDelete(sale.sel_no)}
-                                  className={`${styles['icon-btn']} ${styles.delete}`}
-                                  title="Delete Sale"
-                                >
-                                  <Trash2 size={16} />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
+                                  {statusInfo.label}
+                                </span>
+                              </td>
+                              <td>{Array.isArray(sale.items) ? sale.items.reduce((sum, i) => sum + (i.qty || 0), 0) : sale.qty}</td>
+                              <td>${(sale.subtotal || 0).toFixed(2)}</td>
+                              <td>${(sale.total_tax || 0).toFixed(2)}</td>
+                              <td>${(sale.amount || 0).toFixed(2)}</td>
+                              <td>${(sale.paid || 0).toFixed(2)}</td>
+                              <td>${(sale.balance_due !== undefined ? sale.balance_due : (sale.amount - sale.paid)).toFixed(2)}</td>
+                              <td>{sale.sel_date ? new Date(sale.sel_date).toLocaleDateString() : ''}</td>
+                              <td>
+                                <div className={styles['action-icons']}>
+                                  {/* Status-based action buttons */}
+                                  {sale.status === 'draft' && (
+                                    <button
+                                      onClick={() => handleConfirmSale(sale)}
+                                      className={styles['icon-btn']}
+                                      title="Confirm Sale"
+                                      style={{ color: '#3b82f6' }}
+                                    >
+                                      <CheckCircle size={16} />
+                                    </button>
+                                  )}
+                                  {sale.status === 'confirmed' && (
+                                    <button
+                                      onClick={() => handleDeliverSale(sale)}
+                                      className={styles['icon-btn']}
+                                      title="Mark as Delivered"
+                                      style={{ color: '#10b981' }}
+                                    >
+                                      <Truck size={16} />
+                                    </button>
+                                  )}
+                                  {['draft', 'confirmed'].includes(sale.status) && (
+                                    <button
+                                      onClick={() => handleCancelSale(sale)}
+                                      className={styles['icon-btn']}
+                                      title="Cancel Sale"
+                                      style={{ color: '#ef4444' }}
+                                    >
+                                      <XCircle size={16} />
+                                    </button>
+                                  )}
+                                  
+                                  {/* Standard edit/delete buttons */}
+                                  <button
+                                    onClick={() => handleEdit(sale)}
+                                    className={styles['icon-btn']}
+                                    title="Edit Sale"
+                                  >
+                                    <Edit size={16} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDelete(saleId)}
+                                    className={`${styles['icon-btn']} ${styles.delete}`}
+                                    title="Delete Sale"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                     {filteredSales.length === 0 && (
@@ -450,13 +581,14 @@ const Sales = ({ onBack }) => {
                           <th>Qty</th>
                           <th>Price</th>
                           <th>Discount</th>
+                          <th>Tax</th>
                           <th>Subtotal</th>
                           <th></th>
                         </tr>
                       </thead>
                       <tbody>
                         {formData.items.map((item, idx) => {
-                          const subtotal = (Number(item.qty) * Number(item.price) - Number(item.discount)).toFixed(2);
+                          const subtotal = (Number(item.qty) * Number(item.price) - Number(item.discount) + Number(item.tax)).toFixed(2);
                           return (
                             <tr key={idx}>
                               <td>
@@ -468,7 +600,8 @@ const Sales = ({ onBack }) => {
                               <td><input type="number" name="qty" value={item.qty} onChange={e => handleItemChange(idx, e)} min="1" placeholder="Qty" className={styles['form-input']} style={{ width: 60 }} /></td>
                               <td><input type="number" name="price" value={item.price} onChange={e => handleItemChange(idx, e)} min="0" placeholder="Price" className={styles['form-input']} style={{ width: 80 }} /></td>
                               <td><input type="number" name="discount" value={item.discount} onChange={e => handleItemChange(idx, e)} min="0" placeholder="Discount" className={styles['form-input']} style={{ width: 80 }} /></td>
-                              <td style={{ fontWeight: 600 }}>{subtotal}</td>
+                              <td><input type="number" name="tax" value={item.tax} onChange={e => handleItemChange(idx, e)} min="0" placeholder="Tax" className={styles['form-input']} style={{ width: 80 }} /></td>
+                              <td style={{ fontWeight: 600 }}>${subtotal}</td>
                               <td>{formData.items.length > 1 && <button type="button" onClick={() => handleRemoveItem(idx)} style={{ color: 'red', fontWeight: 700, border: 'none', background: 'none', cursor: 'pointer' }}>×</button>}</td>
                             </tr>
                           );
@@ -512,17 +645,66 @@ const Sales = ({ onBack }) => {
                           ))}
                         </select>
                       </div>
+                      <div className={styles['form-group']}>
+                        <label htmlFor="status">Status *</label>
+                        <select id="status" name="status" value={formData.status} onChange={handleInputChange} required className={styles['form-select']}>
+                          <option value="draft">Draft</option>
+                          <option value="pending">Pending</option>
+                          <option value="confirmed">Confirmed</option>
+                          <option value="delivered">Delivered</option>
+                          <option value="cancelled">Cancelled</option>
+                        </select>
+                        <small style={{ color: '#6b7280', fontSize: '12px' }}>
+                          {formData.status === 'draft' && 'Draft sales don\'t affect inventory'}
+                          {formData.status === 'confirmed' && 'Confirmed sales will decrease inventory'}
+                          {formData.status === 'delivered' && 'Delivered sales are completed'}
+                          {formData.status === 'cancelled' && 'Cancelled sales reverse all effects'}
+                        </small>
+                      </div>
                     </div>
+                  </div>
                   <div className={styles['form-group']}>
                     {/* Removed duplicate Account dropdown for design consistency */}
                   </div>
+                  
+                  {/* Additional fields for enhanced sale management */}
+                  <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '16px' }}>
+                    <div className={styles['form-group']}>
+                      <label htmlFor="notes">Notes</label>
+                      <textarea 
+                        id="notes" 
+                        name="notes" 
+                        value={formData.notes} 
+                        onChange={handleInputChange} 
+                        className={styles['form-textarea']} 
+                        placeholder="Additional notes about this sale..."
+                        rows="3"
+                      />
+                    </div>
+                    <div className={styles['form-group']}>
+                      <label htmlFor="delivery_date">Delivery Date</label>
+                      <input 
+                        type="date" 
+                        id="delivery_date" 
+                        name="delivery_date" 
+                        value={formData.delivery_date} 
+                        onChange={handleInputChange} 
+                        className={styles['form-input']} 
+                      />
+                      <small style={{ color: '#6b7280', fontSize: '12px' }}>
+                        Set expected or actual delivery date
+                      </small>
+                    </div>
                   </div>
                   {/* Total, Tax, Paid at the last row */}
-                  <div style={{ gridColumn: '1 / -1', marginTop: 24, display: 'flex', justifyContent: 'center', gap: 48, alignItems: 'center', fontWeight: 700, fontSize: 18 }}>
+                  <div style={{ gridColumn: '1 / -1', marginTop: 24, display: 'flex', justifyContent: 'center', gap: 32, alignItems: 'center', fontWeight: 700, fontSize: 16 }}>
                     <span>Total Items: {formData.items.reduce((sum, item) => sum + Number(item.qty), 0)}</span>
-                    <span>Total Discount: {formData.items.reduce((sum, item) => sum + Number(item.discount), 0).toFixed(2)}</span>
-                    <span>Total Amount: {formData.items.reduce((sum, item) => sum + (Number(item.qty) * Number(item.price) - Number(item.discount)), 0).toFixed(2)}</span>
-                    <span>Paid: <input type="number" id="paid" name="paid" value={formData.paid} onChange={handleInputChange} min="0" className={styles['form-input']} style={{ width: 120, fontWeight: 700, fontSize: 18 }} /></span>
+                    <span>Subtotal: ${formData.items.reduce((sum, item) => sum + (Number(item.qty) * Number(item.price)), 0).toFixed(2)}</span>
+                    <span>Total Discount: ${formData.items.reduce((sum, item) => sum + Number(item.discount), 0).toFixed(2)}</span>
+                    <span>Total Tax: ${formData.items.reduce((sum, item) => sum + Number(item.tax), 0).toFixed(2)}</span>
+                    <span style={{ fontSize: 18, color: '#059669' }}>Grand Total: ${formData.items.reduce((sum, item) => sum + (Number(item.qty) * Number(item.price) - Number(item.discount) + Number(item.tax)), 0).toFixed(2)}</span>
+                    <span>Paid: <input type="number" id="paid" name="paid" value={formData.paid} onChange={handleInputChange} min="0" className={styles['form-input']} style={{ width: 120, fontWeight: 700, fontSize: 16 }} /></span>
+                    <span style={{ color: formData.items.reduce((sum, item) => sum + (Number(item.qty) * Number(item.price) - Number(item.discount) + Number(item.tax)), 0) - Number(formData.paid) > 0 ? '#dc2626' : '#059669' }}>Balance Due: ${(formData.items.reduce((sum, item) => sum + (Number(item.qty) * Number(item.price) - Number(item.discount) + Number(item.tax)), 0) - Number(formData.paid)).toFixed(2)}</span>
                   </div>
                   <div className={styles['form-group']}>
                     {/* Removed bottom Account dropdown for design consistency */}
