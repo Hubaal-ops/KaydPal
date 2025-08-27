@@ -23,7 +23,8 @@ function downloadPDF(invoice) {
   doc.text('Subtotal', 150, y);
   y += 6;
   invoice.items?.forEach(item => {
-    doc.text(String(item.name), 10, y);
+    const productName = item.product_name || item.name || `Product #${item.product_no}` || 'Unknown Product';
+    doc.text(String(productName), 10, y);
     doc.text(String(item.qty), 60, y);
     doc.text(String(item.price?.toFixed(2)), 80, y);
     doc.text(String(item.discount?.toFixed(2)), 100, y);
@@ -119,7 +120,7 @@ const InvoiceDetail = ({ invoice, onBack }) => {
         <tbody>
           {invoice.items?.map((item,i) => (
             <tr key={i}>
-              <td style={{padding:'8px',borderTop:'1px solid #eee'}}>{item.product_name || item.name}</td>
+              <td style={{padding:'8px',borderTop:'1px solid #eee'}}>{item.product_name || item.name || `Product #${item.product_no}` || 'Unknown Product'}</td>
               <td style={{padding:'8px',borderTop:'1px solid #eee',textAlign:'right'}}>{item.qty}</td>
               <td style={{padding:'8px',borderTop:'1px solid #eee',textAlign:'right'}}>{item.price?.toFixed(2)}</td>
               <td style={{padding:'8px',borderTop:'1px solid #eee',textAlign:'right'}}>{item.discount?.toFixed(2)}</td>

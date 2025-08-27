@@ -13,15 +13,15 @@ exports.createInvoice = async (req, res) => {
     // Fetch customer details
     let customerDoc = null;
     try {
-      customerDoc = await require('../models/Customer').findOne({ customer_no: sale.customer_no });
+      customerDoc = await require('../models/Customer').findOne({ customer_no: sale.customer_no, userId: req.user.id });
     } catch {}
     // Fetch product names for all items
     const Product = require('../models/Product');
     const productMap = {};
     for (const item of sale.items) {
       if (!productMap[item.product_no]) {
-        const productDoc = await Product.findOne({ product_no: item.product_no });
-        productMap[item.product_no] = productDoc ? productDoc.name : (item.product_name || '');
+        const productDoc = await Product.findOne({ product_no: item.product_no, userId: req.user.id });
+        productMap[item.product_no] = productDoc ? productDoc.product_name : (item.product_name || '');
       }
     }
     const items = sale.items.map(item => ({
