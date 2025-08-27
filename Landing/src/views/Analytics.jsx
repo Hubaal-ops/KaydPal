@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { 
   LineChart, Line, BarChart, Bar, XAxis, YAxis, 
-  CartesianGrid, Tooltip as RechartsTooltip, Legend, 
+  CartesianGrid, Legend, 
   ResponsiveContainer, Pie, Cell, AreaChart, Area
 } from 'recharts';
 import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
@@ -25,6 +25,77 @@ import { debounce } from 'lodash';
 import { toast } from 'react-toastify';
 import styles from './Analytics.module.css';
 import { fetchAnalytics, fetchAnalyticsSummary, exportAnalytics } from '../services/analyticsService';
+import { getCategories } from '../services/categoryService';
+import { getStores } from '../services/storeService';
+
+// Error Boundary Component
+class AnalyticsErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('Analytics Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '2rem', textAlign: 'center' }}>
+          <Typography variant="h5" color="error" gutterBottom>
+            Analytics Dashboard Error
+          </Typography>
+          <Typography variant="body1" color="textSecondary" gutterBottom>
+            There was an issue loading the analytics dashboard.
+          </Typography>
+          <Button 
+            variant="contained" 
+            onClick={() => this.setState({ hasError: false, error: null })}
+            style={{ marginTop: '1rem' }}
+          >
+            Try Again
+          </Button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+// Custom Tooltip component to avoid Redux dependency
+const CustomTooltip = ({ active, payload, label, formatter, labelFormatter }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div style={{
+        backgroundColor: 'var(--surface)',
+        padding: '12px',
+        border: '1px solid var(--border)',
+        borderRadius: '8px',
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+      }}>
+        <p style={{ margin: 0, fontWeight: 600, color: 'var(--text-primary)' }}>
+          {labelFormatter ? labelFormatter(label) : label}
+        </p>
+        {payload.map((entry, index) => (
+          <p key={index} style={{ 
+            margin: '4px 0 0 0', 
+            color: entry.color,
+            fontSize: '14px'
+          }}>
+            {formatter ? formatter(entry.value, entry.name)[0] : `${entry.name}: ${entry.value}`}
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
 
 // Chart color palette
 const CHART_COLORS = [
@@ -378,13 +449,18 @@ const Analytics = () => {
     summary: true
   });
   
-  // Analytics data states
+  // Data states
   const [salesTrendData, setSalesTrendData] = useState([]);
   const [stockLevels, setStockLevels] = useState([]);
   const [fastSlowTable, setFastSlowTable] = useState([]);
   const [debtTracking, setDebtTracking] = useState([]);
   const [aiPrediction, setAiPrediction] = useState({ product: '', days: 0 });
   const [restockRec, setRestockRec] = useState({ product: '', qty: 0 });
+  
+  // Real data for dropdowns
+  const [stores, setStores] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [loadingFilters, setLoadingFilters] = useState(false);
   
   // Summary metrics
   const [summary, setSummary] = useState({
@@ -409,11 +485,45 @@ const Analytics = () => {
   const debouncedFetchData = useCallback(
     debounce((params) => {
       fetchData(params);
-    }, 500),
+    }, 1000),
     []
   );
   
-  // Handle date range change
+  // Fetch stores and categories
+  const fetchStoresAndCategories = async () => {
+    setLoadingFilters(true);
+    try {
+      const [storesRes, categoriesRes] = await Promise.all([
+        getStores(),
+        getCategories()
+      ]);
+      
+      console.log('📦 Stores response:', storesRes);
+      console.log('🏷️ Categories response:', categoriesRes);
+      
+      // Handle store data
+      if (storesRes?.data) {
+        setStores(storesRes.data);
+      } else if (Array.isArray(storesRes)) {
+        setStores(storesRes);
+      }
+      
+      // Handle category data
+      if (categoriesRes?.data) {
+        setCategories(categoriesRes.data);
+      } else if (Array.isArray(categoriesRes)) {
+        setCategories(categoriesRes);
+      }
+      
+    } catch (error) {
+      console.error('Error fetching stores and categories:', error);
+      toast.error('Failed to load filter options');
+    } finally {
+      setLoadingFilters(false);
+    }
+  };
+  
+  // Handle date range change with immediate effect
   const handleDateRangeChange = (newValue, type) => {
     const newDateRange = {
       ...dateRange,
@@ -421,14 +531,17 @@ const Analytics = () => {
     };
     setDateRange(newDateRange);
     
-    // Only fetch if both dates are set
-    if (newDateRange.start && newDateRange.end) {
-      debouncedFetchData({
+    // Only fetch if both dates are set and valid
+    if (newDateRange.start && newDateRange.end && newDateRange.start <= newDateRange.end) {
+      console.log('📅 Date range changed, fetching data immediately:', newDateRange);
+      const params = {
         startDate: format(newDateRange.start, 'yyyy-MM-dd'),
         endDate: format(newDateRange.end, 'yyyy-MM-dd'),
-        category,
-        store
-      });
+        ...(category && { category }),
+        ...(store && { store })
+      };
+      // Fetch immediately for date changes, no debouncing needed
+      fetchData(params);
     }
   };
   
@@ -490,13 +603,16 @@ const Analytics = () => {
     setDateRange(newDateRange);
     setDateRangeAnchorEl(null);
     
-    // Fetch data with new date range
-    fetchData({
+    console.log('📅 Quick range selected:', range, newDateRange);
+    
+    // Fetch data with new date range immediately
+    const params = {
       startDate: format(newDateRange.start, 'yyyy-MM-dd'),
       endDate: format(newDateRange.end, 'yyyy-MM-dd'),
-      category,
-      store
-    });
+      ...(category && { category }),
+      ...(store && { store })
+    };
+    fetchData(params);
   };
   
   // Format currency
@@ -538,6 +654,12 @@ const Analytics = () => {
   
   // Fetch analytics data with debouncing
   const fetchData = async (params = {}) => {
+    console.log('🔄 Fetching analytics data with params:', params);
+    console.log('📅 Current date range:', {
+      start: format(dateRange.start, 'yyyy-MM-dd'),
+      end: format(dateRange.end, 'yyyy-MM-dd')
+    });
+    
     try {
       // Set all loading states to true
       setLoading(prev => ({
@@ -554,19 +676,27 @@ const Analytics = () => {
         fetchAnalyticsSummary(params)
       ]);
       
-      // Update states with new data
-      if (analyticsRes.data) {
-        setSalesTrendData(analyticsRes.data.salesTrends || []);
+      console.log('📊 Analytics response:', analyticsRes);
+      console.log('📈 Summary response:', summaryRes);
+      
+      // Update states with new data from analytics response
+      if (analyticsRes && (analyticsRes.data || analyticsRes.salesTrends)) {
+        const data = analyticsRes.data || analyticsRes;
         
-        // Process stock levels with status and colors
-        const processedStockLevels = (analyticsRes.data.stockLevels || []).map((item) => {
+        // Sales trends data
+        setSalesTrendData(data.salesTrends || []);
+        
+        // Process stock levels - fix field mapping
+        const processedStockLevels = (data.stockLevels || []).map((item) => {
           let status = 'good';
-          let color = CHART_COLORS[2]; // Default green
+          let color = CHART_COLORS[1]; // Default green
           
-          if (item.quantity <= 0) {
+          const qty = item.qty || item.quantity || 0;
+          
+          if (qty <= 0) {
             status = 'critical';
             color = CHART_COLORS[3]; // Red
-          } else if (item.quantity <= (item.reorderPoint || 10)) {
+          } else if (qty <= 10) {
             status = 'warning';
             color = CHART_COLORS[2]; // Orange
           }
@@ -575,37 +705,117 @@ const Analytics = () => {
             ...item, 
             status,
             color,
-            value: item.quantity,
-            name: item.productName || `Product ${item.productId}`
+            value: qty,
+            quantity: qty,
+            name: item.name || item.productName || `Product ${item.productId || item._id}`,
+            productName: item.name || item.productName
           };
         });
         
         setStockLevels(processedStockLevels);
-        setFastSlowTable(analyticsRes.data.fastSlowTable || []);
-        setDebtTracking(analyticsRes.data.debtTracking || []);
-        setAiPrediction(analyticsRes.data.aiPrediction || { product: '', days: 0 });
-        setRestockRec(analyticsRes.data.restockRec || { product: '', qty: 0 });
+        
+        // Fast/slow moving products - fix field mapping
+        const fastSlowData = (data.fastSlowProducts || data.fastSlowTable || []).map((item) => ({
+          ...item,
+          name: item.name || item.productName || `Product ${item.productId}`,
+          quantity: item.quantity || item.soldQty || 0,
+          revenue: item.revenue || (item.price * (item.quantity || 0)) || 0
+        }));
+        setFastSlowTable(fastSlowData);
+        
+        // Debt tracking data - fix field mapping
+        const debtData = (data.debtTracking || []).map((item) => ({
+          ...item,
+          customerName: item.name || item.customerName || `Customer ${item.customerId}`,
+          amount: item.amount || 0,
+          daysOverdue: item.days || item.daysOverdue || 0
+        }));
+        setDebtTracking(debtData);
+        
+        // AI predictions - handle string or object format
+        const aiPred = data.aiPrediction || '';
+        if (typeof aiPred === 'string') {
+          setAiPrediction({ product: aiPred, days: 0 });
+        } else {
+          setAiPrediction(aiPred);
+        }
+        
+        // Restock recommendations - handle string or object format
+        const restockRec = data.restockRecommendation || '';
+        if (typeof restockRec === 'string') {
+          setRestockRec({ product: restockRec, qty: 0 });
+        } else {
+          setRestockRec(restockRec);
+        }
       }
       
-      // Update summary data
-      if (summaryRes.data) {
+      // Update summary data from summary response
+      if (summaryRes && (summaryRes.data || summaryRes.totalSales !== undefined)) {
+        const summaryData = summaryRes.data || summaryRes;
+        
         setSummary({
-          totalSales: summaryRes.data.totalSales || 0,
-          totalOrders: summaryRes.data.totalOrders || 0,
-          avgOrderValue: summaryRes.data.avgOrderValue || 0,
-          topSellingProduct: summaryRes.data.topSellingProduct || { name: '', quantity: 0 },
-          lowStockItems: summaryRes.data.lowStockItems || 0,
-          outOfStockItems: summaryRes.data.outOfStockItems || 0,
-          totalCustomers: summaryRes.data.totalCustomers || 0,
-          newCustomers: summaryRes.data.newCustomers || 0,
-          totalRevenue: summaryRes.data.totalRevenue || 0,
-          revenueChange: summaryRes.data.revenueChange || 0
+          totalSales: summaryData.totalSales || 0,
+          totalOrders: summaryData.totalOrders || summaryData.orderCount || 0,
+          avgOrderValue: summaryData.avgOrderValue || 
+            (summaryData.totalSales && summaryData.totalOrders ? 
+              summaryData.totalSales / summaryData.totalOrders : 0),
+          topSellingProduct: summaryData.topSellingProduct || 
+            (summaryData.topProducts && summaryData.topProducts[0] ? 
+              { name: summaryData.topProducts[0].name, quantity: summaryData.topProducts[0].quantity } : 
+              { name: '', quantity: 0 }),
+          lowStockItems: summaryData.lowStockItems || 0,
+          outOfStockItems: summaryData.outOfStockItems || 0,
+          totalCustomers: summaryData.totalCustomers || 0,
+          newCustomers: summaryData.newCustomers || 0,
+          totalRevenue: summaryData.totalRevenue || summaryData.totalSales || 0,
+          revenueChange: summaryData.revenueChange || 0
         });
       }
       
     } catch (err) {
       console.error('Error fetching analytics:', err);
-      toast.error('Failed to load analytics data');
+      
+      // More specific error handling
+      if (err.response) {
+        // Server responded with error status
+        const status = err.response.status;
+        if (status === 401) {
+          toast.error('Authentication required. Please log in again.');
+        } else if (status === 403) {
+          toast.error('Access denied. You do not have permission to view analytics.');
+        } else if (status === 500) {
+          toast.error('Server error. Please try again later.');
+        } else {
+          toast.error(`Failed to load analytics data (${status})`);
+        }
+      } else if (err.request) {
+        // Network error
+        toast.error('Network error. Please check your connection.');
+      } else {
+        // Other error
+        toast.error('Failed to load analytics data');
+      }
+      
+      // Set default empty states on error
+      setSalesTrendData([]);
+      setStockLevels([]);
+      setFastSlowTable([]);
+      setDebtTracking([]);
+      setAiPrediction({ product: '', days: 0 });
+      setRestockRec({ product: '', qty: 0 });
+      setSummary({
+        totalSales: 0,
+        totalOrders: 0,
+        avgOrderValue: 0,
+        topSellingProduct: { name: '', quantity: 0 },
+        lowStockItems: 0,
+        outOfStockItems: 0,
+        totalCustomers: 0,
+        newCustomers: 0,
+        totalRevenue: 0,
+        revenueChange: 0
+      });
+      
     } finally {
       // Reset loading states
       setLoading(prev => ({
@@ -620,6 +830,10 @@ const Analytics = () => {
   
   // Initial data fetch
   useEffect(() => {
+    // Fetch stores and categories first
+    fetchStoresAndCategories();
+    
+    // Then fetch analytics data
     fetchData({
       startDate: format(dateRange.start, 'yyyy-MM-dd'),
       endDate: format(dateRange.end, 'yyyy-MM-dd'),
@@ -633,17 +847,44 @@ const Analytics = () => {
     };
   }, []);
   
-  // Handle filter changes
-  useEffect(() => {
-    const params = {
-      startDate: format(dateRange.start, 'yyyy-MM-dd'),
-      endDate: format(dateRange.end, 'yyyy-MM-dd'),
-      ...(category && { category }),
-      ...(store && { store })
-    };
-    
-    debouncedFetchData(params);
-  }, [dateRange, category, store]);
+  // Debounced handlers for filter changes
+  const debouncedCategoryChange = useCallback(
+    debounce((newCategory) => {
+      const params = {
+        startDate: format(dateRange.start, 'yyyy-MM-dd'),
+        endDate: format(dateRange.end, 'yyyy-MM-dd'),
+        ...(newCategory && { category: newCategory }),
+        ...(store && { store })
+      };
+      fetchData(params);
+    }, 1000),
+    [dateRange, store]
+  );
+  
+  const debouncedStoreChange = useCallback(
+    debounce((newStore) => {
+      const params = {
+        startDate: format(dateRange.start, 'yyyy-MM-dd'),
+        endDate: format(dateRange.end, 'yyyy-MM-dd'),
+        ...(category && { category }),
+        ...(newStore && { store: newStore })
+      };
+      fetchData(params);
+    }, 1000),
+    [dateRange, category]
+  );
+  
+  // Handle category change
+  const handleCategoryChange = (newCategory) => {
+    setCategory(newCategory);
+    debouncedCategoryChange(newCategory);
+  };
+  
+  // Handle store change
+  const handleStoreChange = (newStore) => {
+    setStore(newStore);
+    debouncedStoreChange(newStore);
+  };
   
   // Refresh data
   const handleRefresh = () => {
@@ -681,6 +922,24 @@ const Analytics = () => {
           
           <Button
             variant="contained"
+            color="secondary"
+            startIcon={<BarChart2 size={16} />}
+            onClick={() => {
+              const params = {
+                startDate: format(dateRange.start, 'yyyy-MM-dd'),
+                endDate: format(dateRange.end, 'yyyy-MM-dd'),
+                ...(category && { category }),
+                ...(store && { store })
+              };
+              fetchData(params);
+            }}
+            disabled={Object.values(loading).some(Boolean)}
+          >
+            Load Data
+          </Button>
+          
+          <Button
+            variant="contained"
             color="primary"
             startIcon={<Download size={16} />}
             onClick={() => handleExport('full')}
@@ -698,28 +957,26 @@ const Analytics = () => {
             label="Start Date"
             value={dateRange.start}
             onChange={(newValue) => handleDateRangeChange(newValue, 'start')}
-            renderInput={(params) => (
-              <TextField 
-                {...params} 
-                size="small" 
-                className={styles.dateRangePicker}
-                sx={{ width: 180 }}
-              />
-            )}
+            slotProps={{
+              textField: {
+                size: "small",
+                className: styles.dateRangePicker,
+                sx: { width: 180 }
+              }
+            }}
           />
           
           <DatePicker
             label="End Date"
             value={dateRange.end}
             onChange={(newValue) => handleDateRangeChange(newValue, 'end')}
-            renderInput={(params) => (
-              <TextField 
-                {...params} 
-                size="small" 
-                className={styles.dateRangePicker}
-                sx={{ width: 180 }}
-              />
-            )}
+            slotProps={{
+              textField: {
+                size: "small",
+                className: styles.dateRangePicker,
+                sx: { width: 180 }
+              }
+            }}
             minDate={dateRange.start}
           />
         </LocalizationProvider>
@@ -729,13 +986,15 @@ const Analytics = () => {
           <Select
             value={category}
             label="Category"
-            onChange={(e) => setCategory(e.target.value)}
+            onChange={(e) => handleCategoryChange(e.target.value)}
+            disabled={loadingFilters}
           >
             <MenuItem value="">All Categories</MenuItem>
-            {/* Categories would be populated from the API */}
-            <MenuItem value="electronics">Electronics</MenuItem>
-            <MenuItem value="clothing">Clothing</MenuItem>
-            <MenuItem value="groceries">Groceries</MenuItem>
+            {categories.map((cat) => (
+              <MenuItem key={cat.category_id || cat._id} value={cat.category_name}>
+                {cat.category_name}
+              </MenuItem>
+            ))}
           </Select>
         </FormControl>
         
@@ -744,13 +1003,15 @@ const Analytics = () => {
           <Select
             value={store}
             label="Store"
-            onChange={(e) => setStore(e.target.value)}
+            onChange={(e) => handleStoreChange(e.target.value)}
+            disabled={loadingFilters}
           >
             <MenuItem value="">All Stores</MenuItem>
-            {/* Stores would be populated from the API */}
-            <MenuItem value="main">Main Store</MenuItem>
-            <MenuItem value="downtown">Downtown</MenuItem>
-            <MenuItem value="mall">Mall Outlet</MenuItem>
+            {stores.map((storeItem) => (
+              <MenuItem key={storeItem.store_id || storeItem._id} value={storeItem.store_no || storeItem.store_id}>
+                {storeItem.store_name || storeItem.name || `Store ${storeItem.store_no || storeItem.store_id}`}
+              </MenuItem>
+            ))}
           </Select>
         </FormControl>
         
@@ -780,7 +1041,7 @@ const Analytics = () => {
       
       {/* Summary Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <SummaryCard
             title="Total Revenue"
             value={formatCurrency(summary.totalRevenue)}
@@ -792,7 +1053,7 @@ const Analytics = () => {
           />
         </Grid>
         
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <SummaryCard
             title="Total Orders"
             value={formatNumber(summary.totalOrders)}
@@ -802,7 +1063,7 @@ const Analytics = () => {
           />
         </Grid>
         
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <SummaryCard
             title="Customers"
             value={formatNumber(summary.totalCustomers)}
@@ -813,7 +1074,7 @@ const Analytics = () => {
           />
         </Grid>
         
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <SummaryCard
             title="Avg. Order Value"
             value={formatCurrency(summary.avgOrderValue)}
@@ -827,13 +1088,14 @@ const Analytics = () => {
       {/* Main Content Area */}
       <Grid container spacing={3}>
         {/* Sales Trends Chart */}
-        <Grid item xs={12} md={8}>
+        <Grid size={{ xs: 12, md: 8 }}>
           <ChartContainer
             title="Sales Trends"
             subtitle={`${format(dateRange.start, 'MMM d, yyyy')} - ${format(dateRange.end, 'MMM d, yyyy')}`}
             loading={loading.sales}
             isEmpty={salesTrendData.length === 0}
             emptyMessage="No sales data available for the selected period"
+            height={350}
           >
             <ResponsiveContainer width="100%" height={300}>
               <AreaChart data={salesTrendData}>
@@ -848,16 +1110,28 @@ const Analytics = () => {
                   dataKey="date" 
                   tickLine={false} 
                   axisLine={false}
-                  tickFormatter={(value) => format(new Date(value), 'MMM d')}
+                  tickFormatter={(value) => {
+                    try {
+                      return format(new Date(value), 'MMM d');
+                    } catch {
+                      return value;
+                    }
+                  }}
                 />
                 <YAxis 
                   tickLine={false} 
                   axisLine={false}
                   tickFormatter={(value) => `$${value}`}
                 />
-                <RechartsTooltip 
+                <CustomTooltip 
                   formatter={(value) => [`$${value}`, 'Sales']}
-                  labelFormatter={(label) => format(new Date(label), 'MMM d, yyyy')}
+                  labelFormatter={(label) => {
+                    try {
+                      return format(new Date(label), 'MMM d, yyyy');
+                    } catch {
+                      return label;
+                    }
+                  }}
                 />
                 <Area 
                   type="monotone" 
@@ -872,7 +1146,7 @@ const Analytics = () => {
         </Grid>
         
         {/* Stock Levels */}
-        <Grid item xs={12} md={4}>
+        <Grid size={{ xs: 12, md: 4 }}>
           <ChartContainer
             title="Stock Status"
             subtitle={`${stockLevels.length} products`}
@@ -903,7 +1177,7 @@ const Analytics = () => {
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <RechartsTooltip 
+                <CustomTooltip 
                   formatter={(value, name) => [value, name]}
                 />
                 <Legend />
@@ -937,7 +1211,7 @@ const Analytics = () => {
         </Grid>
         
         {/* Top Products */}
-        <Grid item xs={12} md={6}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <ChartContainer
             title="Top Selling Products"
             subtitle={`${format(dateRange.start, 'MMM d')} - ${format(dateRange.end, 'MMM d, yyyy')}`}
@@ -993,7 +1267,7 @@ const Analytics = () => {
         </Grid>
         
         {/* Debt Tracking */}
-        <Grid item xs={12} md={6}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <ChartContainer
             title="Outstanding Payments"
             subtitle={`${debtTracking.length} customers with overdue payments`}
@@ -1048,7 +1322,7 @@ const Analytics = () => {
       <Box mt={4}>
         <Grid container spacing={3}>
           {/* AI Prediction */}
-          <Grid item xs={12} md={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <Card className={`${styles.aiCardBg} ${isDarkMode ? styles.aiCardBgDark : styles.aiCardBgLight}`}>
               <CardContent>
                 <Box display="flex" alignItems="center" mb={1}>
@@ -1082,7 +1356,7 @@ const Analytics = () => {
           </Grid>
           
           {/* Restock Recommendation */}
-          <Grid item xs={12} md={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <Card className={`${styles.aiCardBg} ${isDarkMode ? styles.aiCardBgDark : styles.aiCardBgLight}`}>
               <CardContent>
                 <Box display="flex" alignItems="center" mb={1}>
@@ -1119,4 +1393,23 @@ const Analytics = () => {
   );
 };
 
-export default Analytics;
+// Wrapped Analytics component
+const AnalyticsWrapper = () => {
+  try {
+    return <Analytics />;
+  } catch (error) {
+    console.error('Analytics Error:', error);
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center' }}>
+        <Typography variant="h5" color="error">
+          Analytics Error
+        </Typography>
+        <Typography variant="body1">
+          There was an issue: {error.message}
+        </Typography>
+      </div>
+    );
+  }
+};
+
+export default AnalyticsWrapper;

@@ -49,13 +49,16 @@ exports.getAnalytics = async (req, res) => {
     const salesTrends = [];
     const trendMap = {};
     sales.forEach(sale => {
-      const week = sale.sel_date.toISOString().slice(0, 7); // YYYY-MM
-      if (!trendMap[week]) trendMap[week] = 0;
-      trendMap[week] += sale.amount || 0;
+      const date = sale.sel_date.toISOString().slice(0, 10); // YYYY-MM-DD format
+      if (!trendMap[date]) trendMap[date] = 0;
+      trendMap[date] += sale.amount || 0;
     });
-    for (const [period, value] of Object.entries(trendMap)) {
-      salesTrends.push({ period, value });
-    }
+    
+    // Convert to array and sort by date
+    const sortedTrends = Object.entries(trendMap)
+      .map(([date, amount]) => ({ date, amount }))
+      .sort((a, b) => new Date(a.date) - new Date(b.date));
+    salesTrends.push(...sortedTrends);
 
     // STOCK LEVELS (top-selling and low-stock)
     const productCounts = {};
@@ -79,34 +82,45 @@ exports.getAnalytics = async (req, res) => {
       { $group: { _id: "$product_no", qty: { $sum: "$qty" } } }
     ]);
     const stockLevels = storeProducts.map(sp => {
-    const prod = allProducts.find(p => p.product_no === sp._id);
-    let status = 'good';
-    if (sp.qty <= (prod?.min_stock || 10)) status = sp.qty === 0 ? 'critical' : 'warning';
-    if (topProductNos.includes(sp._id)) status = 'good';
-    return {
-      name: prod?.product_name || sp._id,
-      qty: sp.qty,
-      status
-    };
-  });
-
-  // Add products with no StoreProduct record (qty = 0)
-  const storeProductIds = storeProducts.map(sp => sp._id);
-  const missingProducts = allProducts.filter(p => !storeProductIds.includes(p.product_no));
-  missingProducts.forEach(prod => {
-    stockLevels.push({
-      name: prod.product_name,
-      qty: 0,
-      status: 'critical'
+      const prod = allProducts.find(p => p.product_no === sp._id);
+      let status = 'good';
+      if (sp.qty <= (prod?.min_stock || 10)) status = sp.qty === 0 ? 'critical' : 'warning';
+      if (topProductNos.includes(sp._id)) status = 'good';
+      return {
+        name: prod?.product_name || `Product ${sp._id}`,
+        productName: prod?.product_name || `Product ${sp._id}`,
+        qty: sp.qty,
+        quantity: sp.qty,
+        product_no: sp._id,
+        status
+      };
     });
-  });
 
-    // FAST/SLOW MOVING PRODUCTS
+    // Add products with no StoreProduct record (qty = 0)
+    const storeProductIds = storeProducts.map(sp => sp._id);
+    const missingProducts = allProducts.filter(p => !storeProductIds.includes(p.product_no));
+    missingProducts.forEach(prod => {
+      stockLevels.push({
+        name: prod.product_name,
+        productName: prod.product_name,
+        qty: 0,
+        quantity: 0,
+        product_no: prod.product_no,
+        status: 'critical'
+      });
+    });
+
+    // FAST/SLOW MOVING PRODUCTS with sales data
     const fastSlowProducts = [];
     for (const prod of allProducts) {
       const soldQty = productCounts[prod.product_no] || 0;
+      const revenue = soldQty * (prod.selling_price || 0);
       fastSlowProducts.push({
         name: prod.product_name,
+        productName: prod.product_name,
+        product_no: prod.product_no,
+        quantity: soldQty,
+        revenue: revenue,
         status: soldQty > 20 ? 'fast' : 'slow' // threshold can be adjusted
       });
     }
@@ -123,41 +137,51 @@ exports.getAnalytics = async (req, res) => {
     const debtCustomers = await Customer.find(customerFilter);
     const customerMap = Object.fromEntries(debtCustomers.map(c => [c.customer_no, c.name]));
     const arList = arSales.map(s => ({
-      name: customerMap[s.customer_no] || s.customer_no,
+      name: customerMap[s.customer_no] || `Customer ${s.customer_no}`,
+      customerName: customerMap[s.customer_no] || `Customer ${s.customer_no}`,
+      customer_no: s.customer_no,
       amount: (s.amount || 0) - (s.paid || 0),
-      days: Math.floor((now - s.sel_date) / (1000 * 60 * 60 * 24))
+      days: Math.floor((now - s.sel_date) / (1000 * 60 * 60 * 24)),
+      daysOverdue: Math.floor((now - s.sel_date) / (1000 * 60 * 60 * 24))
     })).filter(x => x.amount > 1000 && x.days >= 30);
     const debtTracking = arList;
 
-    // AI PREDICTION (simulate)
-    let aiPrediction = '';
+    // AI PREDICTION (simulate with proper object structure)
+    let aiPrediction = { product: '', days: 0 };
     const soonOut = stockLevels.find(s => s.status === 'warning' || s.status === 'critical');
     if (soonOut) {
-      aiPrediction = `${soonOut.name} is likely to run out in ${soonOut.qty < 10 ? '3' : '7'} days`;
-    } else {
-      aiPrediction = 'All items are sufficiently stocked.';
+      aiPrediction = {
+        product: soonOut.name,
+        days: soonOut.qty < 10 ? 3 : 7
+      };
     }
 
-    // SMART RESTOCK RECOMMENDATION (simulate)
-    let restockRecommendation = '';
+    // SMART RESTOCK RECOMMENDATION (simulate with proper object structure)
+    let restockRecommendation = { product: '', qty: 0 };
     const restock = stockLevels.find(s => s.status === 'warning' || s.status === 'critical');
     if (restock) {
-      restockRecommendation = `Recommended reorder quantity for ${restock.name}: ${Math.max(100 - restock.qty, 10)}`;
-    } else {
-      restockRecommendation = 'No restock needed.';
+      restockRecommendation = {
+        product: restock.name,
+        qty: Math.max(100 - restock.qty, 10)
+      };
     }
 
     // DEBT RISK ALERTS (simulate: high risk if debt > $2000 and overdue > 40 days)
     const debtRiskAlerts = debtTracking.filter(d => d.amount > 2000 && d.days > 40).map(d => ({ name: d.name, risk: 'High' }));
 
     res.json({
-      salesTrends,
-      stockLevels,
-      fastSlowProducts,
-      debtTracking,
-      aiPrediction,
-      restockRecommendation,
-      debtRiskAlerts
+      success: true,
+      data: {
+        salesTrends,
+        stockLevels,
+        fastSlowProducts,
+        fastSlowTable: fastSlowProducts, // Alias for compatibility
+        debtTracking,
+        aiPrediction,
+        restockRecommendation,
+        restockRec: restockRecommendation, // Alias for compatibility
+        debtRiskAlerts
+      }
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

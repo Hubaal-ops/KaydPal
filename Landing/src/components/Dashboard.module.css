@@ -1,30 +1,35 @@
 .dashboard {
   min-height: 100vh;
   padding: 2rem;
-  background: #ffffff;
+  background: var(--background);
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
+  transition: background-color 0.3s ease;
 }
 
 .dashboard-header {
   text-align: center;
   margin-bottom: 2.5rem;
-  color: rgb(9, 39, 135);
+  color: var(--text-primary);
 }
 
 .dashboard-header h1 {
   font-size: 2.5rem;
   font-weight: 700;
   margin-bottom: 0.5rem;
+  color: var(--text-primary);
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: color 0.3s ease;
 }
 
 .dashboard-header p {
   font-size: 1rem;
   font-weight: 400;
+  color: var(--text-secondary);
   opacity: 0.9;
+  transition: color 0.3s ease;
 }
 
 .dashboard-content {
@@ -40,15 +45,15 @@
 }
 
 .module-card {
-  background: white;
+  background: var(--surface);
   border-radius: 10px;
   padding: 1.1rem;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
   position: relative;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid var(--border);
 }
 
 .module-card::before {
@@ -64,8 +69,8 @@
 
 .module-card:hover {
   transform: translateY(-6px);
-  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.15);
-  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--border-hover);
 }
 
 .module-card:active {
@@ -86,22 +91,25 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.13);
+  box-shadow: var(--shadow);
+  transition: box-shadow 0.3s ease;
 }
 
 .card-header h3 {
   font-size: 1.05rem;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--text-primary);
   margin: 0;
+  transition: color 0.3s ease;
 }
 
 .card-description {
-  color: #64748b;
+  color: var(--text-secondary);
   font-size: 0.85rem;
   line-height: 1.4;
   margin-bottom: 0.7rem;
   font-weight: 400;
+  transition: color 0.3s ease;
 }
 
 .card-footer {
@@ -109,20 +117,22 @@
   justify-content: space-between;
   align-items: center;
   padding-top: 0.5rem;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--border);
+  transition: border-color 0.3s ease;
 }
 
 .access-text {
-  color: #64748b;
+  color: var(--text-secondary);
   font-size: 0.75rem;
   font-weight: 500;
+  transition: color 0.3s ease;
 }
 
 .arrow-icon {
-  color: #3b82f6;
+  color: var(--primary-color);
   font-size: 0.95rem;
   font-weight: 600;
-  transition: transform 0.2s ease;
+  transition: transform 0.2s ease, color 0.3s ease;
 }
 
 .module-card:hover .arrow-icon {
@@ -206,3 +216,35 @@
 .module-card:nth-child(4) { animation-delay: 0.4s; }
 .module-card:nth-child(5) { animation-delay: 0.5s; }
 .module-card:nth-child(6) { animation-delay: 0.6s; }
+.module-card:nth-child(7) { animation-delay: 0.7s; }
+.module-card:nth-child(8) { animation-delay: 0.8s; }
+
+/* Dark mode specific enhancements */
+:global(.dark) .module-card {
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+:global(.dark) .module-card:hover {
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
+  border-color: var(--border-hover);
+}
+
+:global(.dark) .dashboard-header h1 {
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+:global(.dark) .icon-container {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Enhanced focus states for accessibility */
+.module-card:focus {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+.module-card:focus:not(:focus-visible) {
+  outline: none;
+}

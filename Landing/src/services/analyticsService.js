@@ -3,6 +3,12 @@ import { toast } from 'react-toastify';
 
 const API_URL = '/api/analytics';
 
+// Get authentication headers
+function getAuthHeaders() {
+  const token = localStorage.getItem('token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 // Helper to handle API errors
 const handleError = (error) => {
   console.error('Analytics API Error:', error);
@@ -22,6 +28,7 @@ export const fetchAnalytics = async (params = {}) => {
 
     const response = await axios.get(API_URL, { 
       params: defaultParams,
+      headers: getAuthHeaders(),
       timeout: 30000 // 30 second timeout
     });
     
@@ -36,6 +43,7 @@ export const fetchAnalyticsSummary = async (params = {}) => {
   try {
     const response = await axios.get(`${API_URL}/summary`, { 
       params,
+      headers: getAuthHeaders(),
       timeout: 20000 // 20 second timeout
     });
     return response.data;
@@ -51,6 +59,7 @@ export const exportAnalytics = async (params = {}) => {
       url: `${API_URL}/export`,
       method: 'GET',
       params,
+      headers: getAuthHeaders(),
       responseType: 'blob', // Important for file download
       timeout: 60000 // 60 second timeout for larger exports
     });
