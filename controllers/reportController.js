@@ -1270,7 +1270,8 @@ exports.getSalesAnalytics = async (req, res) => {
 // Sales Export Endpoint
 exports.exportSalesReport = async (req, res) => {
   try {
-    const userId = req.user && req.user.userId ? req.user.userId : req.user && req.user._id ? req.user._id : undefined;
+    // Get userId from JWT token - check both userId and id fields
+    const userId = req.user.userId || req.user.id;
     const { format = 'csv' } = req.query;
     const { start, end } = parseDateRange(req.query);
     
@@ -1342,6 +1343,8 @@ exports.exportSalesReport = async (req, res) => {
       }
     });
     
+    const timestamp = new Date().toISOString().split('T')[0];
+    
     if (format === 'csv') {
       const csvHeaders = Object.keys(exportData[0] || {});
       const csvContent = [
@@ -1352,16 +1355,58 @@ exports.exportSalesReport = async (req, res) => {
       ].join('\n');
       
       res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', `attachment; filename="sales_report_${new Date().toISOString().split('T')[0]}.csv"`);
+      res.setHeader('Content-Disposition', `attachment; filename="sales_report_${timestamp}.csv"`);
       res.send(csvContent);
+    } else if (format === 'excel' || format === 'xlsx') {
+      const XLSX = require('xlsx');
+      
+      // Create workbook and worksheet
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      
+      // Add the worksheet to the workbook
+      XLSX.utils.book_append_sheet(wb, ws, 'Sales Report');
+      
+      // Generate buffer
+      const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+      
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="sales_report_${timestamp}.xlsx"`);
+      res.send(buffer);
+    } else if (format === 'pdf') {
+      // For PDF, we'll return the data as JSON and let frontend handle PDF generation
+      // This avoids server-side PDF generation issues
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="sales_report_${timestamp}.json"`);
+      res.json({
+        type: 'pdf_data',
+        title: 'Sales Report',
+        generated_at: new Date().toLocaleDateString(),
+        period: start && end ? `${start.toLocaleDateString()} - ${end.toLocaleDateString()}` : 'All time',
+        headers: [
+          'Sale No', 'Date', 'Customer', 'Store', 'Product', 
+          'Qty', 'Unit Price', 'Total', 'Status'
+        ],
+        data: exportData.map(row => ([
+          row.sale_no || '',
+          row.date || '',
+          row.customer_name || '',
+          row.store_name || '',
+          row.product_name || '',
+          row.quantity || 0,
+          `$${(row.unit_price || 0).toFixed(2)}`,
+          `$${(row.total_amount || 0).toFixed(2)}`,
+          row.payment_status || ''
+        ]))
+      });
     } else if (format === 'json') {
       res.setHeader('Content-Type', 'application/json');
-      res.setHeader('Content-Disposition', `attachment; filename="sales_report_${new Date().toISOString().split('T')[0]}.json"`);
+      res.setHeader('Content-Disposition', `attachment; filename="sales_report_${timestamp}.json"`);
       res.json(exportData);
     } else {
       res.status(400).json({
         success: false,
-        message: 'Unsupported export format. Use csv or json.'
+        message: 'Unsupported export format. Use csv, excel, xlsx, pdf, or json.'
       });
     }
   } catch (err) {

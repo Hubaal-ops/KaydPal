@@ -211,15 +211,7 @@ const SalesReports = () => {
   const handleExport = async (format) => {
     try {
       setLoading(true);
-      // Map format names to backend expected values
-      const formatMap = {
-        'csv': 'csv',
-        'excel': 'json', // Excel functionality not implemented in backend yet, use JSON
-        'pdf': 'json'    // PDF functionality not implemented in backend yet, use JSON
-      };
-      
-      const backendFormat = formatMap[format] || format;
-      await exportSalesReport(filters, backendFormat);
+      await exportSalesReport(filters, format);
     } catch (err) {
       setError(`Failed to export report as ${format}`);
     } finally {
@@ -348,7 +340,7 @@ const SalesReports = () => {
                 </Typography>
                 
                 <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6} md={3}>
+                  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                     <TextField
                       select
                       fullWidth
@@ -367,26 +359,26 @@ const SalesReports = () => {
                   
                   {filters.period === 'custom' && (
                     <>
-                      <Grid item xs={12} sm={6} md={3}>
+                      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                         <DatePicker
                           label="Start Date"
                           value={filters.startDate}
                           onChange={(date) => handleFilterChange('startDate', date)}
-                          renderInput={(params) => <TextField {...params} size="small" fullWidth />}
+                          slotProps={{ textField: { size: "small", fullWidth: true } }}
                         />
                       </Grid>
-                      <Grid item xs={12} sm={6} md={3}>
+                      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                         <DatePicker
                           label="End Date"
                           value={filters.endDate}
                           onChange={(date) => handleFilterChange('endDate', date)}
-                          renderInput={(params) => <TextField {...params} size="small" fullWidth />}
+                          slotProps={{ textField: { size: "small", fullWidth: true } }}
                         />
                       </Grid>
                     </>
                   )}
                   
-                  <Grid item xs={12} sm={6} md={3}>
+                  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                     <TextField
                       select
                       fullWidth
@@ -404,7 +396,7 @@ const SalesReports = () => {
                     </TextField>
                   </Grid>
                   
-                  <Grid item xs={12} sm={6} md={3}>
+                  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                     <TextField
                       select
                       fullWidth
@@ -422,7 +414,7 @@ const SalesReports = () => {
                     </TextField>
                   </Grid>
                   
-                  <Grid item xs={12} sm={6} md={3}>
+                  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                     <TextField
                       select
                       fullWidth
@@ -439,7 +431,7 @@ const SalesReports = () => {
                     </TextField>
                   </Grid>
                   
-                  <Grid item xs={12} sm={6} md={3}>
+                  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                     <TextField
                       select
                       fullWidth
@@ -456,7 +448,7 @@ const SalesReports = () => {
                     </TextField>
                   </Grid>
                   
-                  <Grid item xs={12} sm={6} md={3}>
+                  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                     <TextField
                       fullWidth
                       label="Min Amount"
@@ -470,7 +462,7 @@ const SalesReports = () => {
                     />
                   </Grid>
                   
-                  <Grid item xs={12} sm={6} md={3}>
+                  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                     <TextField
                       fullWidth
                       label="Max Amount"
@@ -523,7 +515,7 @@ const SalesReports = () => {
             {reportData && (
               <Grid container spacing={3} sx={{ mb: 4 }}>
                 {summaryCards.map((card, index) => (
-                  <Grid item xs={12} sm={6} md={4} lg={2} key={index}>
+                  <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2 }} key={index}>
                     <Card sx={{ height: '100%' }}>
                       <CardContent>
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
@@ -565,7 +557,7 @@ const SalesReports = () => {
             {/* Charts */}
             {reportData?.timeSeriesData && (
               <Grid container spacing={3} sx={{ mb: 4 }}>
-                <Grid item xs={12} md={8}>
+                <Grid size={{ xs: 12, md: 8 }}>
                   <Card>
                     <CardContent>
                       <Typography variant="h6" sx={{ mb: 2 }}>
@@ -584,7 +576,7 @@ const SalesReports = () => {
                   </Card>
                 </Grid>
                 
-                <Grid item xs={12} md={4}>
+                <Grid size={{ xs: 12, md: 4 }}>
                   <Card>
                     <CardContent>
                       <Typography variant="h6" sx={{ mb: 2 }}>
@@ -704,7 +696,7 @@ const SalesReports = () => {
                   </Typography>
                   
                   <Grid container spacing={3}>
-                    <Grid item xs={12} md={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                       <Box sx={{ p: 2, bgcolor: 'background.paper', borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
                         <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>Current Period</Typography>
                         <Typography variant="body2">Revenue: ${Number(reportData.comparisons.current.total_revenue || 0).toLocaleString()}</Typography>
@@ -712,7 +704,7 @@ const SalesReports = () => {
                         <Typography variant="body2">Avg Order: ${reportData.comparisons.current.average_order_value || 0}</Typography>
                       </Box>
                     </Grid>
-                    <Grid item xs={12} md={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                       <Box sx={{ p: 2, bgcolor: 'background.paper', borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
                         <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>Previous Period</Typography>
                         <Typography variant="body2">Revenue: ${Number(reportData.comparisons.previous.total_revenue || 0).toLocaleString()}</Typography>
@@ -726,7 +718,7 @@ const SalesReports = () => {
                     <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 'bold' }}>Growth Metrics</Typography>
                     <Grid container spacing={2}>
                       {Object.entries(reportData.comparisons.growth || {}).map(([key, value]) => (
-                        <Grid item xs={6} sm={3} key={key}>
+                        <Grid size={{ xs: 6, sm: 3 }} key={key}>
                           <Box sx={{ textAlign: 'center', p: 1 }}>
                             <Typography variant="h6" color={value >= 0 ? 'success.main' : 'error.main'}>
                               {value >= 0 ? '+' : ''}{value}%
@@ -751,7 +743,7 @@ const SalesReports = () => {
             {reportData?.topPerformers && (
               <Grid container spacing={3}>
                 {/* Top Customers */}
-                <Grid item xs={12} md={4}>
+                <Grid size={{ xs: 12, md: 4 }}>
                   <Card>
                     <CardContent>
                       <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -783,7 +775,7 @@ const SalesReports = () => {
                 </Grid>
                 
                 {/* Top Products */}
-                <Grid item xs={12} md={4}>
+                <Grid size={{ xs: 12, md: 4 }}>
                   <Card>
                     <CardContent>
                       <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -815,7 +807,7 @@ const SalesReports = () => {
                 </Grid>
                 
                 {/* Top Stores */}
-                <Grid item xs={12} md={4}>
+                <Grid size={{ xs: 12, md: 4 }}>
                   <Card>
                     <CardContent>
                       <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -847,7 +839,7 @@ const SalesReports = () => {
                 </Grid>
                 
                 {/* Performance Charts */}
-                <Grid item xs={12}>
+                <Grid size={{ xs: 12 }}>
                   <Card>
                     <CardContent>
                       <Typography variant="h6" sx={{ mb: 2 }}>Top Products Performance</Typography>
@@ -884,7 +876,7 @@ const SalesReports = () => {
               <CardContent>
                 <Typography variant="h6" sx={{ mb: 2 }}>Time Series Settings</Typography>
                 <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6} md={3}>
+                  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                     <TextField
                       select
                       fullWidth
@@ -900,7 +892,7 @@ const SalesReports = () => {
                       <MenuItem value="year">Yearly</MenuItem>
                     </TextField>
                   </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
+                  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                     <Button
                       variant="contained"
                       onClick={generateReport}
@@ -917,7 +909,7 @@ const SalesReports = () => {
             {/* Revenue Trend */}
             {reportData?.timeSeriesData && (
               <Grid container spacing={3}>
-                <Grid item xs={12}>
+                <Grid size={{ xs: 12 }}>
                   <Card>
                     <CardContent>
                       <Typography variant="h6" sx={{ mb: 2 }}>Revenue Over Time</Typography>
@@ -936,7 +928,7 @@ const SalesReports = () => {
                   </Card>
                 </Grid>
                 
-                <Grid item xs={12} md={6}>
+                <Grid size={{ xs: 12, md: 6 }}>
                   <Card>
                     <CardContent>
                       <Typography variant="h6" sx={{ mb: 2 }}>Sales Volume Trend</Typography>
@@ -953,7 +945,7 @@ const SalesReports = () => {
                   </Card>
                 </Grid>
                 
-                <Grid item xs={12} md={6}>
+                <Grid size={{ xs: 12, md: 6 }}>
                   <Card>
                     <CardContent>
                       <Typography variant="h6" sx={{ mb: 2 }}>Average Order Value</Typography>
@@ -971,7 +963,7 @@ const SalesReports = () => {
                 </Grid>
                 
                 {/* Time Series Summary Table */}
-                <Grid item xs={12}>
+                <Grid size={{ xs: 12 }}>
                   <Card>
                     <CardContent>
                       <Typography variant="h6" sx={{ mb: 2 }}>Time Series Data</Typography>

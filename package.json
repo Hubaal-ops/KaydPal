@@ -138,6 +138,8 @@
     "json-schema-traverse": "^0.4.1",
     "json-stable-stringify-without-jsonify": "^1.0.1",
     "jsonwebtoken": "^9.0.2",
+    "jspdf": "^3.0.2",
+    "jspdf-autotable": "^5.0.2",
     "jwa": "^1.4.2",
     "jws": "^3.2.2",
     "kareem": "^2.5.1",
@@ -263,6 +265,7 @@
     "wide-align": "^1.1.5",
     "word-wrap": "^1.2.5",
     "wrappy": "^1.0.2",
+    "xlsx": "^0.18.5",
     "yallist": "^4.0.0",
     "yocto-queue": "^0.1.0"
   },
