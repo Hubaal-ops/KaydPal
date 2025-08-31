@@ -4,6 +4,18 @@ const router = express.Router();
 const reportController = require('../controllers/reportController');
 const { verifyToken } = require('../middleware/auth');
 
+// Advanced Sales Report (Enterprise-level)
+router.get('/sales/advanced', verifyToken, reportController.generateAdvancedSalesReport);
+
+// Sales Analytics Dashboard
+router.get('/sales/analytics', verifyToken, reportController.getSalesAnalytics);
+
+// Sales Export
+router.get('/sales/export', verifyToken, reportController.exportSalesReport);
+
+// Sales Forecasting
+router.get('/sales/forecast', verifyToken, reportController.getSalesForecasting);
+
 // Stock Valuation Report
 router.get('/stock-valuation', verifyToken, reportController.stockValuationReport);
 

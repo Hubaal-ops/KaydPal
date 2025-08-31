@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import styles from './payment_in.module.css';
-import { Plus, Eye, Edit, Trash2, ArrowLeft, Search } from 'lucide-react';
-import { getPayments, getPaymentById, createPayment, updatePayment, deletePayment } from '../services/paymentService';
+import { Plus, Eye, Edit, Trash2, ArrowLeft, Search, Receipt as ReceiptIcon } from 'lucide-react';
+import { getPayments, getPaymentById, createPayment, updatePayment, deletePayment, generateReceiptData, generateReceiptFromBackend } from '../services/paymentService';
 import { getCustomers } from '../services/customerService';
 import { getAccounts } from '../services/accountService';
+import Receipt from '../components/Receipt';
 
 const PaymentIn = ({ onBack }) => {
   const [viewMode, setViewMode] = useState('table');
@@ -16,6 +17,8 @@ const PaymentIn = ({ onBack }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showReceipt, setShowReceipt] = useState(false);
+  const [receiptData, setReceiptData] = useState(null);
 
   // Fetch customers and accounts on mount
   useEffect(() => {
@@ -78,6 +81,38 @@ const PaymentIn = ({ onBack }) => {
     }
   };
 
+  const handleGenerateReceipt = async (payment) => {
+    try {
+      // Try backend receipt generation first
+      try {
+        const backendReceipt = await generateReceiptFromBackend(payment.id);
+        setReceiptData({
+          payment: backendReceipt.payment,
+          customer: backendReceipt.customer,
+          account: backendReceipt.account,
+          receiptNumber: backendReceipt.receiptNumber,
+          generatedAt: backendReceipt.generatedAt
+        });
+        setShowReceipt(true);
+        return;
+      } catch (backendError) {
+        console.log('Backend receipt generation failed, trying frontend:', backendError.message);
+      }
+      
+      // Fallback to frontend generation
+      const receiptInfo = await generateReceiptData(payment, customers, accounts);
+      setReceiptData(receiptInfo);
+      setShowReceipt(true);
+    } catch (err) {
+      setError('Error generating receipt: ' + err.message);
+    }
+  };
+
+  const handleCloseReceipt = () => {
+    setShowReceipt(false);
+    setReceiptData(null);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -88,20 +123,51 @@ const PaymentIn = ({ onBack }) => {
     }
     setLoading(true);
     try {
+      let paymentResult;
       if (editing) {
-        await updatePayment(editing.id, form);
+        paymentResult = await updatePayment(editing.id, form);
         setSuccess('Payment updated');
       } else {
-        await createPayment(form);
-        setSuccess('Payment added');
+        paymentResult = await createPayment(form);
+        setSuccess('Payment added successfully!');
       }
+      
       // Refresh payments
       const pays = await getPayments();
       console.log('Fetched payments:', pays); // Debug log
       setPayments(pays);
+      
+      // Generate receipt for new payment
+      if (!editing && paymentResult) {
+        try {
+          let receiptInfo;
+          // Check if the backend already provided receipt data
+          if (paymentResult.receipt) {
+            receiptInfo = {
+              payment: paymentResult.data || paymentResult.receipt.payment,
+              customer: paymentResult.receipt.customer,
+              account: paymentResult.receipt.account,
+              receiptNumber: paymentResult.receipt.receiptNumber,
+              generatedAt: new Date().toISOString()
+            };
+          } else {
+            // Fallback to frontend generation
+            receiptInfo = await generateReceiptData(paymentResult.data || paymentResult, customers, accounts);
+          }
+          setReceiptData(receiptInfo);
+          setShowReceipt(true);
+        } catch (receiptErr) {
+          console.log('Receipt generation error:', receiptErr);
+          // Don't show error for receipt generation failure
+        }
+      }
+      
       setForm({ customer_id: '', account_id: '', amount: 0 });
       setEditing(null);
-      setTimeout(() => setViewMode('table'), 1200);
+      
+      if (!showReceipt) {
+        setTimeout(() => setViewMode('table'), 1200);
+      }
     } catch (err) {
       setError('Error saving payment');
     } finally {
@@ -178,6 +244,13 @@ const PaymentIn = ({ onBack }) => {
                         <td>{p.created_at ? new Date(p.created_at).toLocaleDateString() : ''}</td>
                         <td>
                           <div className={styles['action-icons']}>
+                            <button 
+                              onClick={() => handleGenerateReceipt(p)} 
+                              className={styles['icon-btn']} 
+                              title="Generate Receipt"
+                            >
+                              <ReceiptIcon size={16} />
+                            </button>
                             <button onClick={() => handleEdit(p)} className={styles['icon-btn']} title="Edit"><Edit size={16} /></button>
                             <button onClick={() => handleDelete(p.id)} className={`${styles['icon-btn']} ${styles.delete}`} title="Delete"><Trash2 size={16} /></button>
                           </div>
@@ -249,6 +322,24 @@ const PaymentIn = ({ onBack }) => {
           </div>
         )}
       </div>
+      
+      {/* Receipt Component */}
+      {showReceipt && receiptData && (
+        <Receipt
+          payment={receiptData.payment}
+          customer={receiptData.customer}
+          account={receiptData.account}
+          onClose={handleCloseReceipt}
+          onPrint={() => {
+            setSuccess('Receipt printed successfully!');
+            setTimeout(() => {
+              setShowReceipt(false);
+              setReceiptData(null);
+              setViewMode('table');
+            }, 1500);
+          }}
+        />
+      )}
     </div>
   );
 };

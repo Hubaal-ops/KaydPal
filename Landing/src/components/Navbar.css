@@ -41,7 +41,8 @@
   justify-content: center;
   gap: 2.5rem;
 }
-.nav-menu-center a {
+.nav-menu-center a,
+.nav-menu-center .nav-link {
   color: var(--text-secondary);
   font-weight: 500;
   font-size: 0.95rem;
@@ -49,11 +50,19 @@
   transition: color 0.2s, border-color 0.2s;
   padding: 0.5rem 0;
   border-bottom: 2px solid transparent;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
 }
-.nav-menu-center a:hover {
+
+.nav-menu-center a:hover,
+.nav-menu-center .nav-link:hover {
   color: var(--primary-color);
 }
-.nav-menu-center a.active {
+
+.nav-menu-center a.active,
+.nav-menu-center .nav-link.active {
   color: var(--primary-color);
   border-bottom-color: var(--primary-color);
 }

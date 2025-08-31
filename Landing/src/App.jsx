@@ -28,6 +28,7 @@ import Withdrawal from './views/Withdrawal';
 import Analytics from './views/Analytics';
 import ErrorBoundary from './components/ErrorBoundary';
 import Reports from './views/Reports';
+import SalesReports from './views/SalesReports';
 import UserManagement from './views/admin/UserManagement';
 import SystemSettings from './views/admin/SystemSettings';
 import AuditLogs from './views/admin/AuditLogs';
@@ -224,6 +225,14 @@ function App() {
             element={
               user && user.role === 'user'
                 ? <Reports />
+                : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
+            }
+          />
+          <Route
+            path="/reports/sales-advanced"
+            element={
+              user && user.role === 'user'
+                ? <SalesReports />
                 : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
             }
           />

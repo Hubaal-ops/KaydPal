@@ -59,7 +59,10 @@ export async function updateAccount(id, account) {
 
 export async function deleteAccount(id) {
   const res = await fetch(`${API_URL}/${id}`, {
-    method: 'DELETE'
+    method: 'DELETE',
+    headers: {
+      ...getAuthHeaders(),
+    }
   });
   if (!res.ok) throw new Error('Failed to delete account');
   return res.json();

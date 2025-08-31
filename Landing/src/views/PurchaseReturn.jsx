@@ -32,29 +32,43 @@ const PurchaseReturn = ({ onBack }) => {
   });
   const [editingReturn, setEditingReturn] = useState(null);
 
+  // Manual data fetching function
+  const fetchAll = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      console.log('🔍 Fetching purchase returns data...');
+      const [returnsData, productsData, suppliersData, storesData, accountsData] = await Promise.all([
+        getPurchaseReturns(),
+        getProducts(),
+        getSuppliers(),
+        getStores(),
+        getAccounts()
+      ]);
+      
+      console.log('📊 Purchase returns response:', returnsData);
+      console.log('📊 Products response:', productsData);
+      console.log('📊 Suppliers response:', suppliersData);
+      console.log('📊 Stores response:', storesData);
+      console.log('📊 Accounts response:', accountsData);
+      
+      const processedReturns = Array.isArray(returnsData) ? returnsData : (returnsData.data || []);
+      setReturns(processedReturns);
+      setProducts(productsData.data || productsData);
+      setSuppliers(suppliersData.data || suppliersData);
+      setStores(storesData.data || storesData);
+      setAccounts(accountsData.data || accountsData);
+      
+      console.log('✅ Purchase returns loaded:', processedReturns.length, 'items');
+    } catch (err) {
+      console.error('❌ Error loading purchase returns data:', err);
+      setError(`Error loading purchase returns or dropdown data: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchAll = async () => {
-      setLoading(true);
-      setError('');
-      try {
-        const [returnsData, productsData, suppliersData, storesData, accountsData] = await Promise.all([
-          getPurchaseReturns(),
-          getProducts(),
-          getSuppliers(),
-          getStores(),
-          getAccounts()
-        ]);
-        setReturns(Array.isArray(returnsData) ? returnsData : (returnsData.data || []));
-        setProducts(productsData.data || productsData);
-        setSuppliers(suppliersData.data || suppliersData);
-        setStores(storesData.data || storesData);
-        setAccounts(accountsData.data || accountsData);
-      } catch (err) {
-        setError('Error loading purchase returns or dropdown data');
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchAll();
   }, []);
 
@@ -120,8 +134,7 @@ const PurchaseReturn = ({ onBack }) => {
       try {
         await deletePurchaseReturn(id);
         setSuccess('Purchase return deleted successfully');
-        const data = await getPurchaseReturns();
-        setReturns(Array.isArray(data) ? data : (data.data || []));
+        await fetchAll(); // Use shared function
       } catch (err) {
         setError('Error deleting purchase return');
       } finally {
@@ -168,8 +181,7 @@ const PurchaseReturn = ({ onBack }) => {
         await createPurchaseReturn(payload);
         setSuccess('Purchase return added successfully');
       }
-      const data = await getPurchaseReturns();
-      setReturns(Array.isArray(data) ? data : (data.data || []));
+      await fetchAll(); // Use shared function
       setFormData({
         product_no: '',
         supplier_no: '',
@@ -230,8 +242,33 @@ const PurchaseReturn = ({ onBack }) => {
             <Plus size={20} />
             Add New Return
           </button>
+          <button 
+            className={purchasesStyles['action-btn']} 
+            onClick={fetchAll}
+            disabled={loading}
+            title="Manually refresh data"
+          >
+            🔄 Load Data
+          </button>
         </div>
-        {error && <div className={purchasesStyles.error}>{error}</div>}
+        {error && <div className={purchasesStyles.error}>
+          {error}
+          <button 
+            onClick={fetchAll}
+            style={{
+              marginLeft: '10px', 
+              padding: '4px 8px', 
+              fontSize: '12px', 
+              backgroundColor: 'var(--primary-color)', 
+              color: 'white', 
+              border: 'none', 
+              borderRadius: '4px', 
+              cursor: 'pointer'
+            }}
+          >
+            Retry
+          </button>
+        </div>}
         {success && <div className={purchasesStyles.success}>{success}</div>}
         {loading && <div className={purchasesStyles.loading}>Loading...</div>}
         {viewMode === 'table' && (

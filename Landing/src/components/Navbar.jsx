@@ -14,6 +14,16 @@ const Navbar = ({ isDarkMode, toggleTheme, user, setUser }) => {
     navigate('/login');
   };
 
+  const handleSmoothScroll = (sectionId) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ 
+        behavior: 'smooth',
+        block: 'start'
+      });
+    }
+  };
+
   return (
     <nav className="navbar">
       <div className="nav-container">
@@ -35,9 +45,9 @@ const Navbar = ({ isDarkMode, toggleTheme, user, setUser }) => {
           )}
           {!user && isLandingPage && (
             <>
-              <NavLink to="/features">Features</NavLink>
-              <NavLink to="/pricing">Pricing</NavLink>
-              <NavLink to="/contact">Contact</NavLink>
+              <button onClick={() => handleSmoothScroll('features')} className="nav-link">Features</button>
+              <button onClick={() => handleSmoothScroll('pricing')} className="nav-link">Pricing</button>
+              <button onClick={() => handleSmoothScroll('contact')} className="nav-link">Contact</button>
             </>
           )}
         </div>

@@ -179,6 +179,7 @@ const Reports = () => {
 
   const reportTypes = [
     { value: 'sales', label: 'Sales Report', icon: '📊' },
+    { value: 'sales-advanced', label: 'Advanced Sales Analytics', icon: '📈' },
     { value: 'stock-movement', label: 'Stock Movement/History', icon: '🔄' },
     { value: 'inventory', label: 'Inventory Report', icon: '📦' },
     { value: 'stock-valuation', label: 'Stock Valuation', icon: '💲' },
@@ -232,6 +233,13 @@ const Reports = () => {
       setLoading(true);
       setError('');
       setPage(0);
+      
+      // Handle enterprise sales analytics redirect
+      if (reportType === 'sales-advanced') {
+        window.location.href = '/reports/sales-advanced';
+        return;
+      }
+      
       let url;
       if (reportType === 'top-products') {
         url = `/api/reports/top-products?startDate=${formatDate(dateRange.startDate)}&endDate=${formatDate(dateRange.endDate)}&limit=10&type=${topBottomType}`;

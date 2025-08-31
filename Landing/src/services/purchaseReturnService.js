@@ -29,9 +29,30 @@ const apiRequest = async (endpoint, options = {}) => {
 
 export const getPurchaseReturns = async () => {
   try {
-    const data = await apiRequest('/');
-    return data.data || [];
+    console.log('🔍 Making API request to:', API_URL);
+    const response = await apiRequest('/');
+    console.log('📊 API response received:', response);
+    
+    // Handle different response formats
+    if (Array.isArray(response)) {
+      console.log('✅ Response is already an array:', response.length, 'items');
+      return response;
+    }
+    
+    if (response && response.data && Array.isArray(response.data)) {
+      console.log('✅ Response has data array:', response.data.length, 'items');
+      return response.data;
+    }
+    
+    if (response && Array.isArray(response.data)) {
+      console.log('✅ Response data is array:', response.data.length, 'items');
+      return response.data;
+    }
+    
+    console.log('⚠️ Unexpected response format, returning empty array');
+    return [];
   } catch (error) {
+    console.error('❌ Purchase returns API error:', error);
     throw error;
   }
 };

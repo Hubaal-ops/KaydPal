@@ -1,20 +1,21 @@
 const express = require('express');
 const router = express.Router();
 const paymentOutController = require('../controllers/paymentOutController');
+const { verifyToken } = require('../middleware/auth');
 
 // Get all payment outs
-router.get('/', paymentOutController.getAllPaymentsOut);
+router.get('/', verifyToken, paymentOutController.getAllPaymentsOut);
 
 // Get payment out by ID
-router.get('/:id', paymentOutController.getPaymentOutById);
+router.get('/:id', verifyToken, paymentOutController.getPaymentOutById);
 
 // Create new payment out
-router.post('/', paymentOutController.createPaymentOut);
+router.post('/', verifyToken, paymentOutController.createPaymentOut);
 
 // Update payment out
-router.put('/:id', paymentOutController.updatePaymentOut);
+router.put('/:id', verifyToken, paymentOutController.updatePaymentOut);
 
 // Delete payment out
-router.delete('/:id', paymentOutController.deletePaymentOut);
+router.delete('/:id', verifyToken, paymentOutController.deletePaymentOut);
 
 module.exports = router; 

@@ -48,6 +48,13 @@
   margin: 0 auto;
 }
 
+.center-actions {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  justify-content: center;
+}
+
 .action-buttons {
   display: flex;
   gap: 1rem;
@@ -196,6 +203,27 @@
   justify-content: center;
   width: 32px;
   height: 32px;
+}
+
+.icon-btn:hover {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.icon-btn.delete {
+  color: #ef4444;
+}
+
+.icon-btn.delete:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* Receipt button styling */
+.icon-btn[title="Generate Receipt"] {
+  color: #059669;
+}
+
+.icon-btn[title="Generate Receipt"]:hover {
+  background: rgba(5, 150, 105, 0.1);
 }
 
 .icon-btn svg {

@@ -116,18 +116,366 @@ const Sales = require('../models/Sale');
 const Product = require('../models/Product');
 const Expense = require('../models/Expense');
 const Purchase = require('../models/Purchase');
-const { startOfDay, endOfDay } = require('date-fns');
+const Customer = require('../models/Customer');
+const Store = require('../models/Store');
+const Account = require('../models/Account');
+const StoreProduct = require('../models/StoreProduct');
+const { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subDays, subMonths, subYears, format } = require('date-fns');
 
 // Helper: parse date range from query
 function parseDateRange(query) {
-  let { startDate, endDate } = query;
-  if (startDate) startDate = new Date(startDate);
-  if (endDate) endDate = new Date(endDate);
-  return {
-    start: startDate ? startOfDay(startDate) : undefined,
-    end: endDate ? endOfDay(endDate) : undefined,
-  };
+  let { startDate, endDate, period } = query;
+  let start, end;
+  const now = new Date();
+  
+  // Handle predefined periods
+  if (period) {
+    switch (period) {
+      case 'today':
+        start = startOfDay(now);
+        end = endOfDay(now);
+        break;
+      case 'yesterday':
+        const yesterday = subDays(now, 1);
+        start = startOfDay(yesterday);
+        end = endOfDay(yesterday);
+        break;
+      case 'this_week':
+        start = startOfWeek(now, { weekStartsOn: 1 });
+        end = endOfWeek(now, { weekStartsOn: 1 });
+        break;
+      case 'last_week':
+        const lastWeek = subDays(now, 7);
+        start = startOfWeek(lastWeek, { weekStartsOn: 1 });
+        end = endOfWeek(lastWeek, { weekStartsOn: 1 });
+        break;
+      case 'this_month':
+        start = startOfMonth(now);
+        end = endOfMonth(now);
+        break;
+      case 'last_month':
+        const lastMonth = subMonths(now, 1);
+        start = startOfMonth(lastMonth);
+        end = endOfMonth(lastMonth);
+        break;
+      case 'this_quarter':
+        const quarterStart = startOfMonth(subMonths(now, (now.getMonth() % 3)));
+        start = quarterStart;
+        end = endOfMonth(subMonths(quarterStart, -2));
+        break;
+      case 'this_year':
+        start = startOfYear(now);
+        end = endOfYear(now);
+        break;
+      case 'last_year':
+        const lastYear = subYears(now, 1);
+        start = startOfYear(lastYear);
+        end = endOfYear(lastYear);
+        break;
+      case 'last_30_days':
+        start = startOfDay(subDays(now, 30));
+        end = endOfDay(now);
+        break;
+      case 'last_90_days':
+        start = startOfDay(subDays(now, 90));
+        end = endOfDay(now);
+        break;
+      default:
+        // Custom date range
+        if (startDate) start = startOfDay(new Date(startDate));
+        if (endDate) end = endOfDay(new Date(endDate));
+    }
+  } else {
+    // Custom date range
+    if (startDate) start = startOfDay(new Date(startDate));
+    if (endDate) end = endOfDay(new Date(endDate));
+  }
+  
+  return { start, end };
 }
+
+// Advanced Sales Report with Enterprise Features
+exports.generateAdvancedSalesReport = async (req, res) => {
+  try {
+    // Get userId from JWT token - check both userId and id fields
+    const userId = req.user.userId || req.user.id;
+    console.log('🔍 JWT payload:', req.user);
+    console.log('🔍 Extracted userId:', userId);
+    
+    const { start, end } = parseDateRange(req.query);
+    const {
+      customer_no,
+      store_no,
+      product_no,
+      status,
+      min_amount,
+      max_amount,
+      payment_status,
+      groupBy = 'day', // day, week, month, quarter, year
+      metrics = 'basic', // basic, advanced, detailed
+      includeItems = true,
+      includeComparisons = false,
+      page = 1,
+      limit = 50,
+      sortBy = 'sel_date',
+      sortOrder = 'desc'
+    } = req.query;
+
+    console.log('🔍 Generating advanced sales report with filters:', {
+      userId, start, end, customer_no, store_no, product_no, status, min_amount, max_amount, payment_status, groupBy, metrics
+    });
+
+    // Build base filter
+    const filter = {};
+    if (userId) filter.userId = userId;
+    if (start && end) filter.sel_date = { $gte: start, $lte: end };
+    if (customer_no) filter.customer_no = Number(customer_no);
+    if (store_no) filter.store_no = Number(store_no);
+    if (status) filter.status = status;
+    if (min_amount || max_amount) {
+      filter.amount = {};
+      if (min_amount) filter.amount.$gte = Number(min_amount);
+      if (max_amount) filter.amount.$lte = Number(max_amount);
+    }
+    
+    // Payment status filter
+    if (payment_status) {
+      switch (payment_status) {
+        case 'paid':
+          filter.$expr = { $gte: ['$paid', '$amount'] };
+          break;
+        case 'partial':
+          filter.$expr = { $and: [{ $gt: ['$paid', 0] }, { $lt: ['$paid', '$amount'] }] };
+          break;
+        case 'unpaid':
+          filter.paid = { $lte: 0 };
+          break;
+      }
+    }
+
+    // Get sales with pagination and sorting
+    const sortOptions = {};
+    sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
+    
+    const skip = (Number(page) - 1) * Number(limit);
+    
+    const [sales, totalCount] = await Promise.all([
+      Sales.find(filter)
+        .sort(sortOptions)
+        .skip(skip)
+        .limit(Number(limit))
+        .lean(),
+      Sales.countDocuments(filter)
+    ]);
+
+    console.log(`📊 Found ${sales.length} sales out of ${totalCount} total`);
+
+    // Filter by product if specified
+    let filteredSales = sales;
+    if (product_no) {
+      filteredSales = sales.filter(sale => 
+        sale.items && sale.items.some(item => item.product_no === Number(product_no))
+      );
+    }
+
+    // Get related data for enrichment
+    console.log('🔍 Using userId for queries:', userId);
+    
+    const [customers, stores, accounts, products, allCustomers, allStores] = await Promise.all([
+      Customer.find({ userId }).lean(),
+      Store.find({ userId }).lean(),
+      Account.find({ userId }).lean(),
+      Product.find({ userId }).lean(),
+      Customer.find({}).lean(), // Get all customers without userId filter for debugging
+      Store.find({}).lean()     // Get all stores without userId filter for debugging
+    ]);
+    
+    console.log(`📊 Found related data: ${customers.length} customers, ${stores.length} stores, ${accounts.length} accounts, ${products.length} products`);
+    console.log(`📊 Found ALL data: ${allCustomers.length} total customers, ${allStores.length} total stores`);
+    console.log(`📊 User ID for filtering: ${userId}`);
+    
+    // Log sample data for debugging
+    if (filteredSales.length > 0) {
+      const sampleSale = filteredSales[0];
+      console.log('🔍 Sample sale data:', {
+        customer_no: sampleSale.customer_no,
+        customer_no_type: typeof sampleSale.customer_no,
+        store_no: sampleSale.store_no,
+        store_no_type: typeof sampleSale.store_no,
+        amount: sampleSale.amount,
+        userId: sampleSale.userId
+      });
+    }
+    
+    if (customers.length > 0) {
+      console.log('🔍 Sample customer:', { 
+        customer_no: customers[0].customer_no, 
+        customer_no_type: typeof customers[0].customer_no,
+        name: customers[0].name,
+        userId: customers[0].userId
+      });
+    } else {
+      console.log('⚠️ No customers found for userId:', userId);
+    }
+    
+    if (stores.length > 0) {
+      console.log('🔍 Sample store:', { 
+        store_no: stores[0].store_no, 
+        store_no_type: typeof stores[0].store_no,
+        store_name: stores[0].store_name,
+        userId: stores[0].userId
+      });
+    } else {
+      console.log('⚠️ No stores found for userId:', userId);
+    }
+
+    // Create lookup maps with both string and number keys to handle type mismatches
+    const customerMap = new Map();
+    customers.forEach(c => {
+      customerMap.set(c.customer_no, c);
+      customerMap.set(String(c.customer_no), c);
+      customerMap.set(Number(c.customer_no), c);
+    });
+    
+    const storeMap = new Map();
+    stores.forEach(s => {
+      storeMap.set(s.store_no, s);
+      storeMap.set(String(s.store_no), s);
+      storeMap.set(Number(s.store_no), s);
+    });
+    
+    const accountMap = Object.fromEntries(accounts.map(a => [a.account_id, a]));
+    const productMap = new Map();
+    products.forEach(p => {
+      productMap.set(p.product_no, p);
+      productMap.set(String(p.product_no), p);
+      productMap.set(Number(p.product_no), p);
+    });
+
+    // Enrich sales data
+    const enrichedSales = filteredSales.map(sale => {
+      const customer = customerMap.get(sale.customer_no);
+      const store = storeMap.get(sale.store_no);
+      const account = accountMap[sale.account_id];
+      
+      // Calculate derived metrics
+      const balanceDue = (sale.amount || 0) - (sale.paid || 0);
+      const paymentStatus = balanceDue <= 0 ? 'paid' : (sale.paid > 0 ? 'partial' : 'unpaid');
+      const profitMargin = calculateProfitMargin(sale, productMap);
+      
+      let enrichedItems = [];
+      if (includeItems && sale.items) {
+        enrichedItems = sale.items.map(item => {
+          const product = productMap.get(item.product_no);
+          return {
+            ...item,
+            product_name: product?.product_name || item.product_name || '',
+            category: product?.category || '',
+            cost_price: product?.cost_price || 0,
+            profit: (item.price - (product?.cost_price || 0)) * item.qty,
+            margin_percentage: product?.cost_price ? 
+              (((item.price - product.cost_price) / item.price) * 100).toFixed(2) : 0
+          };
+        });
+      }
+
+      return {
+        ...sale,
+        customer_name: customer?.name || `Customer ${sale.customer_no}`,
+        customer_email: customer?.email || '',
+        customer_phone: customer?.phone || '',
+        store_name: store?.store_name || `Store ${sale.store_no}`,
+        account_name: account?.name || account?.account_name || '',
+        balance_due: balanceDue,
+        payment_status: paymentStatus,
+        profit_margin: profitMargin,
+        items: enrichedItems
+      };
+    });
+    
+    // Log enriched data for debugging
+    if (enrichedSales.length > 0) {
+      const sampleEnriched = enrichedSales[0];
+      const customer = customerMap.get(sampleEnriched.customer_no);
+      const store = storeMap.get(sampleEnriched.store_no);
+      console.log('🔍 Sample enriched sale:', {
+        customer_no: sampleEnriched.customer_no,
+        customer_name: sampleEnriched.customer_name,
+        store_no: sampleEnriched.store_no,
+        store_name: sampleEnriched.store_name,
+        lookup_customer: customer ? { name: customer.name } : 'NOT FOUND',
+        lookup_store: store ? { store_name: store.store_name } : 'NOT FOUND'
+      });
+    }
+
+    // Calculate summary metrics
+    const summary = calculateSalesSummary(enrichedSales, metrics);
+    
+    // Group data for time series analysis
+    const timeSeriesData = groupSalesByTime(enrichedSales, groupBy);
+    
+    // Top performers analysis
+    const topPerformers = calculateTopPerformers(enrichedSales);
+    
+    // Comparison data if requested
+    let comparisonData = null;
+    if (includeComparisons && start && end) {
+      comparisonData = await calculateComparisonMetrics(filter, start, end, userId);
+    }
+
+    // Build response
+    const response = {
+      success: true,
+      data: {
+        sales: enrichedSales,
+        summary,
+        timeSeriesData,
+        topPerformers,
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+          total: totalCount,
+          pages: Math.ceil(totalCount / Number(limit))
+        },
+        filters: {
+          period: req.query.period,
+          start,
+          end,
+          customer_no,
+          store_no,
+          product_no,
+          status,
+          payment_status,
+          min_amount,
+          max_amount
+        },
+        metadata: {
+          generated_at: new Date(),
+          report_type: 'advanced_sales',
+          metrics_level: metrics,
+          total_customers: customers.length,
+          total_stores: stores.length,
+          total_products: products.length
+        }
+      }
+    };
+
+    if (comparisonData) {
+      response.data.comparisons = comparisonData;
+    }
+
+    console.log('✅ Advanced sales report generated successfully');
+    res.json(response);
+    
+  } catch (err) {
+    console.error('❌ Error generating advanced sales report:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to generate sales report', 
+      error: err.message 
+    });
+  }
+};
 
 exports.generateReport = async (req, res) => {
   const { type } = req.params;
@@ -618,3 +966,494 @@ exports.generateReport = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error', error: err.message });
   }
 }
+
+// Helper function to calculate profit margin for a sale
+function calculateProfitMargin(sale, productMap) {
+  if (!sale.items || !Array.isArray(sale.items)) return 0;
+  
+  let totalRevenue = 0;
+  let totalCost = 0;
+  
+  sale.items.forEach(item => {
+    const product = productMap.get ? productMap.get(item.product_no) : productMap[item.product_no];
+    const revenue = (item.price || 0) * (item.qty || 0);
+    const cost = (product?.cost_price || 0) * (item.qty || 0);
+    
+    totalRevenue += revenue;
+    totalCost += cost;
+  });
+  
+  if (totalRevenue === 0) return 0;
+  return ((totalRevenue - totalCost) / totalRevenue * 100).toFixed(2);
+}
+
+// Helper function to calculate comprehensive sales summary
+function calculateSalesSummary(sales, metricsLevel) {
+  const summary = {
+    total_sales: sales.length,
+    total_revenue: 0,
+    total_paid: 0,
+    total_outstanding: 0,
+    total_profit: 0,
+    average_order_value: 0,
+    payment_collection_rate: 0,
+    total_items_sold: 0,
+    unique_customers: new Set(),
+    sales_by_status: {
+      draft: 0,
+      confirmed: 0,
+      delivered: 0,
+      cancelled: 0
+    },
+    payment_status_breakdown: {
+      paid: 0,
+      partial: 0,
+      unpaid: 0
+    }
+  };
+
+  sales.forEach(sale => {
+    summary.total_revenue += sale.amount || 0;
+    summary.total_paid += sale.paid || 0;
+    summary.total_outstanding += (sale.amount || 0) - (sale.paid || 0);
+    summary.unique_customers.add(sale.customer_no);
+    
+    // Count sales by status
+    const status = sale.status || 'draft';
+    if (summary.sales_by_status.hasOwnProperty(status)) {
+      summary.sales_by_status[status]++;
+    }
+    
+    // Count by payment status
+    if (summary.payment_status_breakdown.hasOwnProperty(sale.payment_status)) {
+      summary.payment_status_breakdown[sale.payment_status]++;
+    }
+    
+    // Count items
+    if (sale.items && Array.isArray(sale.items)) {
+      summary.total_items_sold += sale.items.reduce((sum, item) => sum + (item.qty || 0), 0);
+    }
+    
+    // Calculate profit if available
+    if (sale.profit_margin && !isNaN(sale.profit_margin)) {
+      summary.total_profit += (sale.amount || 0) * (parseFloat(sale.profit_margin) / 100);
+    }
+  });
+
+  // Calculate derived metrics
+  summary.average_order_value = summary.total_sales > 0 ? (summary.total_revenue / summary.total_sales).toFixed(2) : 0;
+  summary.payment_collection_rate = summary.total_revenue > 0 ? ((summary.total_paid / summary.total_revenue) * 100).toFixed(2) : 0;
+  summary.unique_customers_count = summary.unique_customers.size;
+  summary.average_items_per_sale = summary.total_sales > 0 ? (summary.total_items_sold / summary.total_sales).toFixed(2) : 0;
+  
+  // Remove the Set object for JSON serialization
+  delete summary.unique_customers;
+
+  if (metricsLevel === 'advanced' || metricsLevel === 'detailed') {
+    summary.profit_margin_percentage = summary.total_revenue > 0 ? ((summary.total_profit / summary.total_revenue) * 100).toFixed(2) : 0;
+  }
+
+  return summary;
+}
+
+// Helper function to group sales by time periods
+function groupSalesByTime(sales, groupBy) {
+  const groupedData = new Map();
+  
+  sales.forEach(sale => {
+    const date = new Date(sale.sel_date || sale.created_at);
+    let key;
+    
+    switch (groupBy) {
+      case 'hour':
+        key = format(date, 'yyyy-MM-dd HH:00');
+        break;
+      case 'day':
+        key = format(date, 'yyyy-MM-dd');
+        break;
+      case 'week':
+        key = format(startOfWeek(date, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+        break;
+      case 'month':
+        key = format(date, 'yyyy-MM');
+        break;
+      case 'quarter':
+        const quarter = Math.floor(date.getMonth() / 3) + 1;
+        key = `${date.getFullYear()}-Q${quarter}`;
+        break;
+      case 'year':
+        key = format(date, 'yyyy');
+        break;
+      default:
+        key = format(date, 'yyyy-MM-dd');
+    }
+    
+    if (!groupedData.has(key)) {
+      groupedData.set(key, {
+        period: key,
+        sales_count: 0,
+        total_revenue: 0,
+        total_paid: 0,
+        total_items: 0,
+        unique_customers: new Set()
+      });
+    }
+    
+    const group = groupedData.get(key);
+    group.sales_count++;
+    group.total_revenue += sale.amount || 0;
+    group.total_paid += sale.paid || 0;
+    group.unique_customers.add(sale.customer_no);
+    
+    if (sale.items && Array.isArray(sale.items)) {
+      group.total_items += sale.items.reduce((sum, item) => sum + (item.qty || 0), 0);
+    }
+  });
+  
+  // Convert to array and calculate derived metrics
+  return Array.from(groupedData.values()).map(group => ({
+    ...group,
+    unique_customers_count: group.unique_customers.size,
+    average_order_value: group.sales_count > 0 ? (group.total_revenue / group.sales_count).toFixed(2) : 0,
+    unique_customers: undefined // Remove Set for JSON serialization
+  })).sort((a, b) => a.period.localeCompare(b.period));
+}
+
+// Helper function to calculate top performers
+function calculateTopPerformers(sales) {
+  const customerPerformance = new Map();
+  const productPerformance = new Map();
+  const storePerformance = new Map();
+  
+  sales.forEach(sale => {
+    // Customer performance
+    if (!customerPerformance.has(sale.customer_no)) {
+      customerPerformance.set(sale.customer_no, {
+        customer_no: sale.customer_no,
+        customer_name: sale.customer_name,
+        total_sales: 0,
+        total_revenue: 0,
+        total_orders: 0,
+        last_order_date: null
+      });
+    }
+    
+    const customer = customerPerformance.get(sale.customer_no);
+    customer.total_orders++;
+    customer.total_revenue += sale.amount || 0;
+    const orderDate = new Date(sale.sel_date || sale.created_at);
+    if (!customer.last_order_date || orderDate > customer.last_order_date) {
+      customer.last_order_date = orderDate;
+    }
+    
+    // Store performance
+    if (!storePerformance.has(sale.store_no)) {
+      storePerformance.set(sale.store_no, {
+        store_no: sale.store_no,
+        store_name: sale.store_name,
+        total_sales: 0,
+        total_revenue: 0,
+        total_orders: 0
+      });
+    }
+    
+    const store = storePerformance.get(sale.store_no);
+    store.total_orders++;
+    store.total_revenue += sale.amount || 0;
+    
+    // Product performance
+    if (sale.items && Array.isArray(sale.items)) {
+      sale.items.forEach(item => {
+        if (!productPerformance.has(item.product_no)) {
+          productPerformance.set(item.product_no, {
+            product_no: item.product_no,
+            product_name: item.product_name,
+            total_qty_sold: 0,
+            total_revenue: 0,
+            total_orders: 0
+          });
+        }
+        
+        const product = productPerformance.get(item.product_no);
+        product.total_qty_sold += item.qty || 0;
+        product.total_revenue += (item.price || 0) * (item.qty || 0);
+        product.total_orders++;
+      });
+    }
+  });
+  
+  return {
+    top_customers: Array.from(customerPerformance.values())
+      .sort((a, b) => b.total_revenue - a.total_revenue)
+      .slice(0, 10),
+    top_products: Array.from(productPerformance.values())
+      .sort((a, b) => b.total_revenue - a.total_revenue)
+      .slice(0, 10),
+    top_stores: Array.from(storePerformance.values())
+      .sort((a, b) => b.total_revenue - a.total_revenue)
+      .slice(0, 10)
+  };
+}
+
+// Helper function to calculate comparison metrics
+async function calculateComparisonMetrics(baseFilter, currentStart, currentEnd, userId) {
+  const timeDiff = currentEnd - currentStart;
+  const previousStart = new Date(currentStart.getTime() - timeDiff);
+  const previousEnd = new Date(currentEnd.getTime() - timeDiff);
+  
+  const previousFilter = {
+    ...baseFilter,
+    sel_date: { $gte: previousStart, $lte: previousEnd }
+  };
+  
+  const [currentSales, previousSales] = await Promise.all([
+    Sales.find(baseFilter).lean(),
+    Sales.find(previousFilter).lean()
+  ]);
+  
+  const currentMetrics = calculateSalesSummary(currentSales, 'basic');
+  const previousMetrics = calculateSalesSummary(previousSales, 'basic');
+  
+  const calculateGrowth = (current, previous) => {
+    if (previous === 0) return current > 0 ? 100 : 0;
+    return (((current - previous) / previous) * 100).toFixed(2);
+  };
+  
+  return {
+    current: currentMetrics,
+    previous: previousMetrics,
+    growth: {
+      revenue: calculateGrowth(currentMetrics.total_revenue, previousMetrics.total_revenue),
+      sales_count: calculateGrowth(currentMetrics.total_sales, previousMetrics.total_sales),
+      average_order_value: calculateGrowth(parseFloat(currentMetrics.average_order_value), parseFloat(previousMetrics.average_order_value)),
+      payment_collection_rate: calculateGrowth(parseFloat(currentMetrics.payment_collection_rate), parseFloat(previousMetrics.payment_collection_rate))
+    }
+  };
+}
+
+// Sales Analytics Dashboard Endpoint
+exports.getSalesAnalytics = async (req, res) => {
+  try {
+    const userId = req.user && req.user.userId ? req.user.userId : req.user && req.user._id ? req.user._id : undefined;
+    const { period = 'last_30_days' } = req.query;
+    const { start, end } = parseDateRange({ period });
+    
+    const filter = {};
+    if (userId) filter.userId = userId;
+    if (start && end) filter.sel_date = { $gte: start, $lte: end };
+    
+    const sales = await Sales.find(filter).lean();
+    
+    // Calculate key metrics
+    const analytics = {
+      overview: calculateSalesSummary(sales, 'advanced'),
+      trends: groupSalesByTime(sales, 'day'),
+      performance: calculateTopPerformers(sales),
+      period: period,
+      date_range: { start, end }
+    };
+    
+    res.json({
+      success: true,
+      data: analytics
+    });
+  } catch (err) {
+    console.error('Error generating sales analytics:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate analytics',
+      error: err.message
+    });
+  }
+};
+
+// Sales Export Endpoint
+exports.exportSalesReport = async (req, res) => {
+  try {
+    const userId = req.user && req.user.userId ? req.user.userId : req.user && req.user._id ? req.user._id : undefined;
+    const { format = 'csv' } = req.query;
+    const { start, end } = parseDateRange(req.query);
+    
+    const filter = {};
+    if (userId) filter.userId = userId;
+    if (start && end) filter.sel_date = { $gte: start, $lte: end };
+    
+    // Get sales data
+    const sales = await Sales.find(filter).lean();
+    
+    // Get related data for enrichment
+    const [customers, stores, products] = await Promise.all([
+      Customer.find({ userId }).lean(),
+      Store.find({ userId }).lean(),
+      Product.find({ userId }).lean()
+    ]);
+    
+    // Create lookup maps
+    const customerMap = Object.fromEntries(customers.map(c => [c.customer_no, c]));
+    const storeMap = Object.fromEntries(stores.map(s => [s.store_no, s]));
+    const productMap = Object.fromEntries(products.map(p => [p.product_no, p]));
+    
+    // Flatten sales data for export
+    const exportData = [];
+    sales.forEach(sale => {
+      const customer = customerMap[sale.customer_no];
+      const store = storeMap[sale.store_no];
+      
+      if (sale.items && sale.items.length > 0) {
+        sale.items.forEach(item => {
+          const product = productMap[item.product_no];
+          exportData.push({
+            sale_no: sale.sel_no,
+            date: sale.sel_date ? sale.sel_date.toISOString().split('T')[0] : '',
+            customer_name: customer?.name || customer?.customer_name || '',
+            store_name: store?.store_name || '',
+            product_name: product?.product_name || item.product_name || '',
+            quantity: item.qty || 0,
+            unit_price: item.price || 0,
+            total_amount: (item.qty || 0) * (item.price || 0),
+            discount: sale.discount || 0,
+            tax: sale.tax || 0,
+            grand_total: sale.amount || 0,
+            paid_amount: sale.paid || 0,
+            balance_due: (sale.amount || 0) - (sale.paid || 0),
+            payment_status: (sale.amount || 0) - (sale.paid || 0) <= 0 ? 'Paid' : (sale.paid > 0 ? 'Partial' : 'Unpaid'),
+            status: sale.status || 'confirmed'
+          });
+        });
+      } else {
+        // Handle sales without items
+        exportData.push({
+          sale_no: sale.sel_no,
+          date: sale.sel_date ? sale.sel_date.toISOString().split('T')[0] : '',
+          customer_name: customer?.name || customer?.customer_name || '',
+          store_name: store?.store_name || '',
+          product_name: '',
+          quantity: 0,
+          unit_price: 0,
+          total_amount: 0,
+          discount: sale.discount || 0,
+          tax: sale.tax || 0,
+          grand_total: sale.amount || 0,
+          paid_amount: sale.paid || 0,
+          balance_due: (sale.amount || 0) - (sale.paid || 0),
+          payment_status: (sale.amount || 0) - (sale.paid || 0) <= 0 ? 'Paid' : (sale.paid > 0 ? 'Partial' : 'Unpaid'),
+          status: sale.status || 'confirmed'
+        });
+      }
+    });
+    
+    if (format === 'csv') {
+      const csvHeaders = Object.keys(exportData[0] || {});
+      const csvContent = [
+        csvHeaders.join(','),
+        ...exportData.map(row => 
+          csvHeaders.map(header => `"${(row[header] || '').toString().replace(/"/g, '""')}"`).join(',')
+        )
+      ].join('\n');
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="sales_report_${new Date().toISOString().split('T')[0]}.csv"`);
+      res.send(csvContent);
+    } else if (format === 'json') {
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="sales_report_${new Date().toISOString().split('T')[0]}.json"`);
+      res.json(exportData);
+    } else {
+      res.status(400).json({
+        success: false,
+        message: 'Unsupported export format. Use csv or json.'
+      });
+    }
+  } catch (err) {
+    console.error('Error exporting sales report:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to export sales report',
+      error: err.message
+    });
+  }
+};
+
+// Sales Forecasting Endpoint (Simple prediction based on historical data)
+exports.getSalesForecasting = async (req, res) => {
+  try {
+    const userId = req.user && req.user.userId ? req.user.userId : req.user && req.user._id ? req.user._id : undefined;
+    const { months = 3 } = req.query;
+    
+    // Get last 6 months of data for forecasting
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    
+    const filter = {
+      sel_date: { $gte: sixMonthsAgo, $lte: new Date() }
+    };
+    if (userId) filter.userId = userId;
+    
+    const sales = await Sales.find(filter).lean();
+    
+    // Group by month
+    const monthlyData = {};
+    sales.forEach(sale => {
+      const monthKey = sale.sel_date ? format(sale.sel_date, 'yyyy-MM') : '';
+      if (!monthlyData[monthKey]) {
+        monthlyData[monthKey] = { revenue: 0, count: 0 };
+      }
+      monthlyData[monthKey].revenue += sale.amount || 0;
+      monthlyData[monthKey].count += 1;
+    });
+    
+    const sortedMonths = Object.keys(monthlyData).sort();
+    const monthlyRevenues = sortedMonths.map(month => monthlyData[month].revenue);
+    
+    // Simple linear trend forecasting
+    const forecastData = [];
+    if (monthlyRevenues.length >= 2) {
+      // Calculate trend
+      const n = monthlyRevenues.length;
+      const sumX = (n * (n + 1)) / 2;
+      const sumY = monthlyRevenues.reduce((a, b) => a + b, 0);
+      const sumXY = monthlyRevenues.reduce((sum, revenue, index) => sum + revenue * (index + 1), 0);
+      const sumX2 = (n * (n + 1) * (2 * n + 1)) / 6;
+      
+      const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+      const intercept = (sumY - slope * sumX) / n;
+      
+      // Generate forecast
+      for (let i = 1; i <= months; i++) {
+        const forecastValue = intercept + slope * (n + i);
+        const forecastDate = new Date();
+        forecastDate.setMonth(forecastDate.getMonth() + i);
+        
+        forecastData.push({
+          period: format(forecastDate, 'yyyy-MM'),
+          predicted_revenue: Math.max(0, Math.round(forecastValue * 100) / 100),
+          confidence: Math.max(0.5, 1 - (i * 0.1)) // Decreasing confidence over time
+        });
+      }
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        historical_data: sortedMonths.map(month => ({
+          period: month,
+          actual_revenue: monthlyData[month].revenue,
+          order_count: monthlyData[month].count
+        })),
+        forecast: forecastData,
+        metadata: {
+          forecast_months: months,
+          historical_months: sortedMonths.length,
+          generated_at: new Date()
+        }
+      }
+    });
+  } catch (err) {
+    console.error('Error generating sales forecast:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate sales forecast',
+      error: err.message
+    });
+  }
+};
