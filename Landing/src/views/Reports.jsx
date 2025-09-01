@@ -178,14 +178,14 @@ const Reports = () => {
   const [topBottomType, setTopBottomType] = useState('top'); // 'top' or 'bottom'
 
   const reportTypes = [
-    { value: 'sales', label: 'Sales Report', icon: '📊' },
     { value: 'sales-advanced', label: 'Advanced Sales Analytics', icon: '📈' },
+    { value: 'purchases-advanced', label: 'Advanced Purchase Analytics', icon: '🛍️' },
+    { value: 'inventory-advanced', label: 'Advanced Inventory Analytics', icon: '📊' },
+    { value: 'financial-advanced', label: 'Advanced Financial Analytics', icon: '💰' },
     { value: 'stock-movement', label: 'Stock Movement/History', icon: '🔄' },
-    { value: 'inventory', label: 'Inventory Report', icon: '📦' },
     { value: 'stock-valuation', label: 'Stock Valuation', icon: '💲' },
     { value: 'low-stock', label: 'Low Stock/Out-of-Stock', icon: '⚠️' },
     { value: 'top-products', label: 'Top/Bottom Products', icon: '🏆' },
-    { value: 'purchases', label: 'Purchases Report', icon: '🛒' },
     { value: 'expenses', label: 'Expenses Report', icon: '💰' },
     { value: 'profit-loss', label: 'Profit & Loss', icon: '📈' },
     { value: 'tax', label: 'Tax Report', icon: '🏛️' },
@@ -234,9 +234,21 @@ const Reports = () => {
       setError('');
       setPage(0);
       
-      // Handle enterprise sales analytics redirect
+      // Handle enterprise analytics redirects
       if (reportType === 'sales-advanced') {
         window.location.href = '/reports/sales-advanced';
+        return;
+      }
+      if (reportType === 'purchases-advanced') {
+        window.location.href = '/reports/purchases-advanced';
+        return;
+      }
+      if (reportType === 'inventory-advanced') {
+        window.location.href = '/reports/inventory-advanced';
+        return;
+      }
+      if (reportType === 'financial-advanced') {
+        window.location.href = '/reports/financial-advanced';
         return;
       }
       

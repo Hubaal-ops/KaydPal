@@ -7,11 +7,26 @@ const { verifyToken } = require('../middleware/auth');
 // Advanced Sales Report (Enterprise-level)
 router.get('/sales/advanced', verifyToken, reportController.generateAdvancedSalesReport);
 
+// Advanced Purchase Report (Enterprise-level)
+router.get('/purchases/advanced', verifyToken, reportController.generateAdvancedPurchaseReport);
+
+// Advanced Inventory Report (Enterprise-level)
+router.get('/inventory/advanced', verifyToken, reportController.generateAdvancedInventoryReport);
+
+// Advanced Financial Report (Enterprise-level)
+router.get('/financial/advanced', verifyToken, reportController.generateAdvancedFinancialReport);
+
 // Sales Analytics Dashboard
 router.get('/sales/analytics', verifyToken, reportController.getSalesAnalytics);
 
 // Sales Export
 router.get('/sales/export', verifyToken, reportController.exportSalesReport);
+
+// Purchase Export
+router.get('/purchases/export', verifyToken, reportController.exportPurchaseReport);
+
+// Inventory Export
+router.get('/inventory/export', verifyToken, reportController.exportInventoryReport);
 
 // Sales Forecasting
 router.get('/sales/forecast', verifyToken, reportController.getSalesForecasting);

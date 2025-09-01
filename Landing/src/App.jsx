@@ -29,6 +29,9 @@ import Analytics from './views/Analytics';
 import ErrorBoundary from './components/ErrorBoundary';
 import Reports from './views/Reports';
 import SalesReports from './views/SalesReports';
+import PurchaseReports from './views/PurchaseReports';
+import InventoryReports from './views/InventoryReports';
+import FinancialReports from './views/FinancialReports';
 import UserManagement from './views/admin/UserManagement';
 import SystemSettings from './views/admin/SystemSettings';
 import AuditLogs from './views/admin/AuditLogs';
@@ -233,6 +236,30 @@ function App() {
             element={
               user && user.role === 'user'
                 ? <SalesReports />
+                : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
+            }
+          />
+          <Route
+            path="/reports/purchases-advanced"
+            element={
+              user && user.role === 'user'
+                ? <PurchaseReports />
+                : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
+            }
+          />
+          <Route
+            path="/reports/inventory-advanced"
+            element={
+              user && user.role === 'user'
+                ? <InventoryReports />
+                : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
+            }
+          />
+          <Route
+            path="/reports/financial-advanced"
+            element={
+              user && user.role === 'user'
+                ? <FinancialReports />
                 : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
             }
           />

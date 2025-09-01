@@ -227,6 +227,102 @@ export const getSalesForecasting = async (months = 3) => {
   }
 };
 
+// Generate advanced purchase report with enterprise features
+export const generateAdvancedPurchaseReport = async (filters = {}) => {
+  try {
+    console.log('🔍 Generating advanced purchase report with filters:', filters);
+    
+    const params = new URLSearchParams();
+    
+    // Add all filter parameters
+    Object.keys(filters).forEach(key => {
+      if (filters[key] !== undefined && filters[key] !== null && filters[key] !== '') {
+        if (key === 'startDate' || key === 'endDate') {
+          // Convert date objects to ISO strings
+          params.append(key, filters[key] instanceof Date ? filters[key].toISOString() : filters[key]);
+        } else {
+          params.append(key, filters[key]);
+        }
+      }
+    });
+    
+    const response = await axios.get(
+      `${API_BASE_URL}/purchases/advanced?${params.toString()}`,
+      { headers: getAuthHeaders() }
+    );
+    
+    console.log('✅ Advanced purchase report generated successfully');
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error generating advanced purchase report:', error);
+    throw error.response?.data || error;
+  }
+};
+
+// Generate advanced inventory report with enterprise features
+export const generateAdvancedInventoryReport = async (filters = {}) => {
+  try {
+    console.log('🔍 Generating advanced inventory report with filters:', filters);
+    
+    const params = new URLSearchParams();
+    
+    // Add all filter parameters
+    Object.keys(filters).forEach(key => {
+      if (filters[key] !== undefined && filters[key] !== null && filters[key] !== '') {
+        if (key === 'startDate' || key === 'endDate') {
+          // Convert date objects to ISO strings
+          params.append(key, filters[key] instanceof Date ? filters[key].toISOString() : filters[key]);
+        } else {
+          params.append(key, filters[key]);
+        }
+      }
+    });
+    
+    const response = await axios.get(
+      `${API_BASE_URL}/inventory/advanced?${params.toString()}`,
+      { headers: getAuthHeaders() }
+    );
+    
+    console.log('✅ Advanced inventory report generated successfully');
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error generating advanced inventory report:', error);
+    throw error.response?.data || error;
+  }
+};
+
+// Generate advanced financial report with enterprise features
+export const generateAdvancedFinancialReport = async (filters = {}) => {
+  try {
+    console.log('🔍 Generating advanced financial report with filters:', filters);
+    
+    const params = new URLSearchParams();
+    
+    // Add all filter parameters
+    Object.keys(filters).forEach(key => {
+      if (filters[key] !== undefined && filters[key] !== null && filters[key] !== '') {
+        if (key === 'startDate' || key === 'endDate') {
+          // Convert date objects to ISO strings
+          params.append(key, filters[key] instanceof Date ? filters[key].toISOString() : filters[key]);
+        } else {
+          params.append(key, filters[key]);
+        }
+      }
+    });
+    
+    const response = await axios.get(
+      `${API_BASE_URL}/financial/advanced?${params.toString()}`,
+      { headers: getAuthHeaders() }
+    );
+    
+    console.log('✅ Advanced financial report generated successfully');
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error generating advanced financial report:', error);
+    throw error.response?.data || error;
+  }
+};
+
 // Legacy functions for backward compatibility
 export const generateReport = async (reportType, params) => {
   try {
