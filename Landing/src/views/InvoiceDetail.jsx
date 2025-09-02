@@ -3,52 +3,160 @@ import jsPDF from 'jspdf';
 
 function downloadPDF(invoice) {
   const doc = new jsPDF();
+  let y = 15;
+  
+  // Add business logo if available
+  if (invoice.businessInfo && invoice.businessInfo.logo) {
+    try {
+      const logoWidth = 40;
+      const logoHeight = 25;
+      // Position logo at top center
+      doc.addImage(invoice.businessInfo.logo, 'JPEG', (doc.internal.pageSize.width - logoWidth) / 2, y, logoWidth, logoHeight);
+      y += logoHeight + 5;
+    } catch (e) {
+      console.error('Error adding logo to PDF:', e);
+      // Continue without logo if there's an error
+    }
+  }
+  
+  // Add business info at the top
+  if (invoice.businessInfo) {
+    doc.setFontSize(16);
+    doc.text(invoice.businessInfo.name || 'KaydPal Business Management', 105, y, { align: 'center' });
+    y += 8;
+    
+    doc.setFontSize(10);
+    if (invoice.businessInfo.address || invoice.businessInfo.city || invoice.businessInfo.state || invoice.businessInfo.zipCode) {
+      const addressParts = [invoice.businessInfo.address, invoice.businessInfo.city, invoice.businessInfo.state, invoice.businessInfo.zipCode].filter(Boolean);
+      if (addressParts.length > 0) {
+        doc.text(addressParts.join(', '), 105, y, { align: 'center' });
+        y += 5;
+      }
+    }
+    
+    if (invoice.businessInfo.phone) {
+      doc.text(`Phone: ${invoice.businessInfo.phone}`, 105, y, { align: 'center' });
+      y += 5;
+    }
+    
+    if (invoice.businessInfo.email) {
+      doc.text(`Email: ${invoice.businessInfo.email}`, 105, y, { align: 'center' });
+      y += 5;
+    }
+    
+    if (invoice.businessInfo.website) {
+      doc.text(`Website: ${invoice.businessInfo.website}`, 105, y, { align: 'center' });
+      y += 5;
+    }
+    
+    y += 5; // Add some space
+  }
+  
   doc.setFontSize(16);
-  doc.text(`Invoice #${invoice.invoice_no}`, 10, 15);
+  doc.text(`Invoice #${invoice.invoice_no}`, 105, y, { align: 'center' });
+  y += 10;
+  
   doc.setFontSize(10);
-  doc.text(`Date: ${invoice.date ? new Date(invoice.date).toLocaleDateString() : ''}`, 10, 25);
-  doc.text(`Status: ${invoice.status}`, 10, 32);
-  doc.text(`Customer: ${invoice.customer?.name || ''}`, 10, 40);
-  if (invoice.customer?.address) doc.text(`Address: ${invoice.customer.address}`, 10, 46);
-  if (invoice.customer?.phone) doc.text(`Phone: ${invoice.customer.phone}`, 10, 52);
-  if (invoice.customer?.email) doc.text(`Email: ${invoice.customer.email}`, 10, 58);
-  doc.text('Items:', 10, 68);
-  let y = 74;
-  doc.setFontSize(9);
-  doc.text('Product', 10, y);
-  doc.text('Qty', 60, y);
-  doc.text('Price', 80, y);
-  doc.text('Discount', 100, y);
-  doc.text('Tax', 125, y);
-  doc.text('Subtotal', 150, y);
-  y += 6;
+  doc.text(`Date: ${invoice.date ? new Date(invoice.date).toLocaleDateString() : ''}`, 10, y);
+  doc.text(`Status: ${invoice.status}`, 150, y, { align: 'right' });
+  y += 10;
+  
+  // Customer information
+  doc.text('Bill To:', 10, y);
+  y += 5;
+  doc.text(invoice.customer?.name || '', 10, y);
+  y += 5;
+  if (invoice.customer?.address) {
+    doc.text(invoice.customer.address, 10, y);
+    y += 5;
+  }
+  if (invoice.customer?.phone) {
+    doc.text(`Phone: ${invoice.customer.phone}`, 10, y);
+    y += 5;
+  }
+  if (invoice.customer?.email) {
+    doc.text(`Email: ${invoice.customer.email}`, 10, y);
+    y += 5;
+  }
+  
+  y += 10;
+  doc.text('Items:', 10, y);
+  y += 5;
+  
+  // Table header
+  doc.setFillColor(240, 240, 240);
+  doc.rect(10, y, 190, 7, 'F');
+  doc.setTextColor(0, 0, 0);
+  doc.text('Product', 12, y + 5);
+  doc.text('Qty', 80, y + 5);
+  doc.text('Price', 100, y + 5);
+  doc.text('Discount', 125, y + 5);
+  doc.text('Tax', 150, y + 5);
+  doc.text('Subtotal', 175, y + 5);
+  y += 10;
+  
+  // Table rows
   invoice.items?.forEach(item => {
     const productName = item.product_name || item.name || `Product #${item.product_no}` || 'Unknown Product';
-    doc.text(String(productName), 10, y);
-    doc.text(String(item.qty), 60, y);
-    doc.text(String(item.price?.toFixed(2)), 80, y);
-    doc.text(String(item.discount?.toFixed(2)), 100, y);
-    doc.text(String(item.tax?.toFixed(2)), 125, y);
-    doc.text(String(item.subtotal?.toFixed(2)), 150, y);
-    y += 6;
+    
+    // Check if we need a new page
+    if (y > 270) {
+      doc.addPage();
+      y = 20;
+    }
+    
+    doc.text(String(productName).substring(0, 30), 12, y);
+    doc.text(String(item.qty), 80, y);
+    doc.text(String(item.price?.toFixed(2)), 100, y);
+    doc.text(String(item.discount?.toFixed(2)), 125, y);
+    doc.text(String(item.tax?.toFixed(2)), 150, y);
+    doc.text(String(item.subtotal?.toFixed(2)), 175, y);
+    y += 7;
   });
-  y += 4;
+  
+  y += 10;
+  
+  // Summary
+  doc.line(120, y, 200, y);
+  y += 5;
+  doc.text(`Subtotal:`, 150, y);
+  doc.text(`$${invoice.subtotal?.toFixed(2)}`, 190, y, { align: 'right' });
+  y += 7;
+  
+  doc.text(`Total Discount:`, 150, y);
+  doc.text(`$${invoice.total_discount?.toFixed(2)}`, 190, y, { align: 'right' });
+  y += 7;
+  
+  doc.text(`Total Tax:`, 150, y);
+  doc.text(`$${invoice.total_tax?.toFixed(2)}`, 190, y, { align: 'right' });
+  y += 7;
+  
+  doc.setFontSize(12);
+  doc.text(`Total:`, 150, y);
+  doc.text(`$${invoice.total?.toFixed(2)}`, 190, y, { align: 'right' });
+  y += 7;
+  
   doc.setFontSize(10);
-  doc.text(`Subtotal: ${invoice.subtotal?.toFixed(2)}`, 120, y);
-  y += 6;
-  doc.text(`Total Discount: ${invoice.total_discount?.toFixed(2)}`, 120, y);
-  y += 6;
-  doc.text(`Total Tax: ${invoice.total_tax?.toFixed(2)}`, 120, y);
-  y += 6;
-  doc.text(`Total: ${invoice.total?.toFixed(2)}`, 120, y);
-  y += 6;
-  doc.text(`Paid: ${invoice.paid?.toFixed(2)}`, 120, y);
-  y += 6;
-  doc.text(`Balance Due: ${invoice.balance_due?.toFixed(2)}`, 120, y);
+  doc.text(`Paid:`, 150, y);
+  doc.text(`$${invoice.paid?.toFixed(2)}`, 190, y, { align: 'right' });
+  y += 7;
+  
+  doc.text(`Balance Due:`, 150, y);
+  doc.text(`$${invoice.balance_due?.toFixed(2)}`, 190, y, { align: 'right' });
+  
+  // Notes
   if (invoice.notes) {
-    y += 8;
-    doc.text(`Notes: ${invoice.notes}`, 10, y);
+    y += 15;
+    doc.text(`Notes:`, 10, y);
+    y += 5;
+    doc.text(invoice.notes, 10, y);
   }
+  
+  // Footer
+  y = 280;
+  doc.setFontSize(8);
+  doc.text('This is a computer-generated invoice.', 105, y, { align: 'center' });
+  
   doc.save(`Invoice_${invoice.invoice_no}.pdf`);
 }
 
@@ -75,11 +183,30 @@ const InvoiceDetail = ({ invoice, onBack }) => {
           .no-print, .no-print * {
             display: none !important;
           }
+          * {
+            -webkit-print-color-adjust: exact !important;
+            color-adjust: exact !important;
+          }
         }
         /* Ensure buttons are visible on screen */
         .no-print button {
           display: inline-block !important;
           opacity: 1 !important;
+        }
+        .business-logo {
+          text-align: center;
+          margin-bottom: 16px;
+        }
+        .business-logo img {
+          max-width: 120px;
+          max-height: 80px;
+          object-fit: contain;
+        }
+        .business-info {
+          text-align: center;
+          margin-bottom: 24px;
+          color: #444;
+          font-size: 0.9em;
         }
       `}</style>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:24}}>
@@ -89,6 +216,29 @@ const InvoiceDetail = ({ invoice, onBack }) => {
           <button onClick={()=>downloadPDF(invoice)} style={{padding:'6px 18px',borderRadius:6,border:'1px solid #ddd',background:'#f5f7fa',fontWeight:500}}>Download PDF</button>
         </div>
       </div>
+      
+      {/* Business Information with Logo */}
+      {invoice.businessInfo && (
+        <>
+          {invoice.businessInfo.logo && (
+            <div className="business-logo">
+              <img src={invoice.businessInfo.logo} alt={`${invoice.businessInfo.name} Logo`} />
+            </div>
+          )}
+          <div className="business-info">
+            <h3 style={{margin:'0 0 8px 0',fontSize:'1.2em'}}>{invoice.businessInfo.name}</h3>
+            {(invoice.businessInfo.address || invoice.businessInfo.city || invoice.businessInfo.state || invoice.businessInfo.zipCode) && (
+              <p style={{margin:'0 0 4px 0'}}>
+                {[invoice.businessInfo.address, invoice.businessInfo.city, invoice.businessInfo.state, invoice.businessInfo.zipCode].filter(Boolean).join(', ')}
+              </p>
+            )}
+            {invoice.businessInfo.phone && <p style={{margin:'0 0 4px 0'}}>Phone: {invoice.businessInfo.phone}</p>}
+            {invoice.businessInfo.email && <p style={{margin:'0 0 4px 0'}}>Email: {invoice.businessInfo.email}</p>}
+            {invoice.businessInfo.website && <p style={{margin:'0 0 4px 0'}}>Website: {invoice.businessInfo.website}</p>}
+          </div>
+        </>
+      )}
+      
       <h2 style={{textAlign:'center',marginBottom:8}}>Invoice #{invoice.invoice_no}</h2>
       <div style={{textAlign:'center',color:'#222',marginBottom:24}}>
         <span>Date: {invoice.date ? new Date(invoice.date).toLocaleDateString() : ''}</span> &nbsp;|&nbsp; <span>Status: {invoice.status}</span>
@@ -159,8 +309,13 @@ const InvoiceDetail = ({ invoice, onBack }) => {
         </div>
       </div>
       {invoice.notes && <div style={{marginTop:16,background:'#f5f7fa',padding:12,borderRadius:6}}><b>Notes:</b> {invoice.notes}</div>}
+      
+      <div style={{textAlign:'center',marginTop:32,color:'#666',fontSize:'0.8em'}}>
+        <p>This is a computer-generated invoice.</p>
+        {invoice.businessInfo?.email && <p>For any questions, please contact us at {invoice.businessInfo.email}</p>}
+      </div>
     </div>
   );
 };
 
-export default InvoiceDetail; 
+export default InvoiceDetail;

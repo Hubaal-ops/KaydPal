@@ -72,6 +72,7 @@ export async function generateReceiptData(payment, customers, accounts) {
           customer: result.data.customer,
           account: result.data.account,
           receiptNumber: result.data.receiptNumber,
+          businessInfo: result.data.businessInfo,
           generatedAt: new Date().toISOString()
         };
       }

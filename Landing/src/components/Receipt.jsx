@@ -1,7 +1,7 @@
 import React from 'react';
 import styles from './Receipt.module.css';
 
-const Receipt = ({ payment, customer, account, onClose, onPrint }) => {
+const Receipt = ({ payment, customer, account, businessInfo, onClose, onPrint }) => {
   if (!payment || !customer || !account) return null;
 
   const receiptDate = new Date(payment.created_at).toLocaleDateString();
@@ -24,11 +24,18 @@ const Receipt = ({ payment, customer, account, onClose, onPrint }) => {
         </div>
 
         <div className={styles.businessInfo}>
-          <h2>KaydPal Business Management</h2>
-          <p>123 Business Street</p>
-          <p>City, State 12345</p>
-          <p>Phone: (555) 123-4567</p>
-          <p>Email: info@kaydpal.com</p>
+          {businessInfo?.logo && (
+            <div className={styles.businessLogo}>
+              <img src={businessInfo.logo} alt={`${businessInfo?.name || 'Business'} Logo`} />
+            </div>
+          )}
+          <h2>{businessInfo?.name || 'KaydPal Business Management'}</h2>
+          {(businessInfo?.address || businessInfo?.city || businessInfo?.state || businessInfo?.zipCode) && (
+            <p>{[businessInfo?.address, businessInfo?.city, businessInfo?.state, businessInfo?.zipCode].filter(Boolean).join(', ')}</p>
+          )}
+          {businessInfo?.phone && <p>Phone: {businessInfo.phone}</p>}
+          {businessInfo?.email && <p>Email: {businessInfo.email}</p>}
+          {businessInfo?.website && <p>Website: {businessInfo.website}</p>}
         </div>
 
         <div className={styles.receiptDetails}>
@@ -104,7 +111,7 @@ const Receipt = ({ payment, customer, account, onClose, onPrint }) => {
 
         <div className={styles.footer}>
           <p>This is a computer-generated receipt.</p>
-          <p>For any questions, please contact us at info@kaydpal.com</p>
+          <p>For any questions, please contact us at {businessInfo?.email || 'info@kaydpal.com'}</p>
         </div>
 
         <div className={`${styles.actions} ${styles.noPrint}`}>

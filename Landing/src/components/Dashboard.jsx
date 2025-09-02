@@ -8,7 +8,8 @@ import {
   Users, 
   BarChart3, 
   FileText, 
-  LifeBuoy
+  LifeBuoy,
+  Building
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -16,6 +17,14 @@ const Dashboard = () => {
   const navigate = useNavigate();
   
   const modules = [
+    {
+      id: 'business',
+      title: 'Business Management',
+      description: 'Manage suppliers, customers, and business partners',
+      icon: Building,
+      color: '#ec4899',
+      gradient: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)'
+    },
     {
       id: 'inventory',
       title: 'Inventory',
@@ -56,6 +65,7 @@ const Dashboard = () => {
       color: '#8b5cf6',
       gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)'
     },
+    
     {
       id: 'analytics',
       title: 'Analytics',
@@ -90,6 +100,7 @@ const Dashboard = () => {
       'financial': '/financial',
       'stocks': '/stocks',
       'employees': '/employees',
+      'business': '/business',
       'analytics': '/analytics',
       'reports': '/reports',
       'support': '/support'

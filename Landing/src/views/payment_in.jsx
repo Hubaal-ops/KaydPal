@@ -90,6 +90,7 @@ const PaymentIn = ({ onBack }) => {
           payment: backendReceipt.payment,
           customer: backendReceipt.customer,
           account: backendReceipt.account,
+          businessInfo: backendReceipt.businessInfo,
           receiptNumber: backendReceipt.receiptNumber,
           generatedAt: backendReceipt.generatedAt
         });
@@ -147,6 +148,7 @@ const PaymentIn = ({ onBack }) => {
               payment: paymentResult.data || paymentResult.receipt.payment,
               customer: paymentResult.receipt.customer,
               account: paymentResult.receipt.account,
+              businessInfo: paymentResult.receipt.businessInfo,
               receiptNumber: paymentResult.receipt.receiptNumber,
               generatedAt: new Date().toISOString()
             };
@@ -329,6 +331,7 @@ const PaymentIn = ({ onBack }) => {
           payment={receiptData.payment}
           customer={receiptData.customer}
           account={receiptData.account}
+          businessInfo={receiptData.businessInfo}
           onClose={handleCloseReceipt}
           onPrint={() => {
             setSuccess('Receipt printed successfully!');

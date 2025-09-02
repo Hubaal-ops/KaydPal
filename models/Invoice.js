@@ -10,6 +10,20 @@ const invoiceSchema = new mongoose.Schema({
     phone: String,
     email: String
   },
+  businessInfo: {
+    name: String,
+    logo: String,
+    address: String,
+    city: String,
+    state: String,
+    zipCode: String,
+    country: String,
+    phone: String,
+    email: String,
+    website: String,
+    taxId: String,
+    registrationNumber: String
+  },
   items: [{
     product_no: Number,
     name: String,
@@ -29,4 +43,4 @@ const invoiceSchema = new mongoose.Schema({
   notes: String,
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
 });
-module.exports = mongoose.model('Invoice', invoiceSchema); 
+module.exports = mongoose.model('Invoice', invoiceSchema);

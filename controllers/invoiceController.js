@@ -1,6 +1,50 @@
 const Invoice = require('../models/Invoice');
 const Sale = require('../models/Sale');
+const Business = require('../models/Business');
 const getNextSequence = require('../getNextSequence');
+
+// Get business information for invoices
+const getBusinessInfo = async (userId) => {
+  try {
+    const business = await Business.findOne({ userId });
+    
+    if (!business) {
+      // Return default business info if none found
+      return {
+        name: 'KaydPal Business Management',
+        address: '123 Business Street',
+        city: 'City, State 12345',
+        phone: '(555) 123-4567',
+        email: 'info@kaydpal.com'
+      };
+    }
+    
+    // Return business info with proper formatting
+    return {
+      name: business.name || 'KaydPal Business Management',
+      logo: business.logo || '',
+      address: business.address || '',
+      city: business.city || '',
+      state: business.state || '',
+      zipCode: business.zipCode || '',
+      country: business.country || '',
+      phone: business.phone || '',
+      email: business.email || '',
+      website: business.website || '',
+      taxId: business.taxId || '',
+      registrationNumber: business.registrationNumber || ''
+    };
+  } catch (err) {
+    // Return default business info if error occurs
+    return {
+      name: 'KaydPal Business Management',
+      address: '123 Business Street',
+      city: 'City, State 12345',
+      phone: '(555) 123-4567',
+      email: 'info@kaydpal.com'
+    };
+  }
+};
 
 // Create invoice (usually called after a sale)
 exports.createInvoice = async (req, res) => {
@@ -35,6 +79,10 @@ exports.createInvoice = async (req, res) => {
     const paid = sale.paid || 0;
     const balance_due = total - paid;
     const status = paid >= total ? 'Paid' : (paid > 0 ? 'Partially Paid' : 'Unpaid');
+    
+    // Get business information
+    const businessInfo = await getBusinessInfo(req.user.id);
+    
     const invoice = new Invoice({
       invoice_no,
       sale_id,
@@ -46,6 +94,7 @@ exports.createInvoice = async (req, res) => {
         phone: customerDoc ? customerDoc.phone : (sale.customer_phone || ''),
         email: customerDoc ? customerDoc.email : (sale.customer_email || '')
       },
+      businessInfo,
       items,
       subtotal,
       total_discount,

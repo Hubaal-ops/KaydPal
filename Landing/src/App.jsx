@@ -1,5 +1,4 @@
 import ResetPasswordForm from './components/ResetPasswordForm';
-          <Route path="/reset-password/:token" element={<ResetPasswordForm />} />
 import React, { useState, useEffect, createContext, useMemo } from 'react';
 import { ThemeProvider as MuiThemeProvider, createTheme } from '@mui/material/styles';
 import { Routes, Route, Navigate } from 'react-router-dom';
@@ -32,6 +31,7 @@ import SalesReports from './views/SalesReports';
 import PurchaseReports from './views/PurchaseReports';
 import InventoryReports from './views/InventoryReports';
 import FinancialReports from './views/FinancialReports';
+import BusinessManagement from './views/BusinessManagement';
 import UserManagement from './views/admin/UserManagement';
 import SystemSettings from './views/admin/SystemSettings';
 import AuditLogs from './views/admin/AuditLogs';
@@ -136,6 +136,14 @@ function App() {
             element={
               user && user.role === 'user'
                 ? <Dashboard />
+                : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
+            }
+          />
+          <Route
+            path="/business"
+            element={
+              user && user.role === 'user'
+                ? <BusinessManagement />
                 : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
             }
           />

@@ -1,12 +1,56 @@
 const Payment = require('../models/Payment');
 const Customer = require('../models/Customer');
 const Account = require('../models/Account');
+const Business = require('../models/Business');
 const getNextSequence = require('../getNextSequence');
 const mongoose = require('mongoose');
 
 // Generate receipt number
 const generateReceiptNumber = (paymentId) => {
   return `RCP-${String(paymentId).padStart(6, '0')}`;
+};
+
+// Get business information for receipts
+const getBusinessInfo = async (userId) => {
+  try {
+    const business = await Business.findOne({ userId });
+    
+    if (!business) {
+      // Return default business info if none found
+      return {
+        name: 'KaydPal Business Management',
+        address: '123 Business Street',
+        city: 'City, State 12345',
+        phone: '(555) 123-4567',
+        email: 'info@kaydpal.com'
+      };
+    }
+    
+    // Return business info with proper formatting
+    return {
+      name: business.name || 'KaydPal Business Management',
+      logo: business.logo || '',
+      address: business.address || '',
+      city: business.city || '',
+      state: business.state || '',
+      zipCode: business.zipCode || '',
+      country: business.country || '',
+      phone: business.phone || '',
+      email: business.email || '',
+      website: business.website || '',
+      taxId: business.taxId || '',
+      registrationNumber: business.registrationNumber || ''
+    };
+  } catch (err) {
+    // Return default business info if error occurs
+    return {
+      name: 'KaydPal Business Management',
+      address: '123 Business Street',
+      city: 'City, State 12345',
+      phone: '(555) 123-4567',
+      email: 'info@kaydpal.com'
+    };
+  }
 };
 
 /*
@@ -128,6 +172,7 @@ exports.createPayment = async (req, res) => {
         name: account.name
       },
       receiptNumber: generateReceiptNumber(id),
+      businessInfo: await getBusinessInfo(req.user.id),
       previousBalance: originalCustomerBalance,
       paymentApplied: Number(amount),
       remainingBalance: customer.bal || 0
@@ -238,13 +283,7 @@ exports.generateReceipt = async (req, res) => {
         name: account.name
       },
       receiptNumber: generateReceiptNumber(paymentId),
-      businessInfo: {
-        name: 'KaydPal Business Management',
-        address: '123 Business Street',
-        city: 'City, State 12345',
-        phone: '(555) 123-4567',
-        email: 'info@kaydpal.com'
-      },
+      businessInfo: await getBusinessInfo(req.user.id),
       generatedAt: new Date().toISOString(),
       // Calculate previous balance (current + payment amount)
       previousBalance: (customer.bal || 0) + Number(payment.amount),
@@ -300,7 +339,8 @@ exports.getReceiptData = async (req, res) => {
           bank: account.bank,
           name: account.name
         },
-        receiptNumber: generateReceiptNumber(paymentId)
+        receiptNumber: generateReceiptNumber(paymentId),
+        businessInfo: await getBusinessInfo(req.user.id)
       }
     });
 

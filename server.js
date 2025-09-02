@@ -43,6 +43,7 @@ const purchaseReturnsRoutes = require('./routes/purchaseReturns');
 const salesReturnsRoutes = require('./routes/salesReturns');
 const invoiceRoutes = require('./routes/invoices');
 const systemSettingsRoutes = require('./routes/systemSettings');
+const businessRoutes = require('./routes/business');
 
 
 // Security middleware
@@ -156,6 +157,7 @@ app.use('/api/purchase-returns', purchaseReturnsRoutes);
 app.use('/api/sales-returns', salesReturnsRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/protected/admin/system-settings', systemSettingsRoutes);
+app.use('/api/business', businessRoutes);
 
 // Health check endpoint for tests
 app.get('/api/auth/health', (req, res) => {

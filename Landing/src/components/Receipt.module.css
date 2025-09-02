@@ -63,6 +63,18 @@
   border: 1px solid #e5e7eb;
 }
 
+.businessLogo {
+  margin-bottom: 1rem;
+  display: flex;
+  justify-content: center;
+}
+
+.businessLogo img {
+  max-width: 120px;
+  max-height: 80px;
+  object-fit: contain;
+}
+
 .businessInfo h2 {
   color: #111827;
   font-size: 1.25rem;
@@ -286,28 +298,32 @@
     position: absolute !important;
     left: 0 !important;
     top: 0 !important;
-    width: 100vw !important;
-    min-height: 100vh !important;
+    width: 100% !important;
+    height: auto !important;
     margin: 0 !important;
     padding: 0 !important;
     box-shadow: none !important;
     background: #fff !important;
     z-index: 9999 !important;
+    transform: scale(0.9) !important;
+    transform-origin: top center !important;
   }
   
   .receiptContainer {
     max-width: none !important;
     max-height: none !important;
     overflow: visible !important;
-    border-radius: 12px !important;
+    border-radius: 0 !important;
     box-shadow: none !important;
-    padding: 2rem !important;
+    padding: 0.75rem !important;
     margin: 0 !important;
     background: white !important;
     width: 100% !important;
     height: auto !important;
     page-break-inside: avoid;
-    border: 1px solid #e5e7eb !important;
+    border: none !important;
+    font-size: 0.85em !important;
+    line-height: 1.2 !important;
   }
   
   /* Hide action buttons during print */
@@ -316,99 +332,134 @@
     display: none !important;
   }
   
-  /* Keep all original styling for print */
+  /* More compact layout for print */
   .receiptHeader {
-    text-align: center;
-    margin-bottom: 2rem;
-    padding-bottom: 1.5rem;
-    border-bottom: 1px solid #e5e7eb;
+    margin-bottom: 0.75rem !important;
+    padding-bottom: 0.5rem !important;
+    border-bottom: 1px solid #e5e7eb !important;
   }
   
   .receiptHeader h1 {
-    color: #111827 !important;
-    font-size: 1.75rem;
-    margin: 0 0 1rem 0;
-    font-weight: 600;
-    letter-spacing: -0.025em;
+    font-size: 1.3rem !important;
+    margin: 0 0 0.5rem 0 !important;
+  }
+  
+  .receiptNumber {
+    padding: 0.5rem 0.75rem !important;
+    font-size: 0.8rem !important;
   }
   
   .businessInfo {
-    text-align: center;
-    margin-bottom: 2rem;
-    padding: 1.5rem;
-    background: #fafafa !important;
-    border-radius: 12px;
-    border: 1px solid #e5e7eb;
+    margin-bottom: 0.75rem !important;
+    padding: 0.5rem !important;
   }
   
   .businessInfo h2 {
-    color: #111827 !important;
-    font-size: 1.25rem;
-    margin: 0 0 1rem 0;
-    font-weight: 600;
+    font-size: 1.1rem !important;
+    margin: 0 0 0.5rem 0 !important;
+  }
+  
+  .businessInfo p {
+    margin: 0.1rem 0 !important;
+    font-size: 0.75rem !important;
+    line-height: 1.2 !important;
+  }
+  
+  .businessLogo {
+    margin-bottom: 0.5rem !important;
+  }
+  
+  .businessLogo img {
+    max-width: 80px !important;
+    max-height: 50px !important;
+  }
+  
+  .receiptDetails {
+    margin-bottom: 0.75rem !important;
+  }
+  
+  .detailsRow {
+    gap: 0.5rem !important;
   }
   
   .detailsSection {
-    padding: 1.25rem;
-    background: #fafafa !important;
-    border-radius: 10px;
-    border: 1px solid #e5e7eb;
+    padding: 0.5rem !important;
   }
   
   .detailsSection h3 {
-    color: #6b7280 !important;
-    font-size: 0.95rem;
-    margin: 0 0 1rem 0;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    font-size: 0.8rem !important;
+    margin: 0 0 0.3rem 0 !important;
+  }
+  
+  .detailsSection p {
+    margin: 0.15rem 0 !important;
+    font-size: 0.75rem !important;
+    line-height: 1.2 !important;
+  }
+  
+  .paymentSummary {
+    margin-bottom: 0.75rem !important;
+  }
+  
+  .paymentSummary h3 {
+    font-size: 0.9rem !important;
+    margin: 0 0 0.3rem 0 !important;
   }
   
   .summaryTable {
-    background: white !important;
-    border: 1px solid #e5e7eb;
-    border-radius: 10px;
-    overflow: hidden;
+    border-radius: 6px !important;
   }
   
   .summaryRow {
-    border-bottom: 1px solid #f3f4f6;
-    padding: 1rem 1.25rem;
+    padding: 0.4rem 0.6rem !important;
+    font-size: 0.75rem !important;
+    border-bottom: 1px solid #f3f4f6 !important;
+  }
+  
+  .amount {
+    font-size: 0.85rem !important;
+  }
+  
+  .summaryDivider {
+    margin: 0.2rem 0 !important;
   }
   
   .thankYouMessage {
-    text-align: center;
-    margin-bottom: 2rem;
-    padding: 1.5rem;
-    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%) !important;
-    border-radius: 12px;
-    border: 1px solid #bae6fd;
+    margin-bottom: 0.75rem !important;
+    padding: 0.5rem !important;
   }
   
   .thankYouMessage h3 {
-    color: #0c4a6e !important;
+    font-size: 0.9rem !important;
+    margin: 0 0 0.3rem 0 !important;
   }
   
   .thankYouMessage p {
-    color: #0369a1 !important;
+    font-size: 0.75rem !important;
+    margin: 0.15rem 0 !important;
+    line-height: 1.2 !important;
   }
   
-  .balanceNote {
-    background: #fef2f2 !important;
-    color: #991b1b !important;
-    padding: 0.875rem;
-    border-radius: 8px;
-    border: 1px solid #fecaca;
-  }
-  
+  .balanceNote,
   .paidNote {
-    background: #f0fdf4 !important;
-    color: #166534 !important;
-    padding: 0.875rem;
-    border-radius: 8px;
-    border: 1px solid #bbf7d0;
+    padding: 0.4rem !important;
+    margin-top: 0.4rem !important;
+    font-size: 0.75rem !important;
+    line-height: 1.2 !important;
   }
   
+  .footer {
+    padding: 0.4rem !important;
+    margin-bottom: 0.5rem !important;
+    border-top: 1px solid #e5e7eb !important;
+  }
+  
+  .footer p {
+    font-size: 0.65rem !important;
+    margin: 0.1rem 0 !important;
+    line-height: 1.2 !important;
+  }
+
   /* Force color printing for better appearance */
   * {
     -webkit-print-color-adjust: exact !important;
@@ -417,8 +468,8 @@
   
   /* Set print page margins */
   @page {
-    margin: 0.5in !important;
-    size: A4;
+    margin: 0.25in !important;
+    size: A4 portrait !important;
   }
 }
 
@@ -456,5 +507,58 @@
   .printBtn,
   .closeBtn {
     width: 100%;
+  }
+}
+
+/* Extra optimization for small screen printing */
+@media print and (max-width: 480px) {
+  .receiptOverlay {
+    transform: scale(0.85) !important;
+  }
+  
+  .receiptContainer {
+    padding: 0.5rem !important;
+    font-size: 0.8em !important;
+  }
+  
+  .detailsRow {
+    grid-template-columns: 1fr !important;
+    gap: 0.5rem !important;
+  }
+  
+  .detailsSection {
+    padding: 0.4rem !important;
+  }
+  
+  .summaryRow {
+    padding: 0.3rem 0.5rem !important;
+  }
+  
+  /* Further reduce font sizes */
+  .receiptHeader h1 {
+    font-size: 1.1rem !important;
+  }
+  
+  .businessInfo h2 {
+    font-size: 1rem !important;
+  }
+  
+  .detailsSection h3, 
+  .paymentSummary h3,
+  .thankYouMessage h3 {
+    font-size: 0.8rem !important;
+  }
+  
+  .detailsSection p,
+  .businessInfo p,
+  .thankYouMessage p,
+  .summaryRow,
+  .balanceNote,
+  .paidNote {
+    font-size: 0.7rem !important;
+  }
+  
+  .footer p {
+    font-size: 0.6rem !important;
   }
 }
