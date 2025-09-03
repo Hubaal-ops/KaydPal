@@ -217,8 +217,8 @@ exports.generateAdvancedFinancialReport = async (req, res) => {
     const {
       reportType = 'comprehensive',
       groupBy = 'month',
-      includeComparisons = false,
-      includeForecasting = false,
+      includeComparisons = true,
+      includeForecasting = true,
       page = 1,
       limit = 50
     } = req.query;
@@ -278,7 +278,7 @@ exports.generateAdvancedFinancialReport = async (req, res) => {
     const timeSeriesData = groupFinancialDataByTime(sales, purchases, expenses, groupBy);
     
     // Calculate financial ratios
-    const financialRatios = calculateFinancialRatios(profitLoss, balanceSheet);
+    const financialRatios = calculateFinancialRatios(summary, sales, purchases, expenses);
     
     // Category breakdown
     const categoryBreakdown = calculateCategoryBreakdown(sales, purchases, expenses);
@@ -286,75 +286,128 @@ exports.generateAdvancedFinancialReport = async (req, res) => {
     // Comparison data if requested
     let comparisonData = null;
     if (includeComparisons && start && end) {
-      comparisonData = await calculateFinancialComparisonMetrics(userId, start, end);
+      try {
+        comparisonData = await calculateFinancialComparisonMetrics(
+          { userId },
+          start,
+          end,
+          userId
+        );
+      } catch (comparisonError) {
+        console.warn('⚠️  Comparison metrics calculation failed:', comparisonError.message);
+        comparisonData = null;
+      }
     }
     
     // Forecasting if requested
     let forecastingData = null;
     if (includeForecasting) {
-      forecastingData = generateFinancialForecasting(timeSeriesData);
+      try {
+        forecastingData = generateFinancialForecasting(timeSeriesData);
+      } catch (forecastError) {
+        console.warn('⚠️  Forecasting calculation failed:', forecastError.message);
+        forecastingData = null;
+      }
     }
 
     // Combine all transactions for pagination
     const allTransactions = [
-      ...sales.map(s => ({ ...s, type: 'sale', date: s.sel_date })),
+      ...sales.map(s => ({ ...s, type: 'sale', date: s.sel_date || s.created_at })),
       ...purchases.map(p => ({ ...p, type: 'purchase', date: p.created_at })),
-      ...expenses.map(e => ({ ...e, type: 'expense', date: e.expense_date }))
+      ...expenses.map(e => ({ ...e, type: 'expense', date: e.expense_date || e.created_at })),
+      ...deposits.map(d => ({ ...d, type: 'deposit', date: d.created_at })),
+      ...withdrawals.map(w => ({ ...w, type: 'withdrawal', date: w.created_at }))
     ].sort((a, b) => new Date(b.date) - new Date(a.date));
 
     // Pagination for transactions
     const skip = (Number(page) - 1) * Number(limit);
     const paginatedTransactions = allTransactions.slice(skip, skip + Number(limit));
 
-    const response = {
-      success: true,
-      data: {
-        summary,
+    // Generate different financial statements based on report type
+    let response = {};
+    
+    if (reportType === 'profit_loss') {
+      response = {
+        statement_type: 'profit_loss',
+        profit_loss: profitLoss,
+        time_series: timeSeriesData,
+        metadata: {
+          report_type: reportType,
+          period: { start, end },
+          group_by: groupBy,
+          generated_at: new Date()
+        }
+      };
+    } else if (reportType === 'balance_sheet') {
+      response = {
+        statement_type: 'balance_sheet',
+        balance_sheet: balanceSheet,
+        metadata: {
+          report_type: reportType,
+          period: { start, end },
+          generated_at: new Date()
+        }
+      };
+    } else if (reportType === 'cash_flow') {
+      response = {
+        statement_type: 'cash_flow',
+        cash_flow: cashFlow,
+        time_series: timeSeriesData,
+        metadata: {
+          report_type: reportType,
+          period: { start, end },
+          group_by: groupBy,
+          generated_at: new Date()
+        }
+      };
+    } else {
+      // Comprehensive report (default)
+      response = {
+        statement_type: 'comprehensive',
+        summary: {
+          ...summary,
+          revenue_growth: comparisonData?.growth?.revenue || 0,
+          expense_growth: comparisonData?.growth?.expenses || 0,
+          profit_growth: comparisonData?.growth?.profit || 0,
+          cash_flow_growth: comparisonData?.growth?.cash_flow || 0
+        },
         profit_loss: profitLoss,
         balance_sheet: balanceSheet,
         cash_flow: cashFlow,
-        financial_ratios: financialRatios,
+        time_series: timeSeriesData,
         category_breakdown: categoryBreakdown,
-        time_series_data: timeSeriesData,
+        financial_ratios: financialRatios,
+        forecasting: forecastingData,
         transactions: paginatedTransactions,
+        comparisons: comparisonData,
         pagination: {
           page: Number(page),
           limit: Number(limit),
           total: allTransactions.length,
           pages: Math.ceil(allTransactions.length / Number(limit))
         },
-        filters: {
-          period: req.query.period,
-          start,
-          end,
-          reportType,
-          groupBy
-        },
         metadata: {
+          report_type: reportType,
+          period: { start, end },
+          group_by: groupBy,
           generated_at: new Date(),
-          report_type: 'advanced_financial',
           total_transactions: allTransactions.length
         }
-      }
-    };
-
-    if (comparisonData) {
-      response.data.comparisons = comparisonData;
-    }
-    
-    if (forecastingData) {
-      response.data.forecasting = forecastingData;
+      };
     }
 
     console.log('✅ Advanced financial report generated successfully');
-    res.json(response);
-    
+    res.json({
+      success: true,
+      data: response
+    });
+
   } catch (err) {
     console.error('❌ Error generating advanced financial report:', err);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to generate financial report', 
-      error: err.message 
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate financial report',
+      error: err.message
     });
   }
 };
@@ -610,17 +663,20 @@ exports.generateAdvancedSalesReport = async (req, res) => {
           store_no,
           product_no,
           status,
-          payment_status,
           min_amount,
-          max_amount
+          max_amount,
+          payment_status,
+          groupBy,
+          metrics,
+          includeItems,
+          includeComparisons,
+          sortBy,
+          sortOrder
         },
         metadata: {
           generated_at: new Date(),
           report_type: 'advanced_sales',
-          metrics_level: metrics,
-          total_customers: customers.length,
-          total_stores: stores.length,
-          total_products: products.length
+          total_transactions: totalCount
         }
       }
     };
@@ -631,13 +687,12 @@ exports.generateAdvancedSalesReport = async (req, res) => {
 
     console.log('✅ Advanced sales report generated successfully');
     res.json(response);
-    
   } catch (err) {
     console.error('❌ Error generating advanced sales report:', err);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to generate sales report', 
-      error: err.message 
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate advanced sales report',
+      error: err.message
     });
   }
 };
@@ -2314,9 +2369,14 @@ exports.generateAdvancedFinancialReport = async (req, res) => {
       };
     } else {
       // Comprehensive report (default)
-      const summary = calculateFinancialSummary(sales, purchases, expenses, deposits, withdrawals);
+      const profitLoss = generateProfitLossStatement(sales, purchases, expenses);
+      const balanceSheet = generateBalanceSheet(accounts, sales, purchases, expenses, deposits, withdrawals);
+      const cashFlow = generateCashFlowStatement(sales, purchases, expenses, deposits, withdrawals);
       const timeSeries = groupFinancialDataByTime(sales, purchases, expenses, groupBy);
       const categoryBreakdown = calculateCategoryBreakdown(sales, purchases, expenses);
+      
+      // Calculate summary first before using it
+      const summary = calculateFinancialSummary(sales, purchases, expenses, deposits, withdrawals);
       const financialRatios = calculateFinancialRatios(summary, sales, purchases, expenses);
       
       let forecasting = null;
@@ -2333,6 +2393,9 @@ exports.generateAdvancedFinancialReport = async (req, res) => {
 
       response = {
         statement_type: 'comprehensive',
+        profit_loss: profitLoss,
+        balance_sheet: balanceSheet,
+        cash_flow: cashFlow,
         summary: {
           ...summary,
           revenue_growth: comparisons?.growth?.revenue || 0,
@@ -2884,11 +2947,11 @@ exports.generateAdvancedInventoryReport = async (req, res) => {
     res.json(response);
     
   } catch (err) {
-    console.error('❌ Error generating advanced inventory report:', err);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to generate inventory report', 
-      error: err.message 
+    console.error('❌ Error generating advanced sales report:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate advanced sales report',
+      error: err.message
     });
   }
 };

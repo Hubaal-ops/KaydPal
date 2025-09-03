@@ -1,84 +1,93 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box, Card, CardContent, Typography, TextField, MenuItem, Button,
-  CircularProgress, Alert, Tabs, Tab, Divider, IconButton, FormControl,
-  InputLabel, Select, Switch, FormControlLabel, Table, TableBody,
-  TableCell, TableContainer, TableHead, TableRow, TablePagination, Chip,
-  Grid
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  Grid,
+  Divider,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Button,
+  CircularProgress,
+  Tabs,
+  Tab,
+  Alert
 } from '@mui/material';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import {
-  Download as DownloadIcon, Refresh as RefreshIcon, FilterList as FilterIcon,
-  TrendingUp as TrendingUpIcon, TrendingDown as TrendingDownIcon,
-  AccountBalance as FinanceIcon, MonetizationOn as ProfitIcon,
-  Receipt as ExpenseIcon, AccountBalanceWallet as CashIcon, ShowChart as GrowthIcon
+  FilterList as FilterIcon,
+  Refresh as RefreshIcon,
+  Download as DownloadIcon,
+  TrendingUp as ProfitIcon,
+  TrendingDown as ExpenseIcon,
+  BarChart as GrowthIcon,
+  AccountBalance as CashIcon
 } from '@mui/icons-material';
 import { generateAdvancedFinancialReport } from '../services/reportService';
 
 const FinancialReports = () => {
-  const [activeTab, setActiveTab] = useState(0);
-  const [loading, setLoading] = useState(false);
   const [reportData, setReportData] = useState(null);
-  const [error, setError] = useState(null);
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(25);
-
   const [filters, setFilters] = useState({
-    period: 'last_30_days',
-    startDate: null,
-    endDate: null,
-    groupBy: 'month',
-    includeComparisons: true,
-    includeForecasting: true,
-    reportType: 'comprehensive'
+    period: 'this_month',
+    reportType: 'comprehensive',
+    groupBy: 'month'
   });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState(0);
 
-  useEffect(() => {
-    generateReport();
-  }, []);
+  // Format currency
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(value || 0);
+  };
 
+  // Format percentage
+  const formatPercentage = (value) => {
+    return `${(value || 0).toFixed(2)}%`;
+  };
+
+  // Handle filter changes
   const handleFilterChange = (field, value) => {
-    setFilters(prev => ({ ...prev, [field]: value }));
+    setFilters(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
-  const handleTabChange = (event, newValue) => {
-    setActiveTab(newValue);
-  };
-
+  // Generate report from API
   const generateReport = async () => {
     setLoading(true);
-    setError(null);
-    
+    setError('');
     try {
-      const response = await generateAdvancedFinancialReport(filters);
-      if (response.success) {
-        setReportData(response.data);
-      } else {
-        setError(response.message || 'Failed to generate financial report');
+      // Prepare filters for API call
+      const apiFilters = { ...filters };
+      
+      // Handle period selection
+      if (filters.period !== 'custom') {
+        delete apiFilters.startDate;
+        delete apiFilters.endDate;
       }
+      
+      const response = await generateAdvancedFinancialReport(apiFilters);
+      setReportData(response.data);
+      console.log('📊 Financial report data:', response.data);
     } catch (err) {
-      setError(err.message || 'An error occurred while generating the report');
+      setError(err.message || 'Failed to generate financial report');
+      console.error('Error generating financial report:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount || 0);
-  };
-
-  const formatPercentage = (value) => {
-    return `${parseFloat(value || 0).toFixed(2)}%`;
-  };
-
-  const getGrowthIcon = (value) => {
-    return value >= 0 ? <TrendingUpIcon /> : <TrendingDownIcon />;
-  };
+  // Initialize with a report
+  useEffect(() => {
+    generateReport();
+  }, []);
 
   const renderProfitLossStatement = () => {
     if (!reportData?.profit_loss) return null;
@@ -181,6 +190,12 @@ const FinancialReports = () => {
                     <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{formatCurrency(balance_sheet.assets.current_assets.total)}</Typography>
                   </Box>
                 </Box>
+                <Box sx={{ mt: 2 }}>
+                  <Box display="flex" justifyContent="space-between">
+                    <Typography variant="body2">Fixed Assets</Typography>
+                    <Typography variant="body2">{formatCurrency(balance_sheet.assets.fixed_assets)}</Typography>
+                  </Box>
+                </Box>
                 <Divider sx={{ my: 1 }} />
                 <Box display="flex" justifyContent="space-between">
                   <Typography sx={{ fontWeight: 'bold' }}>Total Assets</Typography>
@@ -202,6 +217,12 @@ const FinancialReports = () => {
                   <Box display="flex" justifyContent="space-between">
                     <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Total Current Liabilities</Typography>
                     <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{formatCurrency(balance_sheet.liabilities.current_liabilities.total)}</Typography>
+                  </Box>
+                </Box>
+                <Box sx={{ mt: 2 }}>
+                  <Box display="flex" justifyContent="space-between">
+                    <Typography variant="body2">Long Term Debt</Typography>
+                    <Typography variant="body2">{formatCurrency(balance_sheet.liabilities.long_term_debt)}</Typography>
                   </Box>
                 </Box>
                 <Divider sx={{ my: 1 }} />
@@ -227,6 +248,11 @@ const FinancialReports = () => {
                 <Box display="flex" justifyContent="space-between">
                   <Typography sx={{ fontWeight: 'bold' }}>Total Equity</Typography>
                   <Typography sx={{ fontWeight: 'bold' }}>{formatCurrency(balance_sheet.equity.total_equity)}</Typography>
+                </Box>
+                <Divider sx={{ my: 2 }} />
+                <Box display="flex" justifyContent="space-between">
+                  <Typography sx={{ fontWeight: 'bold' }}>Total Liabilities & Equity</Typography>
+                  <Typography sx={{ fontWeight: 'bold' }}>{formatCurrency(balance_sheet.liabilities.total_liabilities + balance_sheet.equity.total_equity)}</Typography>
                 </Box>
               </Box>
             </Grid>
@@ -269,6 +295,21 @@ const FinancialReports = () => {
             </Grid>
             
             <Grid item xs={12} md={4}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 2 }}>Investing Activities</Typography>
+              <Box sx={{ pl: 2 }}>
+                <Box display="flex" justifyContent="space-between">
+                  <Typography variant="body2">Equipment Purchases</Typography>
+                  <Typography variant="body2">{formatCurrency(cash_flow.investing_activities.equipment_purchases)}</Typography>
+                </Box>
+                <Divider sx={{ my: 1 }} />
+                <Box display="flex" justifyContent="space-between">
+                  <Typography sx={{ fontWeight: 'bold' }}>Net Investing Cash Flow</Typography>
+                  <Typography sx={{ fontWeight: 'bold' }}>{formatCurrency(cash_flow.investing_activities.net_investing_cash_flow)}</Typography>
+                </Box>
+              </Box>
+            </Grid>
+            
+            <Grid item xs={12} md={4}>
               <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 2 }}>Financing Activities</Typography>
               <Box sx={{ pl: 2 }}>
                 <Box display="flex" justifyContent="space-between">
@@ -278,6 +319,11 @@ const FinancialReports = () => {
                 <Box display="flex" justifyContent="space-between">
                   <Typography variant="body2">Withdrawals</Typography>
                   <Typography variant="body2">{formatCurrency(cash_flow.financing_activities.withdrawals)}</Typography>
+                </Box>
+                <Divider sx={{ my: 1 }} />
+                <Box display="flex" justifyContent="space-between">
+                  <Typography sx={{ fontWeight: 'bold' }}>Net Financing Cash Flow</Typography>
+                  <Typography sx={{ fontWeight: 'bold' }}>{formatCurrency(cash_flow.financing_activities.net_financing_cash_flow)}</Typography>
                 </Box>
                 <Divider sx={{ my: 1 }} />
                 <Box display="flex" justifyContent="space-between">
@@ -362,6 +408,12 @@ const FinancialReports = () => {
           Filters & Options
         </Typography>
         
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+        
         <Grid container spacing={2}>
           <Grid item xs={12} sm={6} md={3}>
             <FormControl fullWidth size="small">
@@ -421,91 +473,6 @@ const FinancialReports = () => {
     </Card>
   );
 
-  const renderOverviewTab = () => {
-    if (filters.reportType === 'profit_loss') {
-      return (
-        <Box>
-          {renderProfitLossStatement()}
-        </Box>
-      );
-    }
-    
-    if (filters.reportType === 'balance_sheet') {
-      return (
-        <Box>
-          {renderBalanceSheet()}
-        </Box>
-      );
-    }
-    
-    if (filters.reportType === 'cash_flow') {
-      return (
-        <Box>
-          {renderCashFlowStatement()}
-        </Box>
-      );
-    }
-    
-    return (
-      <Box>
-        {renderSummaryCards()}
-        {renderProfitLossStatement()}
-        {renderBalanceSheet()}
-        {renderCashFlowStatement()}
-      </Box>
-    );
-  };
-
-  const renderDetailedAnalysisTab = () => (
-    <Card>
-      <CardContent>
-        <Typography variant="h6" gutterBottom>Detailed Financial Analysis</Typography>
-        {reportData?.transactions && (
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Date</TableCell>
-                  <TableCell>Type</TableCell>
-                  <TableCell>Category</TableCell>
-                  <TableCell>Description</TableCell>
-                  <TableCell>Amount</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {reportData.transactions
-                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                  .map((transaction, index) => (
-                    <TableRow key={index}>
-                      <TableCell>{new Date(transaction.date).toLocaleDateString()}</TableCell>
-                      <TableCell>
-                        <Chip 
-                          label={transaction.type} 
-                          color={transaction.type === 'income' ? 'success' : 'error'}
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>{transaction.category}</TableCell>
-                      <TableCell>{transaction.description}</TableCell>
-                      <TableCell>{formatCurrency(transaction.amount)}</TableCell>
-                    </TableRow>
-                  ))}
-              </TableBody>
-            </Table>
-            <TablePagination
-              component="div"
-              count={reportData.transactions?.length || 0}
-              page={page}
-              onPageChange={(e, newPage) => setPage(newPage)}
-              rowsPerPage={rowsPerPage}
-              onRowsPerPageChange={(e) => setRowsPerPage(parseInt(e.target.value, 10))}
-            />
-          </TableContainer>
-        )}
-      </CardContent>
-    </Card>
-  );
-
   const renderRatiosTab = () => (
     <Box>
       {reportData?.financial_ratios && (
@@ -550,49 +517,51 @@ const FinancialReports = () => {
   );
 
   return (
-    <LocalizationProvider dateAdapter={AdapterDateFns}>
-      <Box sx={{ p: 3 }}>
-        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
-              <FinanceIcon sx={{ fontSize: 32 }} />
-              Professional Financial Reports
-            </Typography>
-            <Typography variant="body1" color="textSecondary">
-              Comprehensive financial statements and analysis
-            </Typography>
-          </Box>
+    <Box sx={{ p: 3 }}>
+      <Typography variant="h4" gutterBottom>
+        Financial Reports
+      </Typography>
+      
+      {renderFilters()}
+      
+      {reportData && (
+        <>
+          {renderSummaryCards()}
+          
+          <Tabs
+            value={activeTab}
+            onChange={(e, newValue) => setActiveTab(newValue)}
+            sx={{ mb: 3 }}
+          >
+            <Tab label="Comprehensive" />
+            <Tab label="Profit & Loss" />
+            <Tab label="Balance Sheet" />
+            <Tab label="Cash Flow" />
+            <Tab label="Ratios" />
+          </Tabs>
+          
+          {activeTab === 0 && (
+            <>
+              {renderProfitLossStatement()}
+              {renderBalanceSheet()}
+              {renderCashFlowStatement()}
+              {renderRatiosTab()}
+            </>
+          )}
+          
+          {activeTab === 1 && renderProfitLossStatement()}
+          {activeTab === 2 && renderBalanceSheet()}
+          {activeTab === 3 && renderCashFlowStatement()}
+          {activeTab === 4 && renderRatiosTab()}
+        </>
+      )}
+      
+      {loading && !reportData && (
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
+          <CircularProgress />
         </Box>
-
-        {renderFilters()}
-
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
-            {error}
-          </Alert>
-        )}
-
-        {loading && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
-            <CircularProgress />
-          </Box>
-        )}
-
-        {reportData && !loading && (
-          <Box>
-            <Tabs value={activeTab} onChange={handleTabChange} sx={{ mb: 3 }}>
-              <Tab label="Financial Statement" />
-              <Tab label="Detailed Analysis" />
-              <Tab label="Ratios & Metrics" />
-            </Tabs>
-
-            {activeTab === 0 && renderOverviewTab()}
-            {activeTab === 1 && renderDetailedAnalysisTab()}
-            {activeTab === 2 && renderRatiosTab()}
-          </Box>
-        )}
-      </Box>
-    </LocalizationProvider>
+      )}
+    </Box>
   );
 };
 
