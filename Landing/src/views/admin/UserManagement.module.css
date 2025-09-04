@@ -996,23 +996,23 @@ p {
   border-color: #fca5a5;
 }
 
-.successButton {
+.activateButton {
   color: #10b981;
   border-color: #a7f3d0;
 }
 
-.successButton:hover {
+.activateButton:hover {
   color: #059669;
   background-color: #ecfdf5;
   border-color: #6ee7b7;
 }
 
-.warningButton {
+.deactivateButton {
   color: #f59e0b;
   border-color: #fde68a;
 }
 
-.warningButton:hover {
+.deactivateButton:hover {
   color: #d97706;
   background-color: #fffbeb;
   border-color: #fcd34d;

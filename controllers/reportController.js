@@ -1525,7 +1525,7 @@ async function calculatePurchaseComparisonMetrics(baseFilter, currentStart, curr
 }
 
 // Helper function to calculate comprehensive inventory summary
-function calculateInventorySummary(inventory, metricsLevel) {
+function calculateInventorySummary(inventory, metricsLevel, allStores = []) {
   const summary = {
     total_products: inventory.length,
     total_stock_units: 0,
@@ -1575,11 +1575,17 @@ function calculateInventorySummary(inventory, metricsLevel) {
     }
   });
 
+  // If no store breakdown data, use all stores count
+  if (summary.stores.size === 0 && allStores.length > 0) {
+    summary.total_stores = allStores.length;
+  } else {
+    summary.total_stores = summary.stores.size;
+  }
+
   // Calculate derived metrics
   summary.average_margin_percentage = productsWithMargin > 0 ? (totalMarginSum / productsWithMargin).toFixed(2) : 0;
   summary.inventory_turnover_ratio = 0; // Would need sales data to calculate properly
   summary.total_categories = summary.categories.size;
-  summary.total_stores = summary.stores.size;
   summary.stock_efficiency = summary.total_products > 0 ? 
     ((summary.stock_status_breakdown.in_stock + summary.stock_status_breakdown.overstocked) / summary.total_products * 100).toFixed(2) : 0;
   
@@ -2313,13 +2319,16 @@ exports.generateAdvancedFinancialReport = async (req, res) => {
     if (start && end) baseFilter.created_at = { $gte: start, $lte: end };
 
     // Get all financial data
-    const [sales, purchases, expenses, accounts, deposits, withdrawals] = await Promise.all([
+    const [sales, purchases, expenses, accounts, deposits, withdrawals, suppliers, payments, paymentOuts] = await Promise.all([
       Sale.find(baseFilter).lean(),
       Purchase.find(baseFilter).lean(),
       Expense.find(baseFilter).lean(),
       Account.find(userId ? { userId } : {}).lean(),
       require('../models/Deposit').find(baseFilter).lean().catch(() => []),
-      require('../models/Withdrawal').find(baseFilter).lean().catch(() => [])
+      require('../models/Withdrawal').find(baseFilter).lean().catch(() => []),
+      require('../models/Supplier').find(userId ? { userId } : {}).lean().catch(() => []),
+      require('../models/Payment').find(baseFilter).lean().catch(() => []),
+      require('../models/PaymentOut').find(baseFilter).lean().catch(() => [])
     ]);
 
     // Generate different financial statements based on report type
@@ -2341,7 +2350,7 @@ exports.generateAdvancedFinancialReport = async (req, res) => {
         }
       };
     } else if (reportType === 'balance_sheet') {
-      const balanceSheet = generateBalanceSheet(accounts, sales, purchases, expenses, deposits, withdrawals);
+      const balanceSheet = generateBalanceSheet(accounts, sales, purchases, expenses, deposits, withdrawals, suppliers, payments, paymentOuts);
       
       response = {
         statement_type: 'balance_sheet',
@@ -2370,7 +2379,7 @@ exports.generateAdvancedFinancialReport = async (req, res) => {
     } else {
       // Comprehensive report (default)
       const profitLoss = generateProfitLossStatement(sales, purchases, expenses);
-      const balanceSheet = generateBalanceSheet(accounts, sales, purchases, expenses, deposits, withdrawals);
+      const balanceSheet = generateBalanceSheet(accounts, sales, purchases, expenses, deposits, withdrawals, suppliers, payments, paymentOuts);
       const cashFlow = generateCashFlowStatement(sales, purchases, expenses, deposits, withdrawals);
       const timeSeries = groupFinancialDataByTime(sales, purchases, expenses, groupBy);
       const categoryBreakdown = calculateCategoryBreakdown(sales, purchases, expenses);
@@ -2822,13 +2831,12 @@ exports.generateAdvancedInventoryReport = async (req, res) => {
 
     // Get store products for detailed store-wise inventory
     const StoreProduct = require('../models/StoreProduct');
-    let storeProducts = [];
-    if (store_no || includeMovements) {
-      const storeFilter = { userId };
-      if (store_no) storeFilter.store_no = Number(store_no);
-      
-      storeProducts = await StoreProduct.find(storeFilter).lean();
-    }
+    // Always fetch store products to ensure store information is available
+    // Only filter by specific store if store_no is provided
+    const storeFilter = { userId };
+    if (store_no) storeFilter.store_no = Number(store_no);
+    
+    const storeProducts = await StoreProduct.find(storeFilter).lean();
 
     // Get related data for enrichment
     const stores = await Store.find({ userId }).lean();
@@ -2846,6 +2854,19 @@ exports.generateAdvancedInventoryReport = async (req, res) => {
       storeProductMap.set(key, sp);
     });
 
+    // Create a map of all store products by product_no for quick lookup
+    const allStoreProductsMap = new Map();
+    if (!store_no) {
+      // If no specific store filter, get all store products for accurate store information
+      const allStoreProducts = await StoreProduct.find({ userId }).lean();
+      allStoreProducts.forEach(sp => {
+        if (!allStoreProductsMap.has(sp.product_no)) {
+          allStoreProductsMap.set(sp.product_no, []);
+        }
+        allStoreProductsMap.get(sp.product_no).push(sp);
+      });
+    }
+
     // Enrich inventory data
     const enrichedInventory = products.map(product => {
       // Calculate stock status
@@ -2862,9 +2883,10 @@ exports.generateAdvancedInventoryReport = async (req, res) => {
       const totalRetailValue = stock * unitPrice;
       const potentialProfit = totalRetailValue - totalCostValue;
 
-      // Get store-wise breakdown if available
+      // Get store-wise breakdown
       let storeBreakdown = [];
-      if (storeProducts.length > 0) {
+      if (store_no) {
+        // If specific store is filtered, use the pre-fetched store products
         storeBreakdown = storeProducts
           .filter(sp => sp.product_no === product.product_no)
           .map(sp => {
@@ -2876,6 +2898,18 @@ exports.generateAdvancedInventoryReport = async (req, res) => {
               last_updated: sp.updated_at
             };
           });
+      } else {
+        // If no specific store filter, get all stores for this product
+        const productStoreEntries = allStoreProductsMap.get(product.product_no) || [];
+        storeBreakdown = productStoreEntries.map(sp => {
+          const store = storeMap.get(sp.store_no);
+          return {
+            store_no: sp.store_no,
+            store_name: store?.store_name || `Store ${sp.store_no}`,
+            qty: sp.qty || 0,
+            last_updated: sp.updated_at
+          };
+        });
       }
 
       return {
@@ -2902,7 +2936,7 @@ exports.generateAdvancedInventoryReport = async (req, res) => {
     }
 
     // Calculate summary metrics
-    const summary = calculateInventorySummary(filteredInventory, metrics);
+    const summary = calculateInventorySummary(filteredInventory, metrics, stores);
     
     // Group data for analysis
     const groupedData = groupInventoryData(filteredInventory, groupBy);
@@ -2937,7 +2971,6 @@ exports.generateAdvancedInventoryReport = async (req, res) => {
           generated_at: new Date(),
           report_type: 'advanced_inventory',
           metrics_level: metrics,
-          total_stores: stores.length,
           total_categories: [...new Set(products.map(p => p.category).filter(Boolean))].length
         }
       }

@@ -20,8 +20,10 @@
   --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
   --success: #16a34a;
   --success-bg: #dcfce7;
+  --success-color: #16a34a;
   --error: #ef4444;
   --error-bg: #fee2e2;
+  --error-color: #ef4444;
 }
 
 /* Dark mode colors */
@@ -43,8 +45,10 @@
   --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.3), 0 8px 10px -6px rgb(0 0 0 / 0.3);
   --success: #22c55e;
   --success-bg: #162d1a;
+  --success-color: #22c55e;
   --error: #f87171;
   --error-bg: #411c1c;
+  --error-color: #f87171;
 }
 
 /* Global styles */
@@ -226,4 +230,18 @@ button:hover {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
+}
+
+/* Spinning animation for loading indicators */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
 }

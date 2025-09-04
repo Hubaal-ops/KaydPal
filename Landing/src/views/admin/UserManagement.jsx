@@ -149,6 +149,45 @@ const UserManagement = () => {
     setShowDeleteModal(true);
   };
 
+  // Handle toggle user status
+  const handleToggleStatus = async (user) => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const newStatus = user.status === 'active' ? 'inactive' : 'active';
+      
+      const response = await fetch(`/api/protected/admin/users/${user.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          isActive: newStatus === 'active'
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        // Update the user in the state
+        setUsers(users.map(u => 
+          u.id === user.id 
+            ? { ...u, status: newStatus, isActive: newStatus === 'active' } 
+            : u
+        ));
+        
+        setSuccess(`User "${user.name}" has been ${newStatus} successfully.`);
+        setTimeout(() => setSuccess(''), 3000);
+      } else {
+        setSuccess(result.message || `Failed to ${newStatus} user`);
+      }
+    } catch (err) {
+      setSuccess(`Failed to ${user.status === 'active' ? 'deactivate' : 'activate'} user`);
+    }
+    setLoading(false);
+  };
+
   // Confirm delete (API)
   const confirmDelete = async () => {
     setLoading(true);
@@ -785,6 +824,13 @@ const UserManagement = () => {
                             onClick={() => handleEditUser(user)}
                           >
                             <Edit2 size={16} />
+                          </button>
+                          <button 
+                            className={`${styles.actionButton} ${user.status === 'active' ? styles.deactivateButton : styles.activateButton}`}
+                            aria-label={`Set ${user.name} as ${user.status === 'active' ? 'inactive' : 'active'}`}
+                            onClick={() => handleToggleStatus(user)}
+                          >
+                            {user.status === 'active' ? <UserX size={16} /> : <UserCheck size={16} />}
                           </button>
                           <button 
                             className={`${styles.actionButton} ${styles.deleteButton}`}

@@ -12,6 +12,9 @@ router.get('/purchases/advanced', verifyToken, reportController.generateAdvanced
 // Advanced Inventory Report (Enterprise-level)
 router.get('/inventory/advanced', verifyToken, reportController.generateAdvancedInventoryReport);
 
+// Inventory Export
+router.get('/inventory/export', verifyToken, reportController.exportInventoryReport);
+
 // Advanced Financial Report (Enterprise-level)
 router.get('/financial/advanced', verifyToken, reportController.generateAdvancedFinancialReport);
 

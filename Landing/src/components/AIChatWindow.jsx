@@ -9,6 +9,7 @@ const AIChatWindow = ({ onClose }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [typing, setTyping] = useState(false);
+  const [modelName, setModelName] = useState('');
   const chatEndRef = useRef(null);
 
   useEffect(() => {
@@ -25,26 +26,32 @@ const AIChatWindow = ({ onClose }) => {
     setTyping(true);
     setLoading(true);
     try {
-      // Example: OpenAI-compatible endpoint
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      // Call our backend API instead of OpenAI directly
+      const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer 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'
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
         body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
           messages: newMessages.map(m => ({ role: m.role, content: m.content }))
         })
       });
+      
       const data = await res.json();
-      if (data.choices && data.choices[0] && data.choices[0].message) {
-        setMessages([...newMessages, { role: 'assistant', content: data.choices[0].message.content }]);
+      
+      if (data.success && data.aiMessage) {
+        setMessages([...newMessages, { role: 'assistant', content: data.aiMessage }]);
+        if (data.model && data.model !== modelName) {
+          setModelName(data.model);
+        }
       } else {
-        setError(data.error?.message || 'AI error');
+        setError(data.message || 'Error communicating with AI assistant');
+        console.error('AI chat error:', data);
       }
     } catch (err) {
-      setError('Network error.');
+      console.error('Network error in AI chat:', err);
+      setError('Network error. Please check your connection and try again.');
     }
     setTyping(false);
     setLoading(false);
@@ -54,7 +61,7 @@ const AIChatWindow = ({ onClose }) => {
     <div className={styles.aiChatOverlay}>
       <div className={styles.aiChatWindow}>
         <div className={styles.aiChatHeader}>
-          <span>AI Assistant</span>
+          <span>AI Assistant {modelName && <small>({modelName.split('/').pop()})</small>}</span>
           <button className={styles.aiChatClose} onClick={onClose}>&times;</button>
         </div>
         <div className={styles.aiChatBody}>

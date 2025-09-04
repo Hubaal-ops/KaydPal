@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import styles from './InventoryReports.module.css';
 import {
   Box,
   Card,
@@ -40,7 +41,8 @@ import {
   Store as StoreIcon,
   Category as CategoryIcon,
   AttachMoney as ValueIcon,
-  Warning as WarningIcon
+  Warning as WarningIcon,
+  ArrowLeft
 } from '@mui/icons-material';
 import {
   AreaChart,
@@ -60,6 +62,7 @@ import {
   Scatter
 } from 'recharts';
 import { generateAdvancedInventoryReport } from '../services/reportService';
+import { useNavigate } from 'react-router-dom';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
 
@@ -70,6 +73,12 @@ const InventoryReports = () => {
   const [error, setError] = useState(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
+  const navigate = useNavigate();
+
+  // Handle back button click to return to reports
+  const handleBackClick = () => {
+    navigate('/reports');
+  };
 
   // Filter states
   const [filters, setFilters] = useState({
@@ -204,22 +213,30 @@ const InventoryReports = () => {
             }
             
             xPos = startX;
-            const currentStock = item.current_stock || 0;
-            const retailPrice = parseFloat(item.retail_price || 0);
-            const costPrice = parseFloat(item.cost_price || 0);
+            const currentStock = item.storing_balance || 0;
+            const retailPrice = parseFloat(item.price || 0);
+            const costPrice = parseFloat(item.cost || 0);
             const totalValue = currentStock * retailPrice;
             const stockStatus = currentStock <= (item.min_stock || 0) ? 'Low' : 'Normal';
             
+            // Get store information from store_breakdown or use 'All Stores' if not available
+            let storeInfo = 'N/A';
+            if (item.store_breakdown && item.store_breakdown.length > 0) {
+              storeInfo = item.store_breakdown.map(store => store.store_name).join(', ');
+            } else if (reportData.metadata && reportData.metadata.total_stores) {
+              storeInfo = `${reportData.metadata.total_stores} stores`;
+            }
+            
             const rowData = [
-              item.store_name || '',
-              item.product_name || '',
+              storeInfo,
+              item.product_name || item.product_no || '',
               item.category || '',
               currentStock.toString(),
               (item.min_stock || 0).toString(),
               `$${retailPrice.toFixed(2)}`,
               `$${costPrice.toFixed(2)}`,
               `$${totalValue.toFixed(2)}`,
-              stockStatus
+              item.stock_status?.replace('_', ' ') || stockStatus
             ];
             
             // Alternate row background
@@ -348,250 +365,235 @@ const InventoryReports = () => {
     const { summary } = reportData;
 
     return (
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box display="flex" alignItems="center" justifyContent="space-between">
-                <Box>
-                  <Typography color="textSecondary" gutterBottom variant="body2">
-                    Total Products
-                  </Typography>
-                  <Typography variant="h4">
-                    {formatNumber(summary.total_products)}
-                  </Typography>
-                  <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                    {summary.total_categories} categories
-                  </Typography>
-                </Box>
-                <InventoryIcon sx={{ fontSize: 40, color: 'primary.main' }} />
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
+      <div className={styles.summaryGrid}>
+        <div className={styles.summaryCard}>
+          <div className={styles.summaryHeader}>
+            <div>
+              <div className={styles.summaryTitle}>Total Products</div>
+              <div className={styles.summaryValue}>{formatNumber(summary.total_products)}</div>
+            </div>
+            <div className={styles.iconContainer}>
+              <InventoryIcon sx={{ fontSize: 24, color: 'white' }} />
+            </div>
+          </div>
+          <div className={styles.summaryCompare}>
+            <span>{summary.total_categories} categories</span>
+          </div>
+        </div>
 
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box display="flex" alignItems="center" justifyContent="space-between">
-                <Box>
-                  <Typography color="textSecondary" gutterBottom variant="body2">
-                    Total Stock Units
-                  </Typography>
-                  <Typography variant="h4">
-                    {formatNumber(summary.total_stock_units)}
-                  </Typography>
-                  <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                    Across {summary.total_stores} stores
-                  </Typography>
-                </Box>
-                <StoreIcon sx={{ fontSize: 40, color: 'info.main' }} />
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
+        <div className={styles.summaryCard}>
+          <div className={styles.summaryHeader}>
+            <div>
+              <div className={styles.summaryTitle}>Total Stock Units</div>
+              <div className={styles.summaryValue}>{formatNumber(summary.total_stock_units)}</div>
+            </div>
+            <div className={styles.iconContainer}>
+              <StoreIcon sx={{ fontSize: 24, color: 'white' }} />
+            </div>
+          </div>
+          <div className={styles.summaryCompare}>
+            <span>Across {summary.total_stores} stores</span>
+          </div>
+        </div>
 
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box display="flex" alignItems="center" justifyContent="space-between">
-                <Box>
-                  <Typography color="textSecondary" gutterBottom variant="body2">
-                    Total Retail Value
-                  </Typography>
-                  <Typography variant="h4">
-                    {formatCurrency(summary.total_retail_value)}
-                  </Typography>
-                  <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                    Cost: {formatCurrency(summary.total_cost_value)}
-                  </Typography>
-                </Box>
-                <ValueIcon sx={{ fontSize: 40, color: 'success.main' }} />
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
+        <div className={styles.summaryCard}>
+          <div className={styles.summaryHeader}>
+            <div>
+              <div className={styles.summaryTitle}>Total Retail Value</div>
+              <div className={styles.summaryValue}>{formatCurrency(summary.total_retail_value)}</div>
+            </div>
+            <div className={styles.iconContainer}>
+              <ValueIcon sx={{ fontSize: 24, color: 'white' }} />
+            </div>
+          </div>
+          <div className={styles.summaryCompare}>
+            <span>Cost: {formatCurrency(summary.total_cost_value)}</span>
+          </div>
+        </div>
 
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box display="flex" alignItems="center" justifyContent="space-between">
-                <Box>
-                  <Typography color="textSecondary" gutterBottom variant="body2">
-                    Average Margin
-                  </Typography>
-                  <Typography variant="h4">
-                    {formatPercentage(summary.average_margin_percentage)}
-                  </Typography>
-                  <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                    Potential profit: {formatCurrency(summary.total_potential_profit)}
-                  </Typography>
-                </Box>
-                <TrendingUpIcon sx={{ fontSize: 40, color: 'warning.main' }} />
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+        <div className={styles.summaryCard}>
+          <div className={styles.summaryHeader}>
+            <div>
+              <div className={styles.summaryTitle}>Average Margin</div>
+              <div className={styles.summaryValue}>{formatPercentage(summary.average_margin_percentage)}</div>
+            </div>
+            <div className={styles.iconContainer}>
+              <TrendingUpIcon sx={{ fontSize: 24, color: 'white' }} />
+            </div>
+          </div>
+          <div className={styles.summaryCompare}>
+            <span>Potential profit: {formatCurrency(summary.total_potential_profit)}</span>
+          </div>
+        </div>
+      </div>
     );
   };
 
   const renderFilters = () => (
-    <Card sx={{ mb: 3 }}>
-      <CardContent>
-        <Typography variant="h6" gutterBottom>
-          <FilterIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-          Filters & Options
-        </Typography>
-        
-        <Grid container spacing={2}>
-          <Grid item xs={12} sm={6} md={3}>
-            <TextField
-              fullWidth
-              size="small"
-              label="Store No"
-              value={filters.store_no}
-              onChange={(e) => handleFilterChange('store_no', e.target.value)}
-            />
-          </Grid>
+    <div className={styles.filterCard}>
+      <div className={styles.filterHeader}>
+        <FilterIcon />
+        <h2>Filters</h2>
+      </div>
+      
+      <div className={styles.filterGrid}>
+        <div className={styles.filterGroup}>
+          <TextField
+            fullWidth
+            size="small"
+            label="Store No"
+            value={filters.store_no}
+            onChange={(e) => handleFilterChange('store_no', e.target.value)}
+            className={styles.filterInput}
+          />
+        </div>
 
-          <Grid item xs={12} sm={6} md={3}>
-            <TextField
-              fullWidth
-              size="small"
-              label="Category"
-              value={filters.category}
-              onChange={(e) => handleFilterChange('category', e.target.value)}
-            />
-          </Grid>
+        <div className={styles.filterGroup}>
+          <TextField
+            fullWidth
+            size="small"
+            label="Category"
+            value={filters.category}
+            onChange={(e) => handleFilterChange('category', e.target.value)}
+            className={styles.filterInput}
+          />
+        </div>
 
-          <Grid item xs={12} sm={6} md={3}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Stock Status</InputLabel>
-              <Select
-                value={filters.stock_status}
-                label="Stock Status"
-                onChange={(e) => handleFilterChange('stock_status', e.target.value)}
-              >
-                {stockStatusOptions.map((option) => (
-                  <MenuItem key={option.value} value={option.value}>
-                    {option.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-
-          <Grid item xs={12} sm={6} md={3}>
-            <TextField
-              fullWidth
-              size="small"
-              label="Min Stock"
-              type="number"
-              value={filters.min_stock}
-              onChange={(e) => handleFilterChange('min_stock', e.target.value)}
-            />
-          </Grid>
-
-          <Grid item xs={12} sm={6} md={3}>
-            <TextField
-              fullWidth
-              size="small"
-              label="Max Stock"
-              type="number"
-              value={filters.max_stock}
-              onChange={(e) => handleFilterChange('max_stock', e.target.value)}
-            />
-          </Grid>
-
-          <Grid item xs={12} sm={6} md={3}>
-            <TextField
-              fullWidth
-              size="small"
-              label="Min Value"
-              type="number"
-              value={filters.min_value}
-              onChange={(e) => handleFilterChange('min_value', e.target.value)}
-            />
-          </Grid>
-
-          <Grid item xs={12} sm={6} md={3}>
-            <TextField
-              fullWidth
-              size="small"
-              label="Max Value"
-              type="number"
-              value={filters.max_value}
-              onChange={(e) => handleFilterChange('max_value', e.target.value)}
-            />
-          </Grid>
-
-          <Grid item xs={12} sm={6} md={3}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Group By</InputLabel>
-              <Select
-                value={filters.groupBy}
-                label="Group By"
-                onChange={(e) => handleFilterChange('groupBy', e.target.value)}
-              >
-                {groupByOptions.map((option) => (
-                  <MenuItem key={option.value} value={option.value}>
-                    {option.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-
-          <Grid item xs={12} sm={6} md={3}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Sort By</InputLabel>
-              <Select
-                value={filters.sortBy}
-                label="Sort By"
-                onChange={(e) => handleFilterChange('sortBy', e.target.value)}
-              >
-                {sortOptions.map((option) => (
-                  <MenuItem key={option.value} value={option.value}>
-                    {option.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-        </Grid>
-
-        <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
-          <Button
-            variant="contained"
-            onClick={generateReport}
-            disabled={loading}
-            startIcon={loading ? <CircularProgress size={20} /> : <RefreshIcon />}
+        <div className={styles.filterGroup}>
+          <TextField
+            select
+            fullWidth
+            size="small"
+            label="Stock Status"
+            value={filters.stock_status}
+            onChange={(e) => handleFilterChange('stock_status', e.target.value)}
+            className={styles.filterSelect}
           >
-            {loading ? 'Generating...' : 'Generate Report'}
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<DownloadIcon />}
-            onClick={() => {/* TODO: Implement export */}}
+            {stockStatusOptions.map((option) => (
+              <MenuItem key={option.value} value={option.value}>
+                {option.label}
+              </MenuItem>
+            ))}
+          </TextField>
+        </div>
+
+        <div className={styles.filterGroup}>
+          <TextField
+            fullWidth
+            size="small"
+            label="Min Stock"
+            type="number"
+            value={filters.min_stock}
+            onChange={(e) => handleFilterChange('min_stock', e.target.value)}
+            className={styles.filterInput}
+          />
+        </div>
+
+        <div className={styles.filterGroup}>
+          <TextField
+            fullWidth
+            size="small"
+            label="Max Stock"
+            type="number"
+            value={filters.max_stock}
+            onChange={(e) => handleFilterChange('max_stock', e.target.value)}
+            className={styles.filterInput}
+          />
+        </div>
+
+        <div className={styles.filterGroup}>
+          <TextField
+            fullWidth
+            size="small"
+            label="Min Value"
+            type="number"
+            value={filters.min_value}
+            onChange={(e) => handleFilterChange('min_value', e.target.value)}
+            className={styles.filterInput}
+          />
+        </div>
+
+        <div className={styles.filterGroup}>
+          <TextField
+            fullWidth
+            size="small"
+            label="Max Value"
+            type="number"
+            value={filters.max_value}
+            onChange={(e) => handleFilterChange('max_value', e.target.value)}
+            className={styles.filterInput}
+          />
+        </div>
+
+        <div className={styles.filterGroup}>
+          <TextField
+            select
+            fullWidth
+            size="small"
+            label="Group By"
+            value={filters.groupBy}
+            onChange={(e) => handleFilterChange('groupBy', e.target.value)}
+            className={styles.filterSelect}
           >
-            Export
-          </Button>
-        </Box>
-      </CardContent>
-    </Card>
+            {groupByOptions.map((option) => (
+              <MenuItem key={option.value} value={option.value}>
+                {option.label}
+              </MenuItem>
+            ))}
+          </TextField>
+        </div>
+
+        <div className={styles.filterGroup}>
+          <TextField
+            select
+            fullWidth
+            size="small"
+            label="Sort By"
+            value={filters.sortBy}
+            onChange={(e) => handleFilterChange('sortBy', e.target.value)}
+            className={styles.filterSelect}
+          >
+            {sortOptions.map((option) => (
+              <MenuItem key={option.value} value={option.value}>
+                {option.label}
+              </MenuItem>
+            ))}
+          </TextField>
+        </div>
+      </div>
+
+      <div className={styles.buttonContainer}>
+        <button
+          className={styles.primaryButton}
+          onClick={generateReport}
+          disabled={loading}
+        >
+          {loading ? (
+            <>
+              <CircularProgress size={16} />
+              Generating...
+            </>
+          ) : (
+            <>
+              <RefreshIcon size={16} />
+              Generate Report
+            </>
+          )}
+        </button>
+      </div>
+    </div>
   );
 
   const renderOverviewTab = () => (
-    <Box>
+    <div>
       {renderSummaryCards()}
       
       {reportData?.grouped_data && (
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Inventory Distribution by {filters.groupBy}
-            </Typography>
+        <div className={styles.chartCard}>
+          <div className={styles.chartHeader}>
+            Inventory Distribution by {filters.groupBy}
+          </div>
+          <div className={styles.chartContainer}>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={reportData.grouped_data}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -610,445 +612,501 @@ const InventoryReports = () => {
                 <Bar dataKey="product_count" fill="#82ca9d" name="Products" />
               </BarChart>
             </ResponsiveContainer>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {reportData?.summary?.stock_status_breakdown && (
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Stock Status Distribution
-                </Typography>
-                <ResponsiveContainer width="100%" height={250}>
-                  <PieChart>
-                    <Pie
-                      data={Object.entries(reportData.summary.stock_status_breakdown).map(([key, value]) => ({
-                        name: key.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-                        value
-                      }))}
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                      label
-                    >
-                      {Object.entries(reportData.summary.stock_status_breakdown).map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <RechartsTooltip />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </Grid>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+          <div className={styles.chartCard}>
+            <div className={styles.chartHeader}>
+              Stock Status Distribution
+            </div>
+            <div className={styles.chartContainer}>
+              <ResponsiveContainer width="100%" height={250}>
+                <PieChart>
+                  <Pie
+                    data={Object.entries(reportData.summary.stock_status_breakdown).map(([key, value]) => ({
+                      name: key.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                      value
+                    }))}
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                    label
+                  >
+                    {Object.entries(reportData.summary.stock_status_breakdown).map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <RechartsTooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
 
-          <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Stock Efficiency Metrics
+          <div className={styles.chartCard}>
+            <div className={styles.chartHeader}>
+              Stock Efficiency Metrics
+            </div>
+            <div className={styles.chartContainer}>
+              <div style={{ padding: '1rem' }}>
+                <Typography variant="h3" color="primary" gutterBottom style={{ color: 'var(--primary-color)', marginBottom: '0.5rem' }}>
+                  {formatPercentage(reportData.summary.stock_efficiency)}
                 </Typography>
-                <Box sx={{ p: 2 }}>
-                  <Typography variant="h3" color="primary" gutterBottom>
-                    {formatPercentage(reportData.summary.stock_efficiency)}
-                  </Typography>
-                  <Typography variant="body1" color="textSecondary" gutterBottom>
-                    Stock Efficiency Rate
-                  </Typography>
-                  <Divider sx={{ my: 2 }} />
-                  <Grid container spacing={2}>
-                    <Grid item xs={6}>
-                      <Typography variant="h6" color="success.main">
-                        {formatNumber(reportData.summary.stock_status_breakdown.in_stock)}
-                      </Typography>
-                      <Typography variant="body2" color="textSecondary">
-                        In Stock
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={6}>
-                      <Typography variant="h6" color="error.main">
-                        {formatNumber(reportData.summary.stock_status_breakdown.out_of_stock)}
-                      </Typography>
-                      <Typography variant="body2" color="textSecondary">
-                        Out of Stock
-                      </Typography>
-                    </Grid>
-                  </Grid>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
+                <Typography variant="body1" color="textSecondary" gutterBottom style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+                  Stock Efficiency Rate
+                </Typography>
+                <Divider sx={{ my: 2 }} style={{ margin: '1rem 0' }} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div>
+                    <Typography variant="h6" style={{ color: 'var(--success-color)', marginBottom: '0.25rem' }}>
+                      {formatNumber(reportData.summary.stock_status_breakdown.in_stock)}
+                    </Typography>
+                    <Typography variant="body2" style={{ color: 'var(--text-secondary)' }}>
+                      In Stock
+                    </Typography>
+                  </div>
+                  <div>
+                    <Typography variant="h6" style={{ color: 'var(--error-color)', marginBottom: '0.25rem' }}>
+                      {formatNumber(reportData.summary.stock_status_breakdown.out_of_stock)}
+                    </Typography>
+                    <Typography variant="body2" style={{ color: 'var(--text-secondary)' }}>
+                      Out of Stock
+                    </Typography>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
-    </Box>
+    </div>
   );
 
   const renderDetailedAnalysisTab = () => (
-    <Card>
-      <CardContent>
-        <Typography variant="h6" gutterBottom>
-          Detailed Inventory Analysis
-        </Typography>
-        
-        {reportData?.inventory && (
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Product</TableCell>
-                  <TableCell>Category</TableCell>
-                  <TableCell>Stock</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Cost Value</TableCell>
-                  <TableCell>Retail Value</TableCell>
-                  <TableCell>Margin %</TableCell>
-                  <TableCell>Potential Profit</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {reportData.inventory
-                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                  .map((item) => (
-                    <TableRow key={item.product_no}>
-                      <TableCell>
-                        <Box>
-                          <Typography variant="subtitle2">
-                            {item.product_name || item.product_no}
-                          </Typography>
-                          <Typography variant="caption" color="textSecondary">
-                            {item.product_no}
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell>{item.category || 'N/A'}</TableCell>
-                      <TableCell>{formatNumber(item.storing_balance)}</TableCell>
-                      <TableCell>
-                        <Chip 
-                          label={item.stock_status?.replace('_', ' ') || 'unknown'} 
-                          size="small"
-                          color={getStockStatusColor(item.stock_status)}
-                        />
-                      </TableCell>
-                      <TableCell>{formatCurrency(item.total_cost_value)}</TableCell>
-                      <TableCell>{formatCurrency(item.total_retail_value)}</TableCell>
-                      <TableCell>{formatPercentage(item.margin_percentage)}</TableCell>
-                      <TableCell>{formatCurrency(item.potential_profit)}</TableCell>
-                    </TableRow>
-                  ))}
-              </TableBody>
-            </Table>
-            <TablePagination
-              rowsPerPageOptions={[10, 25, 50, 100]}
-              component="div"
-              count={reportData.inventory.length}
-              rowsPerPage={rowsPerPage}
-              page={page}
-              onPageChange={handlePageChange}
-              onRowsPerPageChange={handleRowsPerPageChange}
-            />
-          </TableContainer>
-        )}
-      </CardContent>
-    </Card>
+    <div className={styles.tableCard}>
+      <div className={styles.tableHeader}>
+        Detailed Inventory Analysis
+      </div>
+      
+      {reportData?.inventory && (
+        <div className={styles.tableContainer}>
+          <table>
+            <thead>
+              <tr>
+                <th className={styles.tableHeadCell}>Store</th>
+                <th className={styles.tableHeadCell}>Product</th>
+                <th className={styles.tableHeadCell}>Category</th>
+                <th className={styles.tableHeadCell}>Stock</th>
+                <th className={styles.tableHeadCell}>Status</th>
+                <th className={styles.tableHeadCell}>Cost Value</th>
+                <th className={styles.tableHeadCell}>Retail Value</th>
+                <th className={styles.tableHeadCell}>Margin %</th>
+                <th className={styles.tableHeadCell}>Potential Profit</th>
+              </tr>
+            </thead>
+            <tbody>
+              {reportData.inventory
+                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                .map((item) => (
+                  <tr className={styles.tableRow} key={item.product_no}>
+                    <td className={styles.tableCell}>
+                      {item.store_breakdown && item.store_breakdown.length > 0 
+                        ? item.store_breakdown.map(store => store.store_name).join(', ') 
+                        : (reportData.metadata && reportData.metadata.total_stores ? 
+                            `${reportData.metadata.total_stores} stores` : 'N/A')}
+                    </td>
+                    <td className={styles.tableCell}>
+                      <div>
+                        <Typography variant="subtitle2">
+                          {item.product_name || item.product_no}
+                        </Typography>
+                        <Typography variant="caption" style={{ color: 'var(--text-secondary)' }}>
+                          {item.product_no}
+                        </Typography>
+                      </div>
+                    </td>
+                    <td className={styles.tableCell}>{item.category || 'N/A'}</td>
+                    <td className={styles.tableCell}>{formatNumber(item.storing_balance)}</td>
+                    <td className={styles.tableCell}>
+                      <Chip 
+                        label={item.stock_status?.replace('_', ' ') || 'unknown'} 
+                        size="small"
+                        color={getStockStatusColor(item.stock_status)}
+                      />
+                    </td>
+                    <td className={styles.tableCell}>{formatCurrency(item.total_cost_value)}</td>
+                    <td className={styles.tableCell}>{formatCurrency(item.total_retail_value)}</td>
+                    <td className={styles.tableCell}>{formatPercentage(item.margin_percentage)}</td>
+                    <td className={styles.tableCell}>{formatCurrency(item.potential_profit)}</td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+          <TablePagination
+            rowsPerPageOptions={[10, 25, 50, 100]}
+            component="div"
+            count={reportData.inventory.length}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onPageChange={handlePageChange}
+            onRowsPerPageChange={handleRowsPerPageChange}
+          />
+        </div>
+      )}
+    </div>
   );
 
   const renderTopPerformersTab = () => (
-    <Box>
+    <div>
       {reportData?.topPerformers && (
-        <Grid container spacing={3}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
           {/* Highest Value Products */}
-          <Grid size={{ xs: 12, md: 4 }}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                  💎 Highest Value Products
-                </Typography>
-                {reportData.topPerformers.highest_value_products?.length > 0 ? (
-                  <Box>
-                    {reportData.topPerformers.highest_value_products.map((product, index) => (
-                      <Box key={index} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1, borderBottom: index < reportData.topPerformers.highest_value_products.length - 1 ? '1px solid' : 'none', borderColor: 'divider' }}>
-                        <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                            {product.product_name || `Product ${product.product_no}`}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {product.stock_units} units • {product.margin_percentage}% margin
-                          </Typography>
-                        </Box>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                          ${Number(product.retail_value || 0).toLocaleString()}
-                        </Typography>
-                      </Box>
-                    ))}
-                  </Box>
-                ) : (
-                  <Typography variant="body2" color="text.secondary">No high-value product data available</Typography>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
+          <div className={styles.tableCard}>
+            <div className={styles.tableHeader}>
+              💎 Highest Value Products
+            </div>
+            {reportData.topPerformers.highest_value_products?.length > 0 ? (
+              <div>
+                {reportData.topPerformers.highest_value_products.map((product, index) => (
+                  <div 
+                    key={index} 
+                    style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center', 
+                      padding: '0.75rem 0',
+                      borderBottom: index < reportData.topPerformers.highest_value_products.length - 1 ? '1px solid var(--border)' : 'none'
+                    }}
+                  >
+                    <div>
+                      <Typography variant="body2" style={{ fontWeight: 'medium' }}>
+                        {product.product_name || `Product ${product.product_no}`}
+                      </Typography>
+                      <Typography variant="caption" style={{ color: 'var(--text-secondary)' }}>
+                        {product.stock_units} units • {product.margin_percentage}% margin
+                      </Typography>
+                    </div>
+                    <Typography variant="body2" style={{ fontWeight: 'bold' }}>
+                      ${Number(product.retail_value || 0).toLocaleString()}
+                    </Typography>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <Typography variant="body2" style={{ color: 'var(--text-secondary)', padding: '1rem' }}>
+                No high-value product data available
+              </Typography>
+            )}
+          </div>
           
           {/* Highest Margin Products */}
-          <Grid size={{ xs: 12, md: 4 }}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                  📈 Highest Margin Products
-                </Typography>
-                {reportData.topPerformers.highest_margin_products?.length > 0 ? (
-                  <Box>
-                    {reportData.topPerformers.highest_margin_products.map((product, index) => (
-                      <Box key={index} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1, borderBottom: index < reportData.topPerformers.highest_margin_products.length - 1 ? '1px solid' : 'none', borderColor: 'divider' }}>
-                        <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                            {product.product_name || `Product ${product.product_no}`}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            ${Number(product.potential_profit || 0).toLocaleString()} profit
-                          </Typography>
-                        </Box>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'success.main' }}>
-                          {product.margin_percentage}%
-                        </Typography>
-                      </Box>
-                    ))}
-                  </Box>
-                ) : (
-                  <Typography variant="body2" color="text.secondary">No margin data available</Typography>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
+          <div className={styles.tableCard}>
+            <div className={styles.tableHeader}>
+              📈 Highest Margin Products
+            </div>
+            {reportData.topPerformers.highest_margin_products?.length > 0 ? (
+              <div>
+                {reportData.topPerformers.highest_margin_products.map((product, index) => (
+                  <div 
+                    key={index} 
+                    style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center', 
+                      padding: '0.75rem 0',
+                      borderBottom: index < reportData.topPerformers.highest_margin_products.length - 1 ? '1px solid var(--border)' : 'none'
+                    }}
+                  >
+                    <div>
+                      <Typography variant="body2" style={{ fontWeight: 'medium' }}>
+                        {product.product_name || `Product ${product.product_no}`}
+                      </Typography>
+                      <Typography variant="caption" style={{ color: 'var(--text-secondary)' }}>
+                        ${Number(product.potential_profit || 0).toLocaleString()} profit
+                      </Typography>
+                    </div>
+                    <Typography variant="body2" style={{ fontWeight: 'bold', color: 'var(--success-color)' }}>
+                      {product.margin_percentage}%
+                    </Typography>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <Typography variant="body2" style={{ color: 'var(--text-secondary)', padding: '1rem' }}>
+                No margin data available
+              </Typography>
+            )}
+          </div>
           
           {/* Low Stock Alerts */}
-          <Grid size={{ xs: 12, md: 4 }}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                  ⚠️ Low Stock Alerts
-                </Typography>
-                {reportData.topPerformers.low_stock_alerts?.length > 0 ? (
-                  <Box>
-                    {reportData.topPerformers.low_stock_alerts.map((product, index) => (
-                      <Box key={index} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1, borderBottom: index < reportData.topPerformers.low_stock_alerts.length - 1 ? '1px solid' : 'none', borderColor: 'divider' }}>
-                        <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                            {product.product_name || `Product ${product.product_no}`}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {product.category || 'No category'}
-                          </Typography>
-                        </Box>
-                        <Box sx={{ textAlign: 'right' }}>
-                          <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'warning.main' }}>
-                            {product.current_stock} units
-                          </Typography>
-                          <Chip 
-                            label={product.stock_status?.replace('_', ' ') || 'unknown'} 
-                            size="small"
-                            color={product.stock_status === 'out_of_stock' ? 'error' : 'warning'}
-                          />
-                        </Box>
-                      </Box>
-                    ))}
-                  </Box>
-                ) : (
-                  <Typography variant="body2" color="text.secondary">No low stock alerts</Typography>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
+          <div className={styles.tableCard}>
+            <div className={styles.tableHeader}>
+              ⚠️ Low Stock Alerts
+            </div>
+            {reportData.topPerformers.low_stock_alerts?.length > 0 ? (
+              <div>
+                {reportData.topPerformers.low_stock_alerts.map((product, index) => (
+                  <div 
+                    key={index} 
+                    style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center', 
+                      padding: '0.75rem 0',
+                      borderBottom: index < reportData.topPerformers.low_stock_alerts.length - 1 ? '1px solid var(--border)' : 'none'
+                    }}
+                  >
+                    <div>
+                      <Typography variant="body2" style={{ fontWeight: 'medium' }}>
+                        {product.product_name || `Product ${product.product_no}`}
+                      </Typography>
+                      <Typography variant="caption" style={{ color: 'var(--text-secondary)' }}>
+                        {product.category || 'No category'}
+                      </Typography>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <Typography variant="body2" style={{ fontWeight: 'bold', color: 'var(--warning-color)' }}>
+                        {product.current_stock} units
+                      </Typography>
+                      <Chip 
+                        label={product.stock_status?.replace('_', ' ') || 'unknown'} 
+                        size="small"
+                        color={product.stock_status === 'out_of_stock' ? 'error' : 'warning'}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <Typography variant="body2" style={{ color: 'var(--text-secondary)', padding: '1rem' }}>
+                No low stock alerts
+              </Typography>
+            )}
+          </div>
           
           {/* Performance Charts */}
-          <Grid size={{ xs: 12 }}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" sx={{ mb: 2 }}>Top Products by Value</Typography>
-                {reportData.topPerformers.highest_value_products?.length > 0 && (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={reportData.topPerformers.highest_value_products.slice(0, 10)}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis 
-                        dataKey="product_name" 
-                        angle={-45}
-                        textAnchor="end"
-                        height={100}
-                        interval={0}
-                      />
-                      <YAxis />
-                      <RechartsTooltip formatter={(value) => [`$${value}`, 'Value']} />
-                      <Bar dataKey="retail_value" fill="#8884d8" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
+          <div className={styles.chartCard} style={{ gridColumn: '1 / -1' }}>
+            <div className={styles.chartHeader}>Top Products by Value</div>
+            <div className={styles.chartContainer}>
+              {reportData.topPerformers.highest_value_products?.length > 0 && (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={reportData.topPerformers.highest_value_products.slice(0, 10)}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="product_name" 
+                      angle={-45}
+                      textAnchor="end"
+                      height={100}
+                      interval={0}
+                    />
+                    <YAxis />
+                    <RechartsTooltip formatter={(value) => [`$${value}`, 'Value']} />
+                    <Bar dataKey="retail_value" fill="#8884d8" />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </div>
+        </div>
       )}
-    </Box>
+    </div>
   );
 
   const renderAnalyticsTab = () => (
-    <Grid container spacing={3}>
-      <Grid item xs={12} md={6}>
-        <Card>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Value vs Stock Analysis
-            </Typography>
-            {reportData?.inventory && (
-              <ResponsiveContainer width="100%" height={300}>
-                <ScatterChart data={reportData.inventory.slice(0, 50)}>
-                  <CartesianGrid />
-                  <XAxis 
-                    type="number" 
-                    dataKey="storing_balance" 
-                    name="Stock Units"
-                    tickFormatter={formatNumber}
-                  />
-                  <YAxis 
-                    type="number" 
-                    dataKey="total_retail_value" 
-                    name="Retail Value"
-                    tickFormatter={(value) => `$${(value/1000).toFixed(0)}K`}
-                  />
-                  <RechartsTooltip 
-                    cursor={{ strokeDasharray: '3 3' }}
-                    formatter={(value, name) => [
-                      name === 'total_retail_value' ? formatCurrency(value) : formatNumber(value),
-                      name === 'total_retail_value' ? 'Retail Value' : 'Stock Units'
-                    ]}
-                  />
-                  <Scatter dataKey="total_retail_value" fill="#8884d8" />
-                </ScatterChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-      </Grid>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+      <div className={styles.chartCard}>
+        <div className={styles.chartHeader}>
+          Value vs Stock Analysis
+        </div>
+        <div className={styles.chartContainer}>
+          {reportData?.inventory && (
+            <ResponsiveContainer width="100%" height={300}>
+              <ScatterChart data={reportData.inventory.slice(0, 50)}>
+                <CartesianGrid />
+                <XAxis 
+                  type="number" 
+                  dataKey="storing_balance" 
+                  name="Stock Units"
+                  tickFormatter={formatNumber}
+                />
+                <YAxis 
+                  type="number" 
+                  dataKey="total_retail_value" 
+                  name="Retail Value"
+                  tickFormatter={(value) => `$${(value/1000).toFixed(0)}K`}
+                />
+                <RechartsTooltip 
+                  cursor={{ strokeDasharray: '3 3' }}
+                  formatter={(value, name) => [
+                    name === 'total_retail_value' ? formatCurrency(value) : formatNumber(value),
+                    name === 'total_retail_value' ? 'Retail Value' : 'Stock Units'
+                  ]}
+                />
+                <Scatter dataKey="total_retail_value" fill="#8884d8" />
+              </ScatterChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
 
-      <Grid item xs={12} md={6}>
-        <Card>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Margin Distribution
-            </Typography>
-            {reportData?.inventory && (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart 
-                  data={reportData.inventory
-                    .filter(item => parseFloat(item.margin_percentage) > 0)
-                    .slice(0, 10)
-                    .sort((a, b) => parseFloat(b.margin_percentage) - parseFloat(a.margin_percentage))
-                  }
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="product_name" 
-                    angle={-45}
-                    textAnchor="end"
-                    height={100}
-                  />
-                  <YAxis tickFormatter={(value) => `${value}%`} />
-                  <RechartsTooltip 
-                    formatter={(value) => [`${parseFloat(value).toFixed(2)}%`, 'Margin']}
-                  />
-                  <Bar dataKey="margin_percentage" fill="#82ca9d" />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-      </Grid>
-    </Grid>
+      <div className={styles.chartCard}>
+        <div className={styles.chartHeader}>
+          Margin Distribution
+        </div>
+        <div className={styles.chartContainer}>
+          {reportData?.inventory && (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart 
+                data={reportData.inventory
+                  .filter(item => parseFloat(item.margin_percentage) > 0)
+                  .slice(0, 10)
+                  .sort((a, b) => parseFloat(b.margin_percentage) - parseFloat(a.margin_percentage))
+                }
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis 
+                  dataKey="product_name" 
+                  angle={-45}
+                  textAnchor="end"
+                  height={100}
+                />
+                <YAxis tickFormatter={(value) => `${value}%`} />
+                <RechartsTooltip 
+                  formatter={(value) => [`${parseFloat(value).toFixed(2)}%`, 'Margin']}
+                />
+                <Bar dataKey="margin_percentage" fill="#82ca9d" />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
+    </div>
   );
 
   if (error) {
     return (
-      <Box sx={{ p: 3 }}>
-        <Alert severity="error" sx={{ mb: 2 }}>
+      <div className={styles.inventoryReports}>
+        <div className={styles.errorAlert}>
           {error}
-        </Alert>
-        <Button variant="contained" onClick={generateReport} startIcon={<RefreshIcon />}>
+          <button onClick={() => setError('')} style={{ float: 'right', background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}>
+            ✕
+          </button>
+        </div>
+        <button className={styles.primaryButton} onClick={generateReport}>
           Retry
-        </Button>
-      </Box>
+        </button>
+      </div>
     );
   }
 
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
-      <Box sx={{ p: 3, maxWidth: '100%' }}>
+      <div className={styles.inventoryReports}>
         {/* Header */}
-        <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-          <Box>
-            <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', mb: 0.5 }}>
-              Inventory Reports
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Enterprise-level inventory analytics and reporting
-            </Typography>
-          </Box>
-          
-          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-            <Button
-              variant="contained"
-              startIcon={<RefreshIcon />}
+        <div className={styles.inventoryReportsHeader}>
+          <button className={styles.backButton} onClick={handleBackClick}>
+            <ArrowLeft size={20} />
+            Back to Reports
+          </button>
+          <h1>Inventory Reports</h1>
+          <p>Enterprise-level inventory analytics and reporting</p>
+          <div style={{ position: 'absolute', right: 0, top: 0, display: 'flex', gap: '0.5rem' }}>
+            <button
+              className={styles.iconButton}
+              onClick={() => handleExport('csv')}
+              disabled={loading}
+              title="Export as CSV"
+            >
+              <DownloadIcon size={20} />
+            </button>
+            <button
+              className={styles.iconButton}
+              onClick={() => handleExport('excel')}
+              disabled={loading}
+              title="Export as Excel"
+            >
+              <DownloadIcon size={20} />
+            </button>
+            <button
+              className={styles.iconButton}
+              onClick={() => handleExport('pdf')}
+              disabled={loading}
+              title="Export as PDF"
+            >
+              <DownloadIcon size={20} />
+            </button>
+            <button
+              className={styles.iconButton}
               onClick={generateReport}
               disabled={loading}
+              title="Refresh"
             >
-              Refresh
-            </Button>
-            <ButtonGroup variant="outlined" size="small">
-              <Button onClick={() => handleExport('csv')} disabled={loading}>
-                CSV
-              </Button>
-              <Button onClick={() => handleExport('excel')} disabled={loading}>
-                Excel
-              </Button>
-              <Button onClick={() => handleExport('pdf')} disabled={loading}>
-                PDF
-              </Button>
-            </ButtonGroup>
-          </Box>
-        </Box>
+              {loading ? (
+                <CircularProgress size={20} />
+              ) : (
+                <RefreshIcon size={20} />
+              )}
+            </button>
+          </div>
+        </div>
 
-        {/* Error Alert */}
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
-            {error}
-          </Alert>
-        )}
+        <div className={styles.inventoryReportsContent}>
+          {/* Error Alert */}
+          {error && (
+            <div className={styles.errorAlert}>
+              {error}
+              <button onClick={() => setError('')} style={{ float: 'right', background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}>
+                ✕
+              </button>
+            </div>
+          )}
 
-        {/* Tabs */}
-        <Paper sx={{ mb: 3 }}>
-          <Tabs value={activeTab} onChange={handleTabChange}>
-            <Tab label="Overview" />
-            <Tab label="Detailed Analysis" />
-            <Tab label="Top Performers" />
-            <Tab label="Analytics" />
-          </Tabs>
-        </Paper>
+          {/* Tabs */}
+          <div className={styles.tabsContainer}>
+            <button 
+              className={`${styles.tabButton} ${activeTab === 0 ? styles.active : ''}`}
+              onClick={() => setActiveTab(0)}
+            >
+              Overview
+            </button>
+            <button 
+              className={`${styles.tabButton} ${activeTab === 1 ? styles.active : ''}`}
+              onClick={() => setActiveTab(1)}
+            >
+              Detailed Analysis
+            </button>
+            <button 
+              className={`${styles.tabButton} ${activeTab === 2 ? styles.active : ''}`}
+              onClick={() => setActiveTab(2)}
+            >
+              Top Performers
+            </button>
+            <button 
+              className={`${styles.tabButton} ${activeTab === 3 ? styles.active : ''}`}
+              onClick={() => setActiveTab(3)}
+            >
+              Analytics
+            </button>
+          </div>
 
-        {/* Tab Content */}
-        {activeTab === 0 && renderOverviewTab()}
-        {activeTab === 1 && renderDetailedAnalysisTab()}
-        {activeTab === 2 && renderTopPerformersTab()}
-        {activeTab === 3 && renderAnalyticsTab()}
-        
-        {loading && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
-            <CircularProgress />
-          </Box>
-        )}
-      </Box>
+          {/* Tab Content */}
+          {activeTab === 0 && renderOverviewTab()}
+          {activeTab === 1 && renderDetailedAnalysisTab()}
+          {activeTab === 2 && renderTopPerformersTab()}
+          {activeTab === 3 && renderAnalyticsTab()}
+          
+          {loading && (
+            <div className={styles.loadingContainer}>
+              <CircularProgress />
+            </div>
+          )}
+        </div>
+      </div>
     </LocalizationProvider>
   );
 };

@@ -77,7 +77,7 @@ function generateProfitLossStatement(sales, purchases, expenses) {
 }
 
 // Generate Balance Sheet - Updated to match frontend expectations
-function generateBalanceSheet(accounts, sales, purchases, expenses, deposits, withdrawals) {
+function generateBalanceSheet(accounts, sales, purchases, expenses, deposits, withdrawals, suppliers, payments, paymentOuts) {
   // Calculate cash position
   const cash = deposits.reduce((sum, d) => sum + (d.amount || 0), 0) - 
                withdrawals.reduce((sum, w) => sum + (w.amount || 0), 0);
@@ -102,8 +102,29 @@ function generateBalanceSheet(accounts, sales, purchases, expenses, deposits, wi
     .filter(p => (p.amount || 0) > (p.paid || 0))
     .reduce((sum, p) => sum + ((p.amount || 0) - (p.paid || 0)), 0);
   
+  // Calculate supplier balances (accounts payable from suppliers)
+  const supplierBalances = suppliers 
+    ? suppliers.reduce((sum, s) => sum + (s.balance || 0), 0)
+    : 0;
+  
+  // Calculate payments to suppliers (another form of accounts payable)
+  const paymentOutPayables = paymentOuts
+    ? paymentOuts.reduce((sum, p) => sum + (p.amount || 0), 0)
+    : 0;
+  
+  // Calculate payments from customers (reduces accounts receivable)
+  const customerPayments = payments
+    ? payments.reduce((sum, p) => sum + (p.amount || 0), 0)
+    : 0;
+  
+  // Adjust accounts receivable with customer payments
+  const adjustedAccountsReceivable = Math.max(0, accountsReceivable - customerPayments);
+  
+  // Total accounts payable including supplier balances and payment outs
+  const totalAccountsPayable = accountsPayable + supplierBalances + paymentOutPayables;
+  
   // Calculate current liabilities
-  const currentLiabilities = accountsPayable;
+  const currentLiabilities = totalAccountsPayable;
   
   // Calculate long term debt (simplified but more realistic)
   const longTermDebt = Math.max(0, accounts.reduce((sum, a) => sum + (a.balance || 0), 0) * 0.1);
@@ -121,16 +142,19 @@ function generateBalanceSheet(accounts, sales, purchases, expenses, deposits, wi
     assets: {
       current_assets: {
         cash: parseFloat(cash.toFixed(2)),
-        accounts_receivable: parseFloat(accountsReceivable.toFixed(2)),
+        accounts_receivable: parseFloat(adjustedAccountsReceivable.toFixed(2)),
         inventory: parseFloat(inventory.toFixed(2)),
-        total: parseFloat(currentAssets.toFixed(2))
+        total: parseFloat((cash + adjustedAccountsReceivable + inventory).toFixed(2))
       },
       fixed_assets: parseFloat(fixedAssets.toFixed(2)),
       total_assets: parseFloat(totalAssets.toFixed(2))
     },
     liabilities: {
       current_liabilities: {
-        accounts_payable: parseFloat(accountsPayable.toFixed(2)),
+        accounts_payable: parseFloat(totalAccountsPayable.toFixed(2)),
+        supplier_balances: parseFloat(supplierBalances.toFixed(2)),
+        purchase_payables: parseFloat(accountsPayable.toFixed(2)),
+        payment_outs: parseFloat(paymentOutPayables.toFixed(2)),
         total: parseFloat(currentLiabilities.toFixed(2))
       },
       long_term_debt: parseFloat(longTermDebt.toFixed(2)),
@@ -144,7 +168,16 @@ function generateBalanceSheet(accounts, sales, purchases, expenses, deposits, wi
     // Core values for compatibility
     total_assets: parseFloat(totalAssets.toFixed(2)),
     total_liabilities: parseFloat(totalLiabilities.toFixed(2)),
-    total_equity: parseFloat(totalEquity.toFixed(2))
+    total_equity: parseFloat(totalEquity.toFixed(2)),
+    
+    // Additional details for transparency
+    details: {
+      raw_accounts_receivable: parseFloat(accountsReceivable.toFixed(2)),
+      customer_payments: parseFloat(customerPayments.toFixed(2)),
+      raw_accounts_payable: parseFloat(accountsPayable.toFixed(2)),
+      supplier_balances: parseFloat(supplierBalances.toFixed(2)),
+      payment_outs: parseFloat(paymentOutPayables.toFixed(2))
+    }
   };
 }
 
