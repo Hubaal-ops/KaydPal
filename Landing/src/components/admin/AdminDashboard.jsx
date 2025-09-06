@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import './AdminDashboard.css';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -7,8 +7,9 @@ import {
   ClipboardList,
   Bell,
   ShieldCheck,
-  LifeBuoy
+  Sparkles
 } from 'lucide-react';
+import AIChatWindow from '../../components/AIChatWindow';
 
 const adminModules = [
   {
@@ -50,8 +51,7 @@ const adminModules = [
     icon: ShieldCheck,
     color: '#7c3aed',
     gradient: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)'
-  },
-  // ...removed support module from admin dashboard...
+  }
 ];
 
 const routeMap = {
@@ -59,12 +59,13 @@ const routeMap = {
   'system-settings': '/admin/system-settings',
   'audit-logs': '/admin/audit-logs',
   'notifications': '/admin/notifications',
-  'roles-permissions': '/admin/roles-permissions',
-  // ...removed support route from admin dashboard...
+  'roles-permissions': '/admin/roles-permissions'
 };
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
+  const [showAIChat, setShowAIChat] = useState(false);
+  
   const handleCardClick = (moduleId) => {
     if (routeMap[moduleId]) {
       navigate(routeMap[moduleId]);
@@ -77,7 +78,14 @@ const AdminDashboard = () => {
         <h1>Admin Dashboard</h1>
         <p>Quick access to administrative functions</p>
       </div>
+      
       <div className="admin-dashboard-content">
+        {/* AI Chat Button */}
+        <div className="admin-ai-chat-button" onClick={() => setShowAIChat(true)}>
+          <Sparkles size={20} />
+          <span>AI Assistant</span>
+        </div>
+        
         <div className="admin-modules-grid">
           {adminModules.map((module) => {
             const IconComponent = module.icon;
@@ -104,8 +112,11 @@ const AdminDashboard = () => {
           })}
         </div>
       </div>
+      
+      {/* AI Chat Window */}
+      {showAIChat && <AIChatWindow onClose={() => setShowAIChat(false)} />}
     </div>
   );
 };
 
-export default AdminDashboard; 
+export default AdminDashboard;

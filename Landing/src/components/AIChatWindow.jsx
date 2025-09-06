@@ -3,7 +3,7 @@ import styles from './Support.module.css';
 
 const AIChatWindow = ({ onClose }) => {
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'Hi! I am your AI assistant. How can I help you today?' }
+    { role: 'assistant', content: 'Hi! I am your KaydPal AI assistant. I can help you with questions about your business data including accounts, products, sales, customers, suppliers, and debts. Try asking "What is my account balance?", "Show me my products", or "How are my sales this month?"' }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -61,7 +61,7 @@ const AIChatWindow = ({ onClose }) => {
     <div className={styles.aiChatOverlay}>
       <div className={styles.aiChatWindow}>
         <div className={styles.aiChatHeader}>
-          <span>AI Assistant {modelName && <small>({modelName.split('/').pop()})</small>}</span>
+          <span>KaydPal AI Assistant {modelName && <small>({modelName.split('/').pop()})</small>}</span>
           <button className={styles.aiChatClose} onClick={onClose}>&times;</button>
         </div>
         <div className={styles.aiChatBody}>
@@ -78,7 +78,7 @@ const AIChatWindow = ({ onClose }) => {
             type="text"
             value={input}
             onChange={e => setInput(e.target.value)}
-            placeholder="Type your message..."
+            placeholder="Ask about your business data..."
             disabled={loading}
             className={styles.aiChatInput}
             autoFocus
@@ -88,6 +88,9 @@ const AIChatWindow = ({ onClose }) => {
           </button>
         </form>
         {error && <div className={styles.aiChatError}>{error}</div>}
+        <div className={styles.aiChatHint}>
+          Try: "What's my account balance?", "Show products", "Sales this month"
+        </div>
       </div>
     </div>
   );

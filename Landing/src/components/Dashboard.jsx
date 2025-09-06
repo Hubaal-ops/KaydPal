@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import styles from './Dashboard.module.css';
 import { 
   Package, 
@@ -9,12 +9,15 @@ import {
   BarChart3, 
   FileText, 
   LifeBuoy,
-  Building
+  Building,
+  Sparkles
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import AIChatWindow from '../components/AIChatWindow';
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const [showAIChat, setShowAIChat] = useState(false);
   
   const modules = [
     {
@@ -120,6 +123,12 @@ const Dashboard = () => {
       </div>
       
       <div className={styles['dashboard-content']}>
+        {/* AI Chat Button */}
+        <div className={styles['ai-chat-button']} onClick={() => setShowAIChat(true)}>
+          <Sparkles size={20} />
+          <span>AI Assistant</span>
+        </div>
+        
         <div className={styles['modules-grid']}>
           {modules.map((module) => {
             const IconComponent = module.icon;
@@ -149,6 +158,9 @@ const Dashboard = () => {
           })}
         </div>
       </div>
+      
+      {/* AI Chat Window */}
+      {showAIChat && <AIChatWindow onClose={() => setShowAIChat(false)} />}
     </div>
   );
 };
