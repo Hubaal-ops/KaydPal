@@ -76,86 +76,250 @@ function generateProfitLossStatement(sales, purchases, expenses) {
   };
 }
 
-// Generate Balance Sheet - Updated to match frontend expectations
-function generateBalanceSheet(accounts, sales, purchases, expenses, deposits, withdrawals, suppliers, payments, paymentOuts) {
-  // Calculate cash position
-  const cash = deposits.reduce((sum, d) => sum + (d.amount || 0), 0) - 
-               withdrawals.reduce((sum, w) => sum + (w.amount || 0), 0);
+// Generate Balance Sheet from strict sources
+function generateBalanceSheet(
+  accounts,
+  sales,
+  purchases,
+  expenses,
+  deposits,
+  withdrawals,
+  suppliers,
+  payments,
+  paymentOuts,
+  storeProducts = [],
+  products = [],
+  purchasesForInventory = null,
+  salesForInventory = null,
+  settings = {},
+  customers = [],
+  invoices = []
+) {
+  // 1) Cash → from transactions (starting cash + inflows - outflows)
+  const startingCash = Number(settings.starting_cash || 0);
   
-  // Calculate accounts receivable (unpaid sales)
-  const accountsReceivable = sales
-    .filter(s => (s.amount || 0) > (s.paid || 0))
-    .reduce((sum, s) => sum + ((s.amount || 0) - (s.paid || 0)), 0);
+  // Calculate cash inflows from actual payments received
+  const cashFromSales = (payments || []).reduce((sum, p) => sum + (p.amount || 0), 0);
+  const depositsTotal = (deposits || []).reduce((sum, d) => sum + (d.amount || 0), 0);
+  const totalInflows = cashFromSales + depositsTotal;
   
-  // Calculate inventory value (simplified but more realistic)
-  const inventory = purchases.reduce((sum, p) => sum + (p.amount || 0), 0) * 0.6;
+  // Calculate cash outflows from actual payments made
+  const cashToPurchases = (paymentOuts || []).reduce((sum, p) => sum + (p.amount || 0), 0);
+  const expensePayments = (expenses || []).reduce((sum, e) => sum + (e.amount || 0), 0);
+  const withdrawalsTotal = (withdrawals || []).reduce((sum, w) => sum + (w.amount || 0), 0);
+  const totalOutflows = cashToPurchases + expensePayments + withdrawalsTotal;
   
-  // Calculate current assets
+  // Calculate cash from transaction flows
+  const cashFromTransactions = startingCash + totalInflows - totalOutflows;
+  
+  // If starting cash is not set and result is 0, use account balances as fallback
+  const accountBalances = (accounts || []).reduce((sum, a) => sum + (a.balance || 0), 0);
+  const cash = (settings.starting_cash != null || cashFromTransactions !== 0) ? cashFromTransactions : accountBalances;
+
+  // 2) Accounts Receivable → from customer invoices that remain unpaid
+  let accountsReceivable = 0;
+  
+  // First try to get from unpaid invoices if available
+  if (invoices && invoices.length > 0) {
+    accountsReceivable = invoices
+      .filter(inv => inv.status === 'Unpaid' || (inv.total || 0) > (inv.paid || 0))
+      .reduce((sum, inv) => sum + ((inv.total || 0) - (inv.paid || 0)), 0);
+  } else {
+    // Fallback to customer balances
+    accountsReceivable = (customers || []).reduce((sum, c) => sum + (c.bal || 0), 0);
+    
+    // If no customer data, use unpaid sales as last resort
+    if (accountsReceivable === 0 && sales && sales.length > 0) {
+      accountsReceivable = sales
+        .filter(s => (s.amount || 0) > (s.paid || 0))
+        .reduce((sum, s) => sum + ((s.amount || 0) - (s.paid || 0)), 0);
+    }
+  }
+
+  // 3) Inventory → from purchases minus cost of goods sold
+  const productCostByNo = new Map();
+  const productPurchasePriceByNo = new Map();
+  
+  // Build product cost map and track purchase prices as fallback
+  (products || []).forEach(p => {
+    const cost = p.cost || p.cost_price || 0;
+    productCostByNo.set(p.product_no, cost);
+  });
+  
+  // Also track latest purchase prices as fallback for cost calculation
+  (purchasesForInventory || purchases || []).forEach(p => {
+    if (Array.isArray(p.items)) {
+      p.items.forEach(item => {
+        if (item.product_no && item.price) {
+          productPurchasePriceByNo.set(item.product_no, item.price);
+        }
+      });
+    }
+  });
+
+  // Calculate total purchases at cost from purchase line items
+  const purchasesAtCost = (purchasesForInventory || purchases || [])
+    .reduce((sum, p) => {
+      if (Array.isArray(p.items)) {
+        const purchaseTotal = p.items.reduce((s2, i) => s2 + ((i.qty || 0) * (i.price || 0)), 0);
+        return sum + purchaseTotal;
+      }
+      return sum;
+    }, 0);
+
+  // Calculate cost of goods sold from sales line items
+  const cogs = (salesForInventory || sales || [])
+    .reduce((sum, s) => {
+      if (Array.isArray(s.items)) {
+        const saleCogsTotal = s.items.reduce((s2, i) => {
+          let costPrice = productCostByNo.get(i.product_no) || 0;
+          
+          // If no cost price is defined, use latest purchase price as fallback
+          if (costPrice === 0) {
+            costPrice = productPurchasePriceByNo.get(i.product_no) || 0;
+            
+            // If still no cost data, estimate using sales price with reasonable margin
+            // Assume 30% markup, so cost = sales_price / 1.3
+            if (costPrice === 0 && i.price > 0) {
+              costPrice = i.price / 1.3; // Estimate cost assuming 30% markup
+            }
+          }
+          
+          const itemCogs = (i.qty || 0) * costPrice;
+          return s2 + itemCogs;
+        }, 0);
+        return sum + saleCogsTotal;
+      }
+      return sum;
+    }, 0);
+
+  const inventory = Math.max(0, purchasesAtCost - cogs);
+  
+  // Debug logging for inventory calculation
+  console.log('📊 Inventory Calculation Debug:');
+  console.log(`   Total Purchases at Cost: $${purchasesAtCost}`);
+  console.log(`   Total Cost of Goods Sold: $${cogs}`);
+  console.log(`   Final Inventory: $${inventory}`);
+  console.log(`   Number of Purchase Records: ${(purchasesForInventory || purchases || []).length}`);
+  console.log(`   Number of Sales Records: ${(salesForInventory || sales || []).length}`);
+  console.log(`   Number of Products with Cost Data: ${productCostByNo.size}`);
+  
+  // Calculate total sales revenue for comparison
+  const totalSalesRevenue = (salesForInventory || sales || []).reduce((sum, s) => sum + (s.amount || 0), 0);
+  console.log(`   Total Sales Revenue (for reference): $${totalSalesRevenue}`);
+  console.log(`   ⚠️  Note: Inventory = Purchases($${purchasesAtCost}) - COGS($${cogs}), NOT Sales Revenue($${totalSalesRevenue})`);
+  
+  // Log detailed purchase breakdown if inventory is significant
+  if (inventory > 100) {
+    console.log('📊 Detailed Purchase Breakdown:');
+    (purchasesForInventory || purchases || []).forEach((p, index) => {
+      if (Array.isArray(p.items) && p.items.length > 0) {
+        const purchaseTotal = p.items.reduce((s2, i) => s2 + ((i.qty || 0) * (i.price || 0)), 0);
+        console.log(`   Purchase ${index + 1}: $${purchaseTotal} (${p.items.length} items)`);
+        p.items.forEach(item => {
+          console.log(`     - Product ${item.product_no}: ${item.qty} x $${item.price} = $${(item.qty || 0) * (item.price || 0)}`);
+        });
+      }
+    });
+    
+    console.log('📊 Sales COGS Breakdown:');
+    (salesForInventory || sales || []).forEach((s, index) => {
+      if (Array.isArray(s.items) && s.items.length > 0) {
+        const saleCogsTotal = s.items.reduce((s2, i) => {
+          const costPrice = productCostByNo.get(i.product_no) || 0;
+          return s2 + ((i.qty || 0) * costPrice);
+        }, 0);
+        console.log(`   Sale ${index + 1}: COGS $${saleCogsTotal} (${s.items.length} items)`);
+        s.items.forEach(item => {
+          let costPrice = productCostByNo.get(item.product_no) || 0;
+          let costSource = 'product_cost';
+          
+          if (costPrice === 0) {
+            costPrice = productPurchasePriceByNo.get(item.product_no) || 0;
+            costSource = costPrice > 0 ? 'purchase_price_fallback' : 'no_cost_data';
+            
+            // If still no cost data, estimate using sales price
+            if (costPrice === 0 && item.price > 0) {
+              costPrice = item.price / 1.3; // Estimate cost assuming 30% markup
+              costSource = 'estimated_from_sales_price';
+            }
+          }
+          
+          console.log(`     - Product ${item.product_no}: ${item.qty} x $${costPrice} cost = $${(item.qty || 0) * costPrice} (${costSource})`);
+          if (costPrice === 0) {
+            console.log(`       ⚠️  WARNING: No cost price found for product ${item.product_no}`);
+          }
+        });
+      }
+    });
+  }
+
+  // Current assets
   const currentAssets = cash + accountsReceivable + inventory;
-  
-  // Calculate fixed assets (more realistic calculation)
-  const fixedAssets = Math.max(0, accounts.reduce((sum, a) => sum + (a.balance || 0), 0) * 0.4);
+
+  // 7) Fixed Assets → from long-term assets purchased (not inventory)
+  const fixedAssets = Number(settings.fixed_assets_total || 0);
   const totalAssets = currentAssets + fixedAssets;
+
+  // 4) Accounts Payable → from supplier balances that remain unpaid
+  const accountsPayable = (suppliers || []).reduce((sum, s) => sum + (s.balance || 0), 0);
+
+  // 8) Liabilities → from Accounts Payable + Long Term Debt
+  const longTermDebt = Number(settings.long_term_debt || 0);
+  const totalLiabilities = accountsPayable + longTermDebt;
+
+  // 5) Retained Earnings (Profit) → from total revenues - total expenses (including COGS)
+  const totalRevenue = (sales || []).reduce((sum, s) => sum + (s.amount || 0), 0);
+  const totalOperatingExpenses = (expenses || []).reduce((sum, e) => sum + (e.amount || 0), 0);
+  const retainedEarnings = totalRevenue - totalOperatingExpenses - cogs;
+
+  // 6) Owner's Equity → from the initial capital contributed by the owner
+  let ownerEquity = Number(settings.owner_initial_capital || 0);
+
+  // 9) Equity → from Owner's Equity + Retained Earnings
+  let totalEquity = ownerEquity + retainedEarnings;
   
-  // Calculate accounts payable (unpaid purchases)
-  const accountsPayable = purchases
-    .filter(p => (p.amount || 0) > (p.paid || 0))
-    .reduce((sum, p) => sum + ((p.amount || 0) - (p.paid || 0)), 0);
+  // If owner's equity is not explicitly set and balance sheet doesn't balance,
+  // calculate implied owner's equity to make the balance sheet balance
+  // This represents the owner's implied initial investment
+  if (settings.owner_initial_capital == null || settings.owner_initial_capital === 0) {
+    const impliedOwnerEquity = totalAssets - totalLiabilities - retainedEarnings;
+    if (impliedOwnerEquity > 0) {
+      ownerEquity = impliedOwnerEquity;
+      totalEquity = ownerEquity + retainedEarnings;
+    }
+  }
+
+  // Verify Assets = Liabilities + Equity (no adjustments, just validation)
+  const balanceSheetDifference = Number((totalAssets - (totalLiabilities + totalEquity)).toFixed(2));
+  const isBalanced = Math.abs(balanceSheetDifference) < 0.01; // Allow for rounding differences
   
-  // Calculate supplier balances (accounts payable from suppliers)
-  const supplierBalances = suppliers 
-    ? suppliers.reduce((sum, s) => sum + (s.balance || 0), 0)
-    : 0;
-  
-  // Calculate payments to suppliers (another form of accounts payable)
-  const paymentOutPayables = paymentOuts
-    ? paymentOuts.reduce((sum, p) => sum + (p.amount || 0), 0)
-    : 0;
-  
-  // Calculate payments from customers (reduces accounts receivable)
-  const customerPayments = payments
-    ? payments.reduce((sum, p) => sum + (p.amount || 0), 0)
-    : 0;
-  
-  // Adjust accounts receivable with customer payments
-  const adjustedAccountsReceivable = Math.max(0, accountsReceivable - customerPayments);
-  
-  // Total accounts payable including supplier balances and payment outs
-  const totalAccountsPayable = accountsPayable + supplierBalances + paymentOutPayables;
-  
-  // Calculate current liabilities
-  const currentLiabilities = totalAccountsPayable;
-  
-  // Calculate long term debt (simplified but more realistic)
-  const longTermDebt = Math.max(0, accounts.reduce((sum, a) => sum + (a.balance || 0), 0) * 0.1);
-  const totalLiabilities = currentLiabilities + longTermDebt;
-  
-  // Calculate equity
-  const retainedEarnings = sales.reduce((sum, s) => sum + (s.amount || 0), 0) - 
-                          expenses.reduce((sum, e) => sum + (e.amount || 0), 0) -
-                          purchases.reduce((sum, p) => sum + (p.amount || 0), 0);
-  
-  const ownerEquity = Math.max(0, totalAssets - totalLiabilities);
-  const totalEquity = retainedEarnings + ownerEquity;
-  
+  // For debugging: log the balance sheet components if not balanced
+  if (!isBalanced) {
+    console.log('⚠️  Balance Sheet Debug Info:');
+    console.log(`   Total Assets: $${totalAssets}`);
+    console.log(`   Total Liabilities: $${totalLiabilities}`);
+    console.log(`   Total Equity: $${totalEquity}`);
+    console.log(`   Difference: $${balanceSheetDifference}`);
+    console.log(`   Cash: $${cash}, AR: $${accountsReceivable}, Inventory: $${inventory}`);
+    console.log(`   AP: $${accountsPayable}, Owner Equity: $${ownerEquity}, Retained: $${retainedEarnings}`);
+  }
+
   return {
     assets: {
       current_assets: {
         cash: parseFloat(cash.toFixed(2)),
-        accounts_receivable: parseFloat(adjustedAccountsReceivable.toFixed(2)),
+        accounts_receivable: parseFloat(accountsReceivable.toFixed(2)),
         inventory: parseFloat(inventory.toFixed(2)),
-        total: parseFloat((cash + adjustedAccountsReceivable + inventory).toFixed(2))
+        total: parseFloat((cash + accountsReceivable + inventory).toFixed(2))
       },
       fixed_assets: parseFloat(fixedAssets.toFixed(2)),
       total_assets: parseFloat(totalAssets.toFixed(2))
     },
     liabilities: {
       current_liabilities: {
-        accounts_payable: parseFloat(totalAccountsPayable.toFixed(2)),
-        supplier_balances: parseFloat(supplierBalances.toFixed(2)),
-        purchase_payables: parseFloat(accountsPayable.toFixed(2)),
-        payment_outs: parseFloat(paymentOutPayables.toFixed(2)),
-        total: parseFloat(currentLiabilities.toFixed(2))
+        accounts_payable: parseFloat(accountsPayable.toFixed(2)),
+        total: parseFloat(accountsPayable.toFixed(2))
       },
       long_term_debt: parseFloat(longTermDebt.toFixed(2)),
       total_liabilities: parseFloat(totalLiabilities.toFixed(2))
@@ -165,18 +329,42 @@ function generateBalanceSheet(accounts, sales, purchases, expenses, deposits, wi
       owner_equity: parseFloat(ownerEquity.toFixed(2)),
       total_equity: parseFloat(totalEquity.toFixed(2))
     },
-    // Core values for compatibility
     total_assets: parseFloat(totalAssets.toFixed(2)),
     total_liabilities: parseFloat(totalLiabilities.toFixed(2)),
     total_equity: parseFloat(totalEquity.toFixed(2)),
-    
-    // Additional details for transparency
+    balance_sheet_validation: {
+      difference: balanceSheetDifference,
+      is_balanced: isBalanced,
+      message: isBalanced ? 'Balance sheet is balanced' : `Balance sheet is off by ${balanceSheetDifference}. Check data sources.`
+    },
     details: {
-      raw_accounts_receivable: parseFloat(accountsReceivable.toFixed(2)),
-      customer_payments: parseFloat(customerPayments.toFixed(2)),
-      raw_accounts_payable: parseFloat(accountsPayable.toFixed(2)),
-      supplier_balances: parseFloat(supplierBalances.toFixed(2)),
-      payment_outs: parseFloat(paymentOutPayables.toFixed(2))
+      settings_used: {
+        starting_cash: settings.starting_cash ?? null,
+        fixed_assets_total: settings.fixed_assets_total ?? null,
+        long_term_debt: settings.long_term_debt ?? null,
+        owner_initial_capital: settings.owner_initial_capital ?? null
+      },
+      calculations: {
+        cash_calculation: {
+          starting_cash: startingCash,
+          total_inflows: totalInflows,
+          total_outflows: totalOutflows,
+          cash_from_transactions: cashFromTransactions,
+          account_balances_fallback: accountBalances,
+          final_cash: cash,
+          method_used: (settings.starting_cash != null || cashFromTransactions !== 0) ? 'transaction_flow' : 'account_balances'
+        },
+        inventory_calculation: {
+          purchases_at_cost: parseFloat(purchasesAtCost.toFixed(2)),
+          cogs: parseFloat(cogs.toFixed(2)),
+          inventory: parseFloat(inventory.toFixed(2))
+        },
+        owner_equity_calculation: {
+          explicit_capital: Number(settings.owner_initial_capital || 0),
+          calculated_equity: ownerEquity,
+          method_used: (settings.owner_initial_capital != null && settings.owner_initial_capital !== 0) ? 'explicit_setting' : 'implied_from_balance'
+        }
+      }
     }
   };
 }

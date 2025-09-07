@@ -8,6 +8,7 @@ const Supplier = require('../models/Supplier');
 const Expense = require('../models/Expense');
 const Account = require('../models/Account');
 const StoreProduct = require('../models/StoreProduct');
+const SystemSetting = require('../models/SystemSetting');
 const { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subDays, subWeeks, subMonths, subYears, startOfDay, endOfDay } = require('date-fns');
 const {
   generateProfitLossStatement,
@@ -232,6 +233,12 @@ exports.generateAdvancedFinancialReport = async (req, res) => {
     const Account = require('../models/Account');
     const Deposit = require('../models/Deposit');
     const Withdrawal = require('../models/Withdrawal');
+    const Supplier = require('../models/Supplier');
+    const Payment = require('../models/Payment');
+    const PaymentOut = require('../models/PaymentOut');
+    const StoreProduct = require('../models/StoreProduct');
+    const Product = require('../models/Product');
+    const SystemSetting = require('../models/SystemSetting');
 
     // Build filters for each data type
     const saleFilter = {};
@@ -250,14 +257,27 @@ exports.generateAdvancedFinancialReport = async (req, res) => {
     if (userId) accountFilter.userId = userId;
 
     // Fetch actual data
-    const [sales, purchases, expenses, accounts, deposits, withdrawals] = await Promise.all([
+    const [sales, purchases, expenses, accounts, deposits, withdrawals, suppliers, payments, paymentOuts, storeProducts, products, customers, invoices, settingsDocs] = await Promise.all([
       Sale.find(saleFilter).lean(),
       Purchase.find(purchaseFilter).lean(),
       Expense.find(expenseFilter).lean(),
       Account.find(accountFilter).lean(),
       Deposit.find({ userId }).lean(),
-      Withdrawal.find({ userId }).lean()
+      Withdrawal.find({ userId }).lean(),
+      Supplier.find({ userId }).lean(),
+      Payment.find({ userId }).lean(),
+      PaymentOut.find({ userId }).lean(),
+      StoreProduct.find({ userId }).lean(),
+      Product.find({ userId }).lean(),
+      Customer.find({ userId }).lean(),
+      require('../models/Invoice').find({ userId }).lean().catch(() => []),
+      SystemSetting.find({ key: { $in: ['starting_cash', 'fixed_assets_total', 'long_term_debt', 'owner_initial_capital'] } }).lean()
     ]);
+
+    const settings = settingsDocs?.reduce((acc, s) => {
+      acc[s.key] = s.value;
+      return acc;
+    }, {}) || {};
 
     console.log('📊 Data fetched:', { 
       sales: sales.length, 
@@ -268,7 +288,24 @@ exports.generateAdvancedFinancialReport = async (req, res) => {
 
     // Generate financial statements using accurate data
     const profitLoss = generateProfitLossStatement(sales, purchases, expenses);
-    const balanceSheet = generateBalanceSheet(accounts, sales, purchases, expenses, deposits, withdrawals);
+    const balanceSheet = generateBalanceSheet(
+      accounts,
+      sales,
+      purchases,
+      expenses,
+      deposits,
+      withdrawals,
+      suppliers,
+      payments,
+      paymentOuts,
+      storeProducts,
+      products,
+      purchases,
+      sales,
+      settings,
+      customers,
+      invoices
+    );
     const cashFlow = generateCashFlowStatement(sales, purchases, expenses, deposits, withdrawals);
     
     // Calculate summary metrics using accurate data
@@ -2319,7 +2356,7 @@ exports.generateAdvancedFinancialReport = async (req, res) => {
     if (start && end) baseFilter.created_at = { $gte: start, $lte: end };
 
     // Get all financial data
-    const [sales, purchases, expenses, accounts, deposits, withdrawals, suppliers, payments, paymentOuts] = await Promise.all([
+    const [sales, purchases, expenses, accounts, deposits, withdrawals, suppliers, payments, paymentOuts, storeProducts, products, customers, invoices, settingsDocs] = await Promise.all([
       Sale.find(baseFilter).lean(),
       Purchase.find(baseFilter).lean(),
       Expense.find(baseFilter).lean(),
@@ -2328,7 +2365,24 @@ exports.generateAdvancedFinancialReport = async (req, res) => {
       require('../models/Withdrawal').find(baseFilter).lean().catch(() => []),
       require('../models/Supplier').find(userId ? { userId } : {}).lean().catch(() => []),
       require('../models/Payment').find(baseFilter).lean().catch(() => []),
-      require('../models/PaymentOut').find(baseFilter).lean().catch(() => [])
+      require('../models/PaymentOut').find(baseFilter).lean().catch(() => []),
+      require('../models/StoreProduct').find(userId ? { userId } : {}).lean().catch(() => []),
+      require('../models/Product').find(userId ? { userId } : {}).lean().catch(() => []),
+      require('../models/Customer').find(userId ? { userId } : {}).lean().catch(() => []),
+      require('../models/Invoice').find(userId ? { userId } : {}).lean().catch(() => []),
+      SystemSetting.find({ key: { $in: ['starting_cash', 'fixed_assets_total', 'long_term_debt', 'owner_initial_capital'] } }).lean()
+    ]);
+
+    const settings = settingsDocs?.reduce((acc, s) => {
+      acc[s.key] = s.value;
+      return acc;
+    }, {}) || {};
+
+    // For inventory, always use all historical purchases/sales up to end date
+    const historicalFilter = { ...(userId ? { userId } : {}), created_at: { $lte: end } };
+    const [allPurchasesToDate, allSalesToDate] = await Promise.all([
+      require('../models/Purchase').find(historicalFilter).lean().catch(() => []),
+      require('../models/Sale').find({ ...(userId ? { userId } : {}), sel_date: { $lte: end } }).lean().catch(() => [])
     ]);
 
     // Generate different financial statements based on report type
@@ -2336,11 +2390,19 @@ exports.generateAdvancedFinancialReport = async (req, res) => {
     
     if (reportType === 'profit_loss') {
       const profitLoss = generateProfitLossStatement(sales, purchases, expenses);
+      const balanceSheet = generateBalanceSheet(accounts, sales, purchases, expenses, deposits, withdrawals, suppliers, payments, paymentOuts, storeProducts, products, allPurchasesToDate, allSalesToDate, settings, customers, invoices);
+      const cashFlow = generateCashFlowStatement(sales, purchases, expenses, deposits, withdrawals);
       const timeSeries = groupFinancialDataByTime(sales, purchases, expenses, groupBy);
+      const summary = calculateFinancialSummary(sales, purchases, expenses, deposits, withdrawals);
+      const financialRatios = calculateFinancialRatios(summary, sales, purchases, expenses);
       
       response = {
         statement_type: 'profit_loss',
         profit_loss: profitLoss,
+        balance_sheet: balanceSheet,
+        cash_flow: cashFlow,
+        summary,
+        financial_ratios: financialRatios,
         time_series: timeSeries,
         metadata: {
           report_type: reportType,
@@ -2350,24 +2412,43 @@ exports.generateAdvancedFinancialReport = async (req, res) => {
         }
       };
     } else if (reportType === 'balance_sheet') {
-      const balanceSheet = generateBalanceSheet(accounts, sales, purchases, expenses, deposits, withdrawals, suppliers, payments, paymentOuts);
+      const profitLoss = generateProfitLossStatement(sales, purchases, expenses);
+      const balanceSheet = generateBalanceSheet(accounts, sales, purchases, expenses, deposits, withdrawals, suppliers, payments, paymentOuts, storeProducts, products, allPurchasesToDate, allSalesToDate, settings, customers, invoices);
+      const cashFlow = generateCashFlowStatement(sales, purchases, expenses, deposits, withdrawals);
+      const timeSeries = groupFinancialDataByTime(sales, purchases, expenses, groupBy);
+      const summary = calculateFinancialSummary(sales, purchases, expenses, deposits, withdrawals);
+      const financialRatios = calculateFinancialRatios(summary, sales, purchases, expenses);
       
       response = {
         statement_type: 'balance_sheet',
+        profit_loss: profitLoss,
         balance_sheet: balanceSheet,
+        cash_flow: cashFlow,
+        summary,
+        financial_ratios: financialRatios,
+        time_series: timeSeries,
         metadata: {
           report_type: reportType,
           period: { start, end },
+          group_by: groupBy,
           generated_at: new Date()
         }
       };
     } else if (reportType === 'cash_flow') {
+      const profitLoss = generateProfitLossStatement(sales, purchases, expenses);
+      const balanceSheet = generateBalanceSheet(accounts, sales, purchases, expenses, deposits, withdrawals, suppliers, payments, paymentOuts, storeProducts, products, allPurchasesToDate, allSalesToDate, settings, customers, invoices);
       const cashFlow = generateCashFlowStatement(sales, purchases, expenses, deposits, withdrawals);
       const timeSeries = groupFinancialDataByTime(sales, purchases, expenses, groupBy);
+      const summary = calculateFinancialSummary(sales, purchases, expenses, deposits, withdrawals);
+      const financialRatios = calculateFinancialRatios(summary, sales, purchases, expenses);
       
       response = {
         statement_type: 'cash_flow',
+        profit_loss: profitLoss,
+        balance_sheet: balanceSheet,
         cash_flow: cashFlow,
+        summary,
+        financial_ratios: financialRatios,
         time_series: timeSeries,
         metadata: {
           report_type: reportType,
@@ -2379,7 +2460,7 @@ exports.generateAdvancedFinancialReport = async (req, res) => {
     } else {
       // Comprehensive report (default)
       const profitLoss = generateProfitLossStatement(sales, purchases, expenses);
-      const balanceSheet = generateBalanceSheet(accounts, sales, purchases, expenses, deposits, withdrawals, suppliers, payments, paymentOuts);
+      const balanceSheet = generateBalanceSheet(accounts, sales, purchases, expenses, deposits, withdrawals, suppliers, payments, paymentOuts, storeProducts, products, allPurchasesToDate, allSalesToDate, settings, customers, invoices);
       const cashFlow = generateCashFlowStatement(sales, purchases, expenses, deposits, withdrawals);
       const timeSeries = groupFinancialDataByTime(sales, purchases, expenses, groupBy);
       const categoryBreakdown = calculateCategoryBreakdown(sales, purchases, expenses);
