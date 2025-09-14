@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styles from './Customer.module.css';
-import { Plus, Eye, Edit, Trash2, ArrowLeft, Search } from 'lucide-react';
+import { Plus, Eye, Edit, Trash2, ArrowLeft, Search, Upload, Download } from 'lucide-react';
 import { getCustomers, addCustomer, updateCustomer, deleteCustomer } from '../services/customerService';
 
 const Customer = ({ onBack }) => {
+  const fileInputRef = useRef(null);
   const [viewMode, setViewMode] = useState('table');
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -55,7 +56,7 @@ const Customer = ({ onBack }) => {
   const handleEdit = (customer) => {
     setEditingCustomer(customer);
     setFormData({
-      name: customer.name || '',
+      name: customer.name,
       email: customer.email || '',
       phone: customer.phone || '',
       address: customer.address || '',
@@ -118,6 +119,92 @@ const Customer = ({ onBack }) => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleImportClick = () => {
+    fileInputRef.current.click();
+  };
+
+  const handleDownloadTemplate = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      const response = await fetch('/api/customers/template', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to download template');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'customer_import_template.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      
+      setSuccess('Template downloaded successfully!');
+    } catch (error) {
+      console.error('Error downloading template:', error);
+      setError('Failed to download template. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Check if file is Excel
+    const validTypes = [
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/csv'
+    ];
+    
+    if (!validTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls|csv)$/i)) {
+      setError('Please upload a valid Excel file (.xlsx, .xls) or CSV file.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch('/api/customers/import', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: formData
+      });
+
+      const result = await response.json();
+      
+      if (response.ok) {
+        setSuccess(result.message);
+        fetchCustomers(); // Refresh the customer list
+      } else {
+        setError(result.message || 'Failed to import customers');
+      }
+    } catch (error) {
+      console.error('Error importing customers:', error);
+      setError('Failed to import customers. Please try again.');
+    } finally {
+      setLoading(false);
+      e.target.value = ''; // Reset file input
+    }
+  };
+
   const filteredCustomers = customers.filter(customer =>
     (customer.name && customer.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (customer.email && customer.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -151,6 +238,29 @@ const Customer = ({ onBack }) => {
             <Plus size={20} />
             Add New Customer
           </button>
+          <button
+            className={styles['action-btn']}
+            onClick={handleImportClick}
+            disabled={loading}
+          >
+            <Upload size={20} />
+            Import Excel
+          </button>
+          <button
+            className={styles['action-btn']}
+            onClick={handleDownloadTemplate}
+            disabled={loading}
+          >
+            <Download size={20} />
+            Download Template
+          </button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept=".xlsx,.xls,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+            style={{ display: 'none' }}
+          />
         </div>
         {error && <div className={styles.error}>{error}</div>}
         {success && <div className={styles.success}>{success}</div>}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styles from './Categories.module.css';
 import { 
   Plus, 
@@ -6,7 +6,9 @@ import {
   Edit, 
   Trash2, 
   ArrowLeft,
-  Search
+  Search,
+  Upload,
+  Download
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -14,11 +16,13 @@ import {
   getCategory, 
   createCategory, 
   updateCategory, 
-  deleteCategory 
+  deleteCategory,
+  importCategories
 } from '../services/categoryService';
 
 const Categories = ({ onBack }) => {
   const navigate = useNavigate();
+  const fileInputRef = useRef(null);
   const [viewMode, setViewMode] = useState('table'); // 'table' or 'form'
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -144,6 +148,54 @@ const Categories = ({ onBack }) => {
     }));
   };
 
+  const handleImportClick = () => {
+    fileInputRef.current.click();
+  };
+
+  const handleDownloadTemplate = () => {
+    // Create a link to download the template
+    const link = document.createElement('a');
+    link.href = '/category_import_template.xlsx';
+    link.download = 'category_import_template.xlsx';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Check if file is Excel
+    const validTypes = [
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/csv'
+    ];
+    
+    if (!validTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls|csv)$/i)) {
+      setError('Please upload a valid Excel file (.xlsx, .xls) or CSV file.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const result = await importCategories(file);
+      setSuccess(result.message);
+      // Refresh the categories list
+      await fetchCategories();
+    } catch (error) {
+      setError(error.response?.data?.message || 'Error importing categories');
+    } finally {
+      setLoading(false);
+      // Reset file input
+      e.target.value = '';
+    }
+  };
+
   const filteredCategories = categories.filter(category =>
     category.category_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (category.description && category.description.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -177,13 +229,35 @@ const Categories = ({ onBack }) => {
             <Plus size={20} />
             Add New Category
           </button>
+          <button 
+            className={styles['action-btn']}
+            onClick={handleImportClick}
+            disabled={loading}
+          >
+            <Upload size={20} />
+            Import Excel
+          </button>
+          <button 
+            className={styles['action-btn']}
+            onClick={handleDownloadTemplate}
+          >
+            <Download size={20} />
+            Download Template
+          </button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept=".xlsx,.xls,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+            style={{ display: 'none' }}
+          />
         </div>
 
         {/* Error and Success Messages */}
         {error && <div className={styles.error}>{error}</div>}
-        {success && <div className={styles.success}>{success}</div>}
+        {success && <div className={styles.success}>{success}</div>
 
-        {/* Table View */}
+        /* Table View */}
         {viewMode === 'table' && (
           <div className={styles['table-container']}>
             <div className={styles['table-header']}>
@@ -303,4 +377,4 @@ const Categories = ({ onBack }) => {
   );
 };
 
-export default Categories; 
+export default Categories;

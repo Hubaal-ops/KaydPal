@@ -7,7 +7,8 @@ const {
   getAllCategories, 
   getCategoryById, 
   updateCategory, 
-  deleteCategory 
+  deleteCategory,
+  importCategories
 } = require('../controllers/categoryController');
 
 // Get all categories
@@ -68,6 +69,23 @@ router.delete('/:id', async (req, res) => {
     }
     res.json({ success: true, message: 'Category deleted successfully' });
   } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Import categories from Excel
+router.post('/import', async (req, res) => {
+  try {
+    // Check if file was uploaded
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
+    
+    // Pass the file buffer to the controller
+    const result = await importCategories(req.file, { userId: req.user.id });
+    res.json({ success: true, data: result });
+  } catch (error) {
+    console.error('Import error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
