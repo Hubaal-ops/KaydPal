@@ -45,10 +45,33 @@ function isInternalDataQuery(messages) {
   
   // Consider it internal if confidence is above threshold or contains business keywords
   const businessKeywords = [
-    'account', 'balance', 'money', 'product', 'inventory', 'stock', 'sale', 'sales',
-    'purchase', 'customer', 'supplier', 'debt', 'revenue', 'profit', 'expense',
-    'report', 'analysis', 'trend', 'performance', 'business', 'dashboard',
-    'financial', 'cash flow', 'invoice', 'order', 'transaction'
+    // English keywords
+    'account', 'balance', 'money', 'bank', 'cash', 'funds',
+    'purchase', 'buy', 'procurement', 'supplier order', 'vendor', 'cost',
+    'customer', 'client', 'buyer', 'consumer', 'customer debt', 'receivable',
+    'sale', 'sell', 'revenue', 'transaction', 'order', 'invoice', 'customer order',
+    'product', 'inventory', 'stock', 'item', 'goods', 'storing', 'warehouse',
+    'report', 'summary', 'overview', 'dashboard', 'export', 'statement',
+    'analysis', 'trend', 'compare', 'growth', 'performance', 'metric', 'kpi', 'insight',
+    'financial', 'cash flow', 'balance sheet', 'financial report',
+    'debt', 'profit', 'loss', 'income', 'expense',
+    // Somali keywords with improved translations
+    'xisaab', 'badeecad', 'iib', 'macmiil', 'alaab-qeybiye', 'iibsasho', 'badeecad kayd ah',
+    'faa\'iido', 'khasaaro', 'dakhli', 'dakhliga', 'lacag soo-gal', 'kharash', 
+    'socodka lacagta', 'qulqulka lacagta', 'xaashida xisaabeed', 'balansiga', 'warbixinta maaliyadeed',
+    'hadhaag', 'lacag', 'maalgelin', 'hanti lacageed',
+    'kayd', 'sahay', 'kayd badeeco', 'shay', 'qodob', 'alaab', 'kaydin', 'bakhaar',
+    'sahay yari', 'kayd la\'aan', 'alaab ka dhammaatay',
+    'iibka', 'iibin', 'hawlgal maaliyadeed', 'dalab', 'qaansheegad',
+    'soo iibsi', 'qandaraas',
+    'daynta macmiilka', 'lacag la sugayo', 'la qaabilo', 'daynta alaab-qeybiye', 'lacag la bixinayo',
+    'isbeddel', 'falanqayn', 'is barbar dhig', 'koboc', 'horumar', 'waxqabad',
+    'cabbir', 'kpi', 'tilmaame muhiim ah', 'faham', 'aragti ganacsi',
+    'warbixin', 'soo koobid', 'guudmar', 'jaantus xogeed', 'dhoofin', 'bayaanka', 'xisaab celin',
+    'ganacsi', 'talo', 'digniin', 'ururinta deynta', 'istaraatiijiyadda qiimaynta', 'jadwalka lacag bixinta',
+    // Additional Somali expressions
+    'hadhaagga', 'hadhaagga xisaabta', 'immisa badeecad ayaan kaydsanayaa', 'maanta', 'shalay', 
+    'usbuucan', 'bishaan', 'sanadkan', 'lacagta daynta kuma maqan', 'daynta kuma maqan', 'aan la bixin'
   ];
   
   const hasBusinessKeywords = businessKeywords.some(keyword => content.includes(keyword));
@@ -414,7 +437,7 @@ function formatPurchaseData(purchases, timePeriod) {
   // Sort by quantity and show top 3
   const topProducts = Object.entries(productPurchases)
     .sort(([,a], [,b]) => b.quantity - a.quantity)
-    .slice(0, 3);
+    +slice(0, 3);
   
   if (topProducts.length > 0) {
     response += "\nMost purchased products:\n";
@@ -507,7 +530,7 @@ function formatDebtData(payments, paymentOuts, customers, suppliers) {
 
 // POST /api/ai/chat
 router.post('/chat', auth, async (req, res) => {
-  const { messages } = req.body;
+  const { messages, language = 'english' } = req.body; // Extract language from request body
   if (!messages || !Array.isArray(messages)) {
     return res.status(400).json({ success: false, message: 'Messages array required.' });
   }
@@ -515,7 +538,8 @@ router.post('/chat', auth, async (req, res) => {
   // Log for debugging
   console.log('AI Chat Request:', { 
     userId: req.user?.id, 
-    messages: messages.map(m => `${m.role}: ${m.content}`) 
+    messages: messages.map(m => `${m.role}: ${m.content}`),
+    language: language
   });
   
   // Check if this is a query about internal data
@@ -621,7 +645,14 @@ router.post('/chat', auth, async (req, res) => {
       const lastUserMessageIndex = enhancedMessages.map((m, i) => m.role === 'user' ? i : -1).filter(i => i !== -1).pop();
       
       if (lastUserMessageIndex !== undefined) {
+        // Add language instruction to the context prompt
+        const languageInstruction = language === 'somali' 
+          ? 'IMPORTANT: Respond ONLY in Somali language. Translate all responses to Somali.' 
+          : 'IMPORTANT: Respond ONLY in English language.';
+          
         const contextPrompt = `You are KaydPal AI, an intelligent business management assistant with memory of past conversations.
+
+${languageInstruction}
 
 User Query Intent: ${intentAnalysis.intent} (confidence: ${(intentAnalysis.confidence * 100).toFixed(1)}%)
 Time Context: ${timeContext}
@@ -720,8 +751,23 @@ Original Question: ${content}`;
   
   console.log('Processing external query');
   
-  // For non-internal queries, use the original implementation
+  // For non-internal queries, use the original implementation but add language instruction
   try {
+    // Add language instruction to the last user message
+    const enhancedMessages = [...messages];
+    const lastUserMessageIndex = enhancedMessages.map((m, i) => m.role === 'user' ? i : -1).filter(i => i !== -1).pop();
+    
+    if (lastUserMessageIndex !== undefined) {
+      const languageInstruction = language === 'somali' 
+        ? 'IMPORTANT: Respond ONLY in Somali language. Translate all responses to Somali.' 
+        : 'IMPORTANT: Respond ONLY in English language.';
+        
+      enhancedMessages[lastUserMessageIndex] = {
+        role: 'user',
+        content: `${languageInstruction}\n\n${enhancedMessages[lastUserMessageIndex].content}`
+      };
+    }
+    
     // Using OpenRouter instead of OpenAI directly
     const openRouterRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
@@ -733,7 +779,7 @@ Original Question: ${content}`;
       },
       body: JSON.stringify({
         model: process.env.AI_MODEL || 'openai/gpt-3.5-turbo', // Default model
-        messages: messages.map(m => ({ role: m.role, content: m.content })),
+        messages: enhancedMessages.map(m => ({ role: m.role, content: m.content })),
         temperature: 0.7,
         max_tokens: 1000
       })

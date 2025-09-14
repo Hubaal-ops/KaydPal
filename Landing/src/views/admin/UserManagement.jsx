@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Search, 
   Filter, 
@@ -14,7 +14,10 @@ import {
   UserCog,
   X,
   Save,
-  Loader2
+  Loader2,
+  Check,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import styles from './UserManagement.module.css';
@@ -22,54 +25,14 @@ import styles from './UserManagement.module.css';
 const UserManagement = () => {
   const navigate = useNavigate();
   
-  // Handle back navigation
-  const handleBack = (e) => {
-    e?.preventDefault();
-    navigate(-1); // Go back to previous page
-  };
-  
   // State management
   const [users, setUsers] = useState([]);
-
-  // Fetch users from backend API
-  useEffect(() => {
-    const fetchUsers = async () => {
-      setLoading(true);
-      try {
-        const token = localStorage.getItem('token'); // Adjust if you store token elsewhere
-        const response = await fetch('/api/protected/admin/users/list', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        const result = await response.json();
-        if (result.success && Array.isArray(result.data)) {
-          // Map backend _id to id for frontend compatibility
-          setUsers(result.data.map(u => ({
-            ...u,
-            id: u._id,
-            status: u.isActive ? 'active' : 'inactive',
-            joinDate: u.createdAt ? u.createdAt.split('T')[0] : '',
-            lastLogin: u.lastLogin || null
-          })));
-        } else {
-          setUsers([]);
-        }
-      } catch (err) {
-        setUsers([]);
-      }
-      setLoading(false);
-    };
-    fetchUsers();
-  }, []);
-  const [viewMode, setViewMode] = React.useState('table');
-  
-  // Track view mode changes
-  React.useEffect(() => {
-    console.log('Current view mode:', viewMode);
-  }, [viewMode]);
+  const [selectedUsers, setSelectedUsers] = useState([]);
+  const [selectAll, setSelectAll] = useState(false);
+  const [showBulkActions, setShowBulkActions] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
+  const [isClosing, setIsClosing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRole, setSelectedRole] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
@@ -85,28 +48,184 @@ const UserManagement = () => {
     status: 'active',
     phone: '',
     department: '',
-    password: '' // Only used for create or reset
+    password: ''
   });
   const [errors, setErrors] = useState({});
+  const [viewMode, setViewMode] = useState('table');
+
+  // Fetch users from backend API
+  useEffect(() => {
+    const fetchUsers = async () => {
+      setLoading(true);
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/protected/admin/users/list', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        const result = await response.json();
+        if (result.success && Array.isArray(result.data)) {
+          setUsers(result.data.map(u => ({
+            ...u,
+            id: u._id || u.id,
+            status: u.isActive ? 'active' : 'inactive',
+            joinDate: u.createdAt ? u.createdAt.split('T')[0] : '',
+            lastLogin: u.lastLogin || null
+          })));
+        } else {
+          setUsers([]);
+        }
+      } catch (err) {
+        console.error('Error fetching users:', err);
+        setUsers([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchUsers();
+  }, []);
+
+  // Handle view mode changes
+  useEffect(() => {
+    console.log('Current view mode:', viewMode);
+  }, [viewMode]);
 
   // Filter users based on search term and filters
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = selectedRole === 'all' || user.role === selectedRole;
-    const matchesStatus = selectedStatus === 'all' || user.status === selectedStatus;
-    
-    return matchesSearch && matchesRole && matchesStatus;
-  });
+  const filteredUsers = useMemo(() => {
+    return users.filter(user => {
+      const matchesSearch = searchTerm === '' || 
+        (user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.email?.toLowerCase().includes(searchTerm.toLowerCase()));
+      const matchesRole = selectedRole === 'all' || user.role === selectedRole;
+      const matchesStatus = selectedStatus === 'all' || user.status === selectedStatus;
+      
+      return matchesSearch && matchesRole && matchesStatus;
+    });
+  }, [users, searchTerm, selectedRole, selectedStatus]);
 
   // Pagination logic
   const indexOfLastUser = currentPage * usersPerPage;
   const indexOfFirstUser = indexOfLastUser - usersPerPage;
-  const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
+  const currentUsers = useMemo(() => 
+    filteredUsers.slice(indexOfFirstUser, indexOfLastUser),
+    [filteredUsers, indexOfFirstUser, indexOfLastUser]
+  );
   const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
 
   // Handle pagination
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
+
+  // Handle back navigation
+  const handleBack = (e) => {
+    e?.preventDefault();
+    navigate(-1);
+  };
+
+  // Toggle select all users
+  const toggleSelectAll = (checked) => {
+    if (checked) {
+      setSelectedUsers(filteredUsers.map(user => user.id));
+      setSelectAll(true);
+    } else {
+      setSelectedUsers([]);
+      setSelectAll(false);
+    }
+  };
+
+  // Toggle single user selection
+  const toggleUserSelection = (userId, checked) => {
+    if (checked) {
+      setSelectedUsers(prev => [...prev, userId]);
+    } else {
+      setSelectedUsers(prev => prev.filter(id => id !== userId));
+      setSelectAll(false);
+    }
+  };
+
+  // Update select all when selected users change
+  useEffect(() => {
+    if (selectedUsers.length > 0) {
+      setShowBulkActions(true);
+      if (selectedUsers.length === filteredUsers.length) {
+        setSelectAll(true);
+      } else {
+        setSelectAll(false);
+      }
+    } else {
+      setShowBulkActions(false);
+      setSelectAll(false);
+    }
+  }, [selectedUsers, filteredUsers.length]);
+
+  // Handle bulk actions
+  const handleBulkAction = async (action) => {
+    if (selectedUsers.length === 0) return;
+
+    setLoading(true);
+    const token = localStorage.getItem('token');
+    const requests = [];
+    let successCount = 0;
+
+    try {
+      // Process each selected user
+      for (const userId of selectedUsers) {
+        try {
+          let response;
+          
+          if (action === 'delete') {
+            response = await fetch(`/api/protected/admin/users/${userId}`, {
+              method: 'DELETE',
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+          } else {
+            const newStatus = action === 'activate' ? 'active' : 'inactive';
+            response = await fetch(`/api/protected/admin/users/${userId}`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({ isActive: newStatus === 'active' })
+            });
+          }
+
+          const result = await response.json();
+          if (result.success) {
+            successCount++;
+          }
+        } catch (err) {
+          console.error(`Error performing ${action} on user ${userId}:`, err);
+        }
+      }
+
+      // Refresh user list
+      const refreshResponse = await fetch('/api/protected/admin/users/list', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const refreshResult = await refreshResponse.json();
+      
+      if (refreshResult.success && Array.isArray(refreshResult.data)) {
+        setUsers(refreshResult.data.map(u => ({
+          ...u,
+          id: u._id,
+          status: u.isActive ? 'active' : 'inactive',
+          joinDate: u.createdAt ? u.createdAt.split('T')[0] : '',
+          lastLogin: u.lastLogin || null
+        })));
+      }
+
+      showSuccessMessage(`Successfully processed ${successCount} of ${selectedUsers.length} users`);
+      setSelectedUsers([]);
+      setSelectAll(false);
+      
+    } catch (err) {
+      showSuccessMessage('An error occurred while processing bulk action');
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   // Handle add new user
   const handleAddUser = (e) => {
@@ -177,13 +296,13 @@ const UserManagement = () => {
             : u
         ));
         
-        setSuccess(`User "${user.name}" has been ${newStatus} successfully.`);
+        showSuccessMessage(`User "${user.name}" has been ${newStatus} successfully.`);
         setTimeout(() => setSuccess(''), 3000);
       } else {
-        setSuccess(result.message || `Failed to ${newStatus} user`);
+        showSuccessMessage(result.message || `Failed to ${newStatus} user`);
       }
     } catch (err) {
-      setSuccess(`Failed to ${user.status === 'active' ? 'deactivate' : 'activate'} user`);
+      showSuccessMessage(`Failed to ${user.status === 'active' ? 'deactivate' : 'activate'} user`);
     }
     setLoading(false);
   };
@@ -203,13 +322,13 @@ const UserManagement = () => {
       if (result.success) {
         setUsers(users.filter(user => user.id !== selectedUser.id));
         setShowDeleteModal(false);
-        setSuccess(`User "${selectedUser.name}" has been deleted successfully.`);
-        setTimeout(() => setSuccess(''), 3000);
+        
+        showSuccessMessage(`User "${selectedUser.name}" has been deleted successfully.`);
       } else {
-        setSuccess(result.message || 'Failed to delete user');
+        showSuccessMessage(result.message || 'Failed to delete user');
       }
     } catch (err) {
-      setSuccess('Failed to delete user');
+      showSuccessMessage('Failed to delete user');
     }
     setLoading(false);
   };
@@ -293,9 +412,9 @@ const UserManagement = () => {
             status: result.data.isActive ? 'active' : 'inactive',
             joinDate: result.data.createdAt ? result.data.createdAt.split('T')[0] : user.joinDate
           } : user));
-          setSuccess('User updated successfully');
+          showSuccessMessage('User updated successfully');
         } else {
-          setSuccess(result.message || 'Failed to update user');
+          showSuccessMessage(result.message || 'Failed to update user');
         }
       } else {
         // Create user
@@ -323,15 +442,15 @@ const UserManagement = () => {
             lastLogin: result.data.lastLogin || null
           };
           setUsers([newUser, ...users]);
-          setSuccess('User created successfully');
+          showSuccessMessage('User created successfully');
         } else {
-          setSuccess(result.message || 'Failed to create user');
+          showSuccessMessage(result.message || 'Failed to create user');
         }
       }
       setViewMode('table');
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      setSuccess('Failed to save user');
+      showSuccessMessage('Failed to save user');
     }
     setLoading(false);
   };
@@ -531,11 +650,29 @@ const UserManagement = () => {
 
       {/* Success Message */}
       {success && (
-        <div className={styles.successMessage}>
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-          </svg>
-          {success}
+        <div 
+          className={`${styles.successMessage} ${isClosing ? styles.slideOut : ''}`}
+          onAnimationEnd={() => isClosing && setSuccess('')}
+        >
+          <div className={styles.messageContent}>
+            <svg xmlns="http://www.w3.org/2000/svg" className={styles.successIcon} viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <span>{success}</span>
+          </div>
+          <button 
+            type="button" 
+            className={styles.closeButton}
+            onClick={() => {
+              setIsClosing(true);
+              setTimeout(() => setSuccess(''), 300);
+            }}
+            aria-label="Close message"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className={styles.closeIcon} viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </button>
         </div>
       )}
 
@@ -725,6 +862,51 @@ const UserManagement = () => {
         </div>
       ) : (
         <div className={styles.tableContainer}>
+          {/* Bulk Actions Bar */}
+          {showBulkActions && (
+            <div className={styles.bulkActionsBar}>
+              <div className={styles.bulkActionsLeft}>
+                <span>{selectedUsers.length} user{selectedUsers.length !== 1 ? 's' : ''} selected</span>
+              </div>
+              <div className={styles.bulkActionsRight}>
+                <button 
+                  className={`${styles.bulkActionButton} ${styles.activateButton}`}
+                  onClick={() => handleBulkAction('activate')}
+                  disabled={loading}
+                >
+                  <UserCheck size={16} />
+                  <span>Activate</span>
+                </button>
+                <button 
+                  className={`${styles.bulkActionButton} ${styles.deactivateButton}`}
+                  onClick={() => handleBulkAction('deactivate')}
+                  disabled={loading}
+                >
+                  <UserX size={16} />
+                  <span>Deactivate</span>
+                </button>
+                <button 
+                  className={`${styles.bulkActionButton} ${styles.deleteButton}`}
+                  onClick={() => handleBulkAction('delete')}
+                  disabled={loading}
+                >
+                  <Trash2 size={16} />
+                  <span>Delete</span>
+                </button>
+                <button 
+                  className={styles.bulkActionButton}
+                  onClick={() => {
+                    setSelectedUsers([]);
+                    setSelectAll(false);
+                  }}
+                >
+                  <X size={16} />
+                  <span>Clear</span>
+                </button>
+              </div>
+            </div>
+          )}
+          
           <div className={styles.tableFilters}>
             <div className={styles.filtersContainer}>
               <div className={styles.searchBox}>
@@ -780,6 +962,17 @@ const UserManagement = () => {
             <table className={styles.usersTable}>
               <thead>
                 <tr>
+                  <th>
+                    <div className={styles.checkboxHeader}>
+                      <button 
+                        className={styles.checkboxButton}
+                        onClick={() => toggleSelectAll(!selectAll)}
+                        aria-label={selectAll ? 'Deselect all users' : 'Select all users'}
+                      >
+                        {selectAll ? <CheckSquare size={18} /> : <Square size={18} />}
+                      </button>
+                    </div>
+                  </th>
                   <th>USER</th>
                   <th>ROLE</th>
                   <th>STATUS</th>
@@ -792,6 +985,17 @@ const UserManagement = () => {
                 {currentUsers.length > 0 ? (
                   currentUsers.map(user => (
                     <tr key={user.id}>
+                      <td>
+                        <div className={styles.checkboxCell}>
+                          <button 
+                            className={`${styles.checkboxButton} ${selectedUsers.includes(user.id) ? styles.checked : ''}`}
+                            onClick={() => toggleUserSelection(user.id, !selectedUsers.includes(user.id))}
+                            aria-label={`Select ${user.name}`}
+                          >
+                            {selectedUsers.includes(user.id) ? <Check size={16} /> : null}
+                          </button>
+                        </div>
+                      </td>
                       <td>
                         <div className={styles.userCell}>
                           <div className={styles.avatar}>

@@ -70,6 +70,35 @@
   cursor: pointer;
 }
 
+/* Language Tabs */
+.languageTabs {
+  display: flex;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+  background: var(--surface, #fff);
+}
+
+.languageTab {
+  flex: 1;
+  padding: 0.75rem;
+  border: none;
+  background: var(--background, #f9f9f9);
+  color: var(--text-secondary, #666);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-bottom: 2px solid transparent;
+}
+
+.languageTab:hover {
+  background: var(--surface-hover, #f0f0f0);
+}
+
+.languageTab.activeTab {
+  background: var(--surface, #fff);
+  color: var(--primary-color, #6366f1);
+  border-bottom: 2px solid var(--primary-color, #6366f1);
+}
+
 .aiChatBody {
   flex: 1;
   overflow-y: auto;

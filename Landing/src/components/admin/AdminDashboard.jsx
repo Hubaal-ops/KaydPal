@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import './AdminDashboard.css';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -7,9 +7,8 @@ import {
   ClipboardList,
   Bell,
   ShieldCheck,
-  Sparkles
+  BarChart3
 } from 'lucide-react';
-import AIChatWindow from '../../components/AIChatWindow';
 
 const adminModules = [
   {
@@ -51,6 +50,14 @@ const adminModules = [
     icon: ShieldCheck,
     color: '#7c3aed',
     gradient: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)'
+  },
+  {
+    id: 'analytics',
+    title: 'Platform Analytics',
+    description: 'View platform performance and business metrics',
+    icon: BarChart3,
+    color: '#4F46E5',
+    gradient: 'linear-gradient(135deg, #4F46E5 0%, #3730A3 100%)'
   }
 ];
 
@@ -59,13 +66,12 @@ const routeMap = {
   'system-settings': '/admin/system-settings',
   'audit-logs': '/admin/audit-logs',
   'notifications': '/admin/notifications',
-  'roles-permissions': '/admin/roles-permissions'
+  'roles-permissions': '/admin/roles-permissions',
+  'analytics': '/admin/analytics'
 };
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
-  const [showAIChat, setShowAIChat] = useState(false);
-  
   const handleCardClick = (moduleId) => {
     if (routeMap[moduleId]) {
       navigate(routeMap[moduleId]);
@@ -80,12 +86,6 @@ const AdminDashboard = () => {
       </div>
       
       <div className="admin-dashboard-content">
-        {/* AI Chat Button */}
-        <div className="admin-ai-chat-button" onClick={() => setShowAIChat(true)}>
-          <Sparkles size={20} />
-          <span>AI Assistant</span>
-        </div>
-        
         <div className="admin-modules-grid">
           {adminModules.map((module) => {
             const IconComponent = module.icon;
@@ -112,9 +112,6 @@ const AdminDashboard = () => {
           })}
         </div>
       </div>
-      
-      {/* AI Chat Window */}
-      {showAIChat && <AIChatWindow onClose={() => setShowAIChat(false)} />}
     </div>
   );
 };

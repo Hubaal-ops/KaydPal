@@ -755,15 +755,88 @@ p {
 
 /* Success Message */
 .successMessage {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  max-width: 400px;
   background: #ecfdf5;
   color: #065f46;
-  padding: 0.75rem 1rem;
-  border-radius: 6px;
-  margin-bottom: 1.5rem;
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.9375rem;
+  z-index: 1000;
+  animation: slideIn 0.3s ease-out forwards;
+  border-left: 4px solid #10b981;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.successMessage.slideOut {
+  animation: slideOut 0.3s ease-in forwards;
+}
+
+@keyframes slideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+.messageContent {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.9375rem;
+  flex: 1;
+}
+
+.successIcon {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  color: #10b981;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  padding: 0.25rem;
+  margin-left: 0.5rem;
+  cursor: pointer;
+  color: #065f46;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.closeButton:hover {
+  opacity: 1;
+  background: rgba(6, 95, 70, 0.1);
+}
+
+.closeIcon {
+  width: 1rem;
+  height: 1rem;
 }
 
 /* Form Styles */
@@ -1010,6 +1083,152 @@ p {
 .deactivateButton {
   color: #f59e0b;
   border-color: #fde68a;
+}
+
+/* Bulk Actions Bar */
+.bulkActionsBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1.5rem;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px 8px 0 0;
+  margin-bottom: -1px;
+  z-index: 10;
+  position: relative;
+}
+
+.bulkActionsLeft {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #334155;
+}
+
+.bulkActionsRight {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.bulkActionButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  background-color: #fff;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid #e2e8f0;
+}
+
+.bulkActionButton:hover {
+  background-color: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.bulkActionButton.activateButton {
+  color: #059669;
+  border-color: #a7f3d0;
+  background-color: #ecfdf5;
+}
+
+.bulkActionButton.activateButton:hover {
+  background-color: #d1fae5;
+  border-color: #6ee7b7;
+}
+
+.bulkActionButton.deactivateButton {
+  color: #d97706;
+  border-color: #fde68a;
+  background-color: #fffbeb;
+}
+
+.bulkActionButton.deactivateButton:hover {
+  background-color: #fef3c7;
+  border-color: #fcd34d;
+}
+
+.bulkActionButton.deleteButton {
+  color: #dc2626;
+  border-color: #fecaca;
+  background-color: #fef2f2;
+}
+
+.bulkActionButton.deleteButton:hover {
+  background-color: #fee2e2;
+  border-color: #fca5a5;
+}
+
+/* Checkbox styles */
+.checkboxHeader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin: 0 auto;
+}
+
+.checkboxButton {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #cbd5e1;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: all 0.2s ease;
+  color: #fff;
+}
+
+.checkboxButton:hover {
+  border-color: #94a3b8;
+  background-color: #f1f5f9;
+}
+
+.checkboxButton.checked {
+  background-color: #4f46e5;
+  border-color: #4f46e5;
+}
+
+.checkboxButton.checked:hover {
+  background-color: #4338ca;
+  border-color: #4338ca;
+}
+
+.checkboxCell {
+  padding: 0 16px;
+  text-align: center;
+  vertical-align: middle;
+  width: 40px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .bulkActionsBar {
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+  }
+  
+  .bulkActionsRight {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  
+  .bulkActionButton {
+    flex: 1;
+    justify-content: center;
+    min-width: 120px;
+  }
 }
 
 .deactivateButton:hover {

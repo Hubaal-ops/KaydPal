@@ -15,51 +15,107 @@ const StoreProduct = require('../models/StoreProduct');
 function analyzeQueryIntent(message) {
   const content = message.toLowerCase();
   
-  // Define intent patterns with confidence scoring
+  // Define intent patterns with confidence scoring for both English and Somali
   const intentPatterns = {
     // Financial queries
     financial: {
-      keywords: ['profit', 'loss', 'revenue', 'income', 'expense', 'cash flow', 'balance sheet', 'financial report'],
+      keywords: [
+        'profit', 'loss', 'revenue', 'income', 'expense', 'cash flow', 'balance sheet', 'financial report',
+        'faaide', 'khasaarat', 'dakhliga', 'kharash', 'lacagta', 'warbixinta maaliyadda',
+        'haray', 'lacag', 'bilansh', 'bilansiga', 'faayida',
+        'faa\'iido', 'khasaaro', 'dakhli', 'dakhliga', 'lacag soo-gal', 'kharash', 
+        'socodka lacagta', 'qulqulka lacagta', 'xaashida xisaabeed', 'balansiga', 'warbixinta maaliyadeed',
+        'hadhaag', 'maalgelin', 'hanti lacageed'
+      ],
       confidence: 0
     },
     // Account queries
     accounts: {
-      keywords: ['account', 'balance', 'money', 'bank', 'cash', 'funds'],
+      keywords: [
+        'account', 'balance', 'money', 'bank', 'cash', 'funds',
+        'akoon', 'balans', 'lacag', 'bangi', 'kharash', 'haray', 'bilansh', 'bilansiga',
+        'xisaab', 'hadhaag', 'lacag', 'bangi', 'kharash', 'hadhaagga'
+      ],
       confidence: 0
     },
     // Inventory queries
     inventory: {
-      keywords: ['product', 'inventory', 'stock', 'item', 'goods', 'storing', 'warehouse'],
+      keywords: [
+        'product', 'inventory', 'stock', 'item', 'goods', 'storing', 'warehouse',
+        'alaab', 'kaydka', 'kaydinta', 'alabta', 'alab', 'kaydin', 'bakoor',
+        'alabtaada', 'alabtayda', 'kaydkaaga', 'kaydkayga',
+        'badeecad', 'kayd', 'kayd badeeco', 'badeeco', 'kaydin', 'bakhaar',
+        'badeecadaada', 'badeecadayda', 'kaydkaaga', 'kaydkayga',
+        'sahay', 'shay', 'qodob', 'alaab', 'sahay yari', 'kayd la\'aan', 'alaab ka dhammaatay'
+      ],
       confidence: 0
     },
     // Sales queries
     sales: {
-      keywords: ['sale', 'sell', 'revenue', 'transaction', 'order', 'invoice', 'customer order'],
+      keywords: [
+        'sale', 'sell', 'revenue', 'transaction', 'order', 'invoice', 'customer order',
+        'iibka', 'iibi', 'dakhliga', 'wareejinta', 'dalabka', 'fatora', 'dalabka macmiilka',
+        'iibkaaga', 'iibkayga', 'iibka bishii', 'iibka sanan', 'dakhligaada',
+        'iib', 'iibka', 'iibin', 'dakhli', 'dakhliga', 'hawlgal maaliyadeed', 'dalab', 'qaansheegad',
+        'iibkaaga', 'iibkayga', 'iibka bishan', 'iibka bishii', 'iibka bishii hore', 'iibka sanadkan'
+      ],
       confidence: 0
     },
     // Purchase queries
     purchases: {
-      keywords: ['purchase', 'buy', 'procurement', 'supplier order', 'vendor', 'cost'],
+      keywords: [
+        'purchase', 'buy', 'procurement', 'supplier order', 'vendor', 'cost',
+        'iibsasho', 'iibso', 'dalabka', 'dalabka dhaqdhaqaaqa', 'kharash',
+        'iibsashada', 'iibsashadayda', 'dalabkaaga', 'dalabkayga',
+        'iibsasho', 'iibso', 'dalabka alaab-qeybiye', 'kharash', 'soo iibsi', 'qandaraas',
+        'iibsashada', 'iibsashadayda', 'dalabkaaga', 'dalabkayga'
+      ],
       confidence: 0
     },
     // Customer queries
     customers: {
-      keywords: ['customer', 'client', 'buyer', 'consumer', 'customer debt', 'receivable'],
+      keywords: [
+        'customer', 'client', 'buyer', 'consumer', 'customer debt', 'receivable',
+        'macmiil', 'macmil', 'iibiyaha', 'deynka macmiilka', 'lacashta',
+        'macmiilkaaga', 'macmiilkayga', 'deynka', 'deynkayga', 'deynkaaga',
+        'macaamiil', 'macmil', 'iibiyaha', 'daynka macaamiilka', 'lacashta',
+        'macaamiilkaaga', 'macaamiilkayga', 'daynka', 'daynkayga', 'daynkaaga',
+        'lacagta daynta kuma maqan', 'daynta kuma maqan', 'lacag la sugayo', 'la qaabilo'
+      ],
       confidence: 0
     },
     // Supplier queries
     suppliers: {
-      keywords: ['supplier', 'vendor', 'provider', 'supplier debt', 'payable'],
+      keywords: [
+        'supplier', 'vendor', 'provider', 'supplier debt', 'payable',
+        'dhaqdhaqaaq', 'iibiyaha', 'bixinta', 'deynka dhaqdhaqaaqa',
+        'dhaqdhaqaaqaaga', 'dhaqdhaqaaqayga', 'deynkaaga', 'deynkayga',
+        'alaab-qeybiye', 'alaab-qeybiyaha', 'bixinta', 'daynka alaab-qeybiye',
+        'alaab-qeybiye-kaaga', 'alaab-qeybiye-kayga',
+        'lacagta daynta kuma maqan', 'daynta kuma maqan', 'lacag la bixinayo'
+      ],
       confidence: 0
     },
     // Analytics queries
     analytics: {
-      keywords: ['trend', 'analysis', 'compare', 'growth', 'performance', 'metric', 'kpi', 'insight'],
+      keywords: [
+        'trend', 'analysis', 'compare', 'growth', 'performance', 'metric', 'kpi', 'insight',
+        'horumar', 'falcelinta', 'isma la', 'koritaanka', 'waxqabadka', 'tilmaamaha',
+        'horumarka', 'koritaanka', 'waxqabadkaaga', 'waxqabadkayga',
+        'isbeddel', 'falanqayn', 'is barbar dhig', 'isma la', 'koritaanka', 'waxqabad', 'tilmaamaha',
+        'jihada socdka', 'jihadaha', 'koboc', 'horumar', 'cabbir', 'kpi', 'tilmaame muhiim ah', 
+        'faham', 'aragti ganacsi'
+      ],
       confidence: 0
     },
     // Report queries
     reports: {
-      keywords: ['report', 'summary', 'overview', 'dashboard', 'export', 'statement'],
+      keywords: [
+        'report', 'summary', 'overview', 'dashboard', 'export', 'statement',
+        'warbixinta', 'soo koobay', 'guud', 'dashboard', 'dhoofinta', 'bayaanka',
+        'warbixintayda', 'warbixintaaga', 'soo koobinta', 'bayaankaaga',
+        'warbixin', 'soo koobid', 'guudmar', 'jaantus xogeed', 'dhoofin', 'bayaanka', 'xisaab celin'
+      ],
       confidence: 0
     }
   };
@@ -71,7 +127,9 @@ function analyzeQueryIntent(message) {
       if (content.includes(keyword)) {
         // Give higher score for exact matches and context
         const contextBonus = content.includes(`${keyword} report`) || 
-                           content.includes(`${keyword} analysis`) ? 0.2 : 0;
+                           content.includes(`${keyword} analysis`) || 
+                           content.includes(`${keyword} warbixinta`) || 
+                           content.includes(`${keyword} falcelinta`) ? 0.2 : 0;
         return score + 1 + contextBonus;
       }
       return score;
@@ -94,17 +152,17 @@ function extractTimeContext(content) {
   const contentLower = content.toLowerCase();
   
   const timePatterns = {
-    today: ['today', 'this day'],
-    yesterday: ['yesterday'],
-    thisWeek: ['this week', 'current week'],
-    lastWeek: ['last week', 'previous week'],
-    thisMonth: ['this month', 'current month'],
-    lastMonth: ['last month', 'previous month'],
-    thisQuarter: ['this quarter', 'current quarter', 'q1', 'q2', 'q3', 'q4'],
-    thisYear: ['this year', 'current year', '2024', '2025'],
-    lastYear: ['last year', 'previous year'],
-    ytd: ['year to date', 'ytd'],
-    mtd: ['month to date', 'mtd']
+    today: ['today', 'this day', 'maanta', 'maantadan'],
+    yesterday: ['yesterday', 'shalay', 'shalaydan'],
+    thisWeek: ['this week', 'current week', 'usbuucan', 'usbuucan hadda'],
+    lastWeek: ['last week', 'previous week', 'usbuucii hore', 'usbuucii la soo dhaafay'],
+    thisMonth: ['this month', 'current month', 'bishaan', 'bisha hadda'],
+    lastMonth: ['last month', 'previous month', 'bisha la soo dhaafay', 'bisha hore'],
+    thisQuarter: ['this quarter', 'current quarter', 'rubaca'],
+    thisYear: ['this year', 'current year', '2024', '2025', 'sanan hadda'],
+    lastYear: ['last year', 'previous year', 'sanan hore'],
+    ytd: ['year to date', 'ytd', 'sanadkan ilaa hadda'],
+    mtd: ['month to date', 'mtd', 'bishan ilaa hadda']
   };
 
   for (const [period, patterns] of Object.entries(timePatterns)) {
