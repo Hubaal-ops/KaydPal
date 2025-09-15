@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styles from './Stores.module.css';
 import { 
   Plus, 
@@ -6,13 +6,16 @@ import {
   Edit, 
   Trash2, 
   ArrowLeft,
-  Search
+  Search,
+  Upload,
+  Download
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { getStores, getStore, createStore, updateStore, deleteStore } from '../services/storeService';
+import { getStores, getStore, createStore, updateStore, deleteStore, importStores, downloadTemplate } from '../services/storeService';
 
 const Stores = ({ onBack }) => {
   const navigate = useNavigate();
+  const fileInputRef = useRef(null);
   const [viewMode, setViewMode] = useState('table'); // 'table' or 'form'
   const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -139,11 +142,70 @@ const Stores = ({ onBack }) => {
     }));
   };
 
-  const filteredStores = stores.filter(store =>
-    store.store_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    store.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    store.manager.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const handleImportClick = () => {
+    fileInputRef.current.click();
+  };
+
+  const handleDownloadTemplate = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      // Call the download template API
+      const response = await downloadTemplate();
+      
+      if (response.success) {
+        setSuccess('Template downloaded successfully!');
+      }
+    } catch (error) {
+      console.error('Error downloading template:', error);
+      setError('Failed to download template. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Check if file is Excel
+    const validTypes = [
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/csv'
+    ];
+    
+    if (!validTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls|csv)$/i)) {
+      setError('Please upload a valid Excel file (.xlsx, .xls) or CSV file.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const result = await importStores(file);
+      setSuccess(result.message);
+      // Refresh the stores list
+      await fetchStores();
+    } catch (error) {
+      setError(error.response?.data?.message || 'Error importing stores');
+    } finally {
+      setLoading(false);
+      // Reset file input
+      e.target.value = '';
+    }
+  };
+
+  const filteredStores = stores.filter(store => {
+    return (
+      store.store_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      store.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (store.manager && store.manager.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+  });
 
   return (
     <div className={styles.stores}>
@@ -173,6 +235,28 @@ const Stores = ({ onBack }) => {
             <Plus size={20} />
             Add New Store
           </button>
+          <button 
+            className={styles['action-btn']}
+            onClick={handleImportClick}
+            disabled={loading}
+          >
+            <Upload size={20} />
+            Import Excel
+          </button>
+          <button 
+            className={styles['action-btn']}
+            onClick={handleDownloadTemplate}
+          >
+            <Download size={20} />
+            Download Template
+          </button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept=".xlsx,.xls,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+            style={{ display: 'none' }}
+          />
         </div>
 
         {/* Error and Success Messages */}
@@ -205,7 +289,8 @@ const Stores = ({ onBack }) => {
                 <table className={styles.table}>
                   <thead>
                     <tr>
-                      <th>Name</th>
+                      <th>ID</th>
+                      <th>Store Name</th>
                       <th>Location</th>
                       <th>Manager</th>
                       <th>Total Items</th>
@@ -216,17 +301,26 @@ const Stores = ({ onBack }) => {
                   <tbody>
                     {filteredStores.map((store) => (
                       <tr key={store._id}>
+                        <td>{store.store_no}</td>
                         <td>{store.store_name}</td>
                         <td>{store.location}</td>
                         <td>{store.manager}</td>
                         <td>{store.total_items}</td>
-                        <td>{store.created_at ? new Date(store.created_at).toLocaleDateString() : ''}</td>
+                        <td>{new Date(store.created_at).toLocaleDateString()}</td>
                         <td>
                           <div className={styles['action-icons']}>
-                            <button onClick={() => handleEdit(store)} className={styles['icon-btn']} title="Edit">
+                            <button
+                              onClick={() => handleEdit(store)}
+                              className={styles['icon-btn']}
+                              title="Edit"
+                            >
                               <Edit size={16} />
                             </button>
-                            <button onClick={() => handleDelete(store._id)} className={`${styles['icon-btn']} ${styles.delete}`} title="Delete">
+                            <button
+                              onClick={() => handleDelete(store._id)}
+                              className={`${styles['icon-btn']} ${styles.delete}`}
+                              title="Delete"
+                            >
                               <Trash2 size={16} />
                             </button>
                           </div>
@@ -308,4 +402,4 @@ const Stores = ({ onBack }) => {
   );
 };
 
-export default Stores; 
+export default Stores;

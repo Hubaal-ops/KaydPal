@@ -2,16 +2,33 @@ const express = require('express');
 const app = express();
 const reportsRoutes = require('./routes/reports');
 app.use('/api/reports', reportsRoutes);
-// Remove these two lines
-// const aiRoutes = require('./routes/ai');
-// app.use('/api/ai', aiRoutes);
- const passwordRoutes = require('./routes/password');
+const passwordRoutes = require('./routes/password');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const morgan = require('morgan');
+const multer = require('multer');
 require('dotenv').config({ path: './config.env' });
+
+// Configure multer for file uploads
+const storage = multer.memoryStorage();
+const upload = multer({ 
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/vnd.ms-excel' || 
+        file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+        file.mimetype === 'text/csv' ||
+        file.originalname.match(/\.(xlsx|xls|csv)$/i)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only Excel and CSV files are allowed.'));
+    }
+  }
+});
 
 // Force MongoDB URI to use Inventory database
 process.env.MONGODB_URI = 'mongodb://127.0.0.1:27017/Inventory';
@@ -44,7 +61,6 @@ const salesReturnsRoutes = require('./routes/salesReturns');
 const invoiceRoutes = require('./routes/invoices');
 const systemSettingsRoutes = require('./routes/systemSettings');
 const businessRoutes = require('./routes/business');
-
 
 // Security middleware
 app.use(helmet());
@@ -113,7 +129,6 @@ const connectDB = async () => {
 // Connect to database
 connectDB();
 
-
 // API Routes
 app.use('/api/auth', authRoutes);
 // Register password reset routes after all other /api/auth routes
@@ -133,7 +148,11 @@ app.use('/api/ai', aiRoutes);
 // Notifications route (admin only)
 const notificationsRoutes = require('./routes/notifications');
 app.use('/api/protected/admin/notifications', notificationsRoutes);
+
+// Apply multer middleware specifically to the categories import route
+app.use('/api/categories/import', upload.single('file'));
 app.use('/api/categories', categoryRoutes);
+
 app.use('/api/products', productRoutes);
 app.use('/api/accounts', accountRoutes);
 app.use('/api/deposits', depositRoutes);
@@ -231,6 +250,16 @@ app.get('/api', (req, res) => {
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Error:', err.stack);
+  
+  // Handle multer errors
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({
+        success: false,
+        message: 'File size too large. Maximum file size is 5MB.'
+      });
+    }
+  }
   
   res.status(err.status || 500).json({
     success: false,

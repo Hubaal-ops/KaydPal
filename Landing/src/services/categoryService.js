@@ -5,7 +5,6 @@ const apiRequest = async (endpoint, options = {}) => {
   const token = localStorage.getItem('token');
   const response = await fetch(`${API_URL}${endpoint}`, {
     headers: {
-      'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },
@@ -55,6 +54,9 @@ export const createCategory = async (categoryData) => {
   try {
     const data = await apiRequest('/', {
       method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify(categoryData),
     });
     return data.data;
@@ -69,6 +71,9 @@ export const updateCategory = async (id, categoryData) => {
   try {
     const data = await apiRequest(`/${id}`, {
       method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify(categoryData),
     });
     return data.data;
@@ -91,10 +96,41 @@ export const deleteCategory = async (id) => {
   }
 };
 
+// Import categories from Excel file
+export const importCategories = async (file) => {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const token = localStorage.getItem('token');
+    const response = await fetch('/api/categories/import', {
+      method: 'POST',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const error = new Error(errorData.message || 'Request failed');
+      error.status = response.status;
+      throw error;
+    }
+    
+    const data = await response.json();
+    return data.data;
+  } catch (error) {
+    console.error('Error importing categories:', error);
+    throw error;
+  }
+};
+
 export default {
   getCategories,
   getCategory,
   createCategory,
   updateCategory,
-  deleteCategory
+  deleteCategory,
+  importCategories
 };

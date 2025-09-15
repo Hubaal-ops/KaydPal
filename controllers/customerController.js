@@ -1,5 +1,6 @@
 const Customer = require('../models/Customer');
 const getNextSequence = require('../getNextSequence');
+const XLSX = require('xlsx');
 
 async function insertCustomer(customerData) {
   // Generate customer_no using counter
@@ -74,10 +75,90 @@ async function deleteCustomer(customer_no, userId) {
   return { message: 'Customer deleted successfully' };
 }
 
+// Import customers from Excel file
+async function importCustomers(file, userId) {
+  try {
+    // Read the Excel file from buffer
+    const workbook = XLSX.read(file.buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    
+    // Convert to JSON
+    const jsonData = XLSX.utils.sheet_to_json(worksheet);
+    
+    if (!jsonData || jsonData.length === 0) {
+      return { success: false, message: 'No data found in the Excel file.' };
+    }
+    
+    let importedCount = 0;
+    let skippedCount = 0;
+    let errors = [];
+    
+    // Process each row
+    for (const [index, row] of jsonData.entries()) {
+      try {
+        // Extract customer data (supporting different column names)
+        const name = row.name || row.Name || row.Customer || row.customer || '';
+        const email = row.email || row.Email || '';
+        const phone = row.phone || row.Phone || row.Telephone || row.Tel || '';
+        const address = row.address || row.Address || '';
+        const balance = parseFloat(row.balance || row.Balance || row.bal || row.Bal || 0) || 0;
+        
+        if (!name || name.trim() === '') {
+          skippedCount++;
+          errors.push(`Row ${index + 1}: Missing customer name`);
+          continue;
+        }
+        
+        // Check if customer already exists by name or email
+        const existingCustomer = await Customer.findOne({
+          $or: [
+            { name: name.trim(), userId },
+            { email: email.trim(), userId, email: { $ne: '' } }
+          ]
+        });
+        
+        if (existingCustomer) {
+          skippedCount++;
+          errors.push(`Row ${index + 1}: Customer "${name}" already exists`);
+          continue;
+        }
+        
+        // Insert new customer
+        await insertCustomer({
+          name: name.trim(),
+          email: email ? email.trim() : '',
+          phone: phone ? phone.toString().trim() : '',
+          address: address ? address.trim() : '',
+          bal: balance,
+          userId
+        });
+        
+        importedCount++;
+      } catch (error) {
+        skippedCount++;
+        errors.push(`Row ${index + 1}: ${error.message}`);
+      }
+    }
+    
+    return {
+      success: true,
+      message: `✅ Import completed. ${importedCount} customers imported, ${skippedCount} skipped.`,
+      imported: importedCount,
+      skipped: skippedCount,
+      errors: errors
+    };
+  } catch (error) {
+    console.error('Import error:', error);
+    return { success: false, message: `Failed to process Excel file: ${error.message}` };
+  }
+}
+
 module.exports = {
   insertCustomer,
   getCustomerBalance,
   getAllCustomers,
   updateCustomer,
-  deleteCustomer
+  deleteCustomer,
+  importCustomers  // Add this line to export the import function
 };

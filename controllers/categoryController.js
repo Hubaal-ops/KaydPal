@@ -121,10 +121,96 @@ async function deleteCategory(category_id) {
   };
 }
 
+async function importCategories(file, options) {
+  const XLSX = require('xlsx');
+  const db = await connectDB();
+  const categories = db.collection('categories');
+  const userId = options.userId;
+  
+  if (!userId) {
+    throw new Error('userId is required for multi-tenancy.');
+  }
+  
+  try {
+    // Read the Excel file from buffer
+    const workbook = XLSX.read(file.buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    
+    // Convert to JSON
+    const jsonData = XLSX.utils.sheet_to_json(worksheet);
+    
+    if (!jsonData || jsonData.length === 0) {
+      throw new Error('No data found in the Excel file.');
+    }
+    
+    let importedCount = 0;
+    let skippedCount = 0;
+    let errors = [];
+    
+    // Process each row
+    for (const [index, row] of jsonData.entries()) {
+      try {
+        // Extract category data (supporting different column names)
+        const categoryName = row.category_name || row.CategoryName || row.name || row.Name || row['Category Name'];
+        const description = row.description || row.Description || row.desc || row.Desc || '';
+        
+        if (!categoryName || categoryName.trim() === '') {
+          skippedCount++;
+          errors.push(`Row ${index + 1}: Missing category name`);
+          continue;
+        }
+        
+        // Check if category already exists
+        const existingCategory = await categories.findOne({ 
+          category_name: categoryName.trim(),
+          userId: userId
+        });
+        
+        if (existingCategory) {
+          skippedCount++;
+          errors.push(`Row ${index + 1}: Category "${categoryName}" already exists`);
+          continue;
+        }
+        
+        // Generate category_id using counter
+        const category_id = await getNextSequence('category_id');
+        if (!category_id) {
+          throw new Error("Failed to get a valid category ID.");
+        }
+        
+        const newCategory = {
+          category_id,
+          category_name: categoryName.trim(),
+          description: description || '',
+          created_at: new Date(),
+          userId: userId
+        };
+        
+        await categories.insertOne(newCategory);
+        importedCount++;
+      } catch (error) {
+        skippedCount++;
+        errors.push(`Row ${index + 1}: ${error.message}`);
+      }
+    }
+    
+    return {
+      message: `✅ Import completed. ${importedCount} categories imported, ${skippedCount} skipped.`,
+      imported: importedCount,
+      skipped: skippedCount,
+      errors: errors
+    };
+  } catch (error) {
+    throw new Error(`Failed to process Excel file: ${error.message}`);
+  }
+}
+
 module.exports = {
   insertCategory,
   getAllCategories,
   getCategoryById,
   updateCategory,
-  deleteCategory
-}; 
+  deleteCategory,
+  importCategories
+};
