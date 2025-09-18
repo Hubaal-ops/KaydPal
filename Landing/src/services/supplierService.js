@@ -46,6 +46,29 @@ export async function updateSupplier(supplier_no, supplier) {
   return await res.json();
 }
 
+export async function importSuppliers(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await fetch(`${API_BASE}/import`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: formData
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || 'Failed to import suppliers');
+  }
+  return await res.json();
+}
+
+export async function downloadSupplierTemplate() {
+  const res = await fetch(`${API_BASE}/import/template`, {
+    headers: getAuthHeaders()
+  });
+  if (!res.ok) throw new Error('Failed to download template');
+  return await res.blob();
+}
+
 export async function deleteSupplier(supplier_no) {
   const res = await fetch(`${API_BASE}/${supplier_no}`, {
     method: 'DELETE',

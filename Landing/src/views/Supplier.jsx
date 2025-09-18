@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styles from './Supplier.module.css';
 import { Plus, Eye, Edit, Trash2, ArrowLeft, Search } from 'lucide-react';
-import { getSuppliers, addSupplier, updateSupplier, deleteSupplier } from '../services/supplierService';
+import { getSuppliers, addSupplier, updateSupplier, deleteSupplier, importSuppliers, downloadSupplierTemplate } from '../services/supplierService';
 
 const Supplier = ({ onBack }) => {
+  const fileInputRef = useRef(null);
   const [viewMode, setViewMode] = useState('table');
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -155,6 +156,65 @@ const Supplier = ({ onBack }) => {
           >
             <Plus size={20} />
             Add New Supplier
+          </button>
+          <button
+            className={styles['action-btn']}
+            onClick={() => fileInputRef.current && fileInputRef.current.click()}
+          >
+            &#8681; Import Suppliers
+          </button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={async (e) => {
+              const file = e.target.files[0];
+              if (!file) return;
+              setError('');
+              setSuccess('');
+              setLoading(true);
+              try {
+                const result = await importSuppliers(file);
+                if (result.success) {
+                  setSuccess(result.data.message);
+                  if (result.data.errors && result.data.errors.length > 0) {
+                    setError(result.data.errors.join('\n'));
+                  }
+                  fetchSuppliers();
+                } else {
+                  setError(result.message || 'Import failed');
+                }
+              } catch (err) {
+                setError(err.message || 'Import failed');
+              } finally {
+                setLoading(false);
+                e.target.value = '';
+              }
+            }}
+            accept=".xlsx,.xls,.csv"
+            style={{ display: 'none' }}
+          />
+          <button
+            className={styles['action-btn']}
+            onClick={async () => {
+              try {
+                setError('');
+                setSuccess('');
+                const blob = await downloadSupplierTemplate();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'supplier_import_template.xlsx';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                a.remove();
+                setSuccess('Template downloaded');
+              } catch (err) {
+                setError('Failed to download template');
+              }
+            }}
+          >
+            Download Template
           </button>
         </div>
         {error && <div className={styles.error}>{error}</div>}

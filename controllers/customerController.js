@@ -110,17 +110,16 @@ async function importCustomers(file, userId) {
           continue;
         }
         
-        // Check if customer already exists by name or email
+        // Check if customer already exists by name and phone
         const existingCustomer = await Customer.findOne({
-          $or: [
-            { name: name.trim(), userId },
-            { email: email.trim(), userId, email: { $ne: '' } }
-          ]
+          name: name.trim(),
+          phone: phone ? phone.toString().trim() : '',
+          userId
         });
         
         if (existingCustomer) {
           skippedCount++;
-          errors.push(`Row ${index + 1}: Customer "${name}" already exists`);
+          errors.push(`Row ${index + 1}: Customer with same name and phone already exists`);
           continue;
         }
         
