@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styles from './Categories.module.css';
 import { Plus, Eye, Edit, Trash2, ArrowLeft, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -7,10 +7,14 @@ import {
   getAccountById,
   createAccount,
   updateAccount,
-  deleteAccount
+  deleteAccount,
+  exportAccountsToExcel,
+  importAccountsFromExcel,
+  downloadAccountTemplate
 } from '../services/accountService';
 
 const Account = ({ onBack }) => {
+  const fileInputRef = useRef(null);
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState('table');
   const [accounts, setAccounts] = useState([]);
@@ -139,6 +143,89 @@ const Account = ({ onBack }) => {
     }));
   };
 
+  const handleImport = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    // Check file type
+    const validTypes = [
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/csv',
+      'application/csv'
+    ];
+    
+    const fileExt = file.name.split('.').pop().toLowerCase();
+    const isValidType = validTypes.includes(file.type) || 
+                       ['.xls', '.xlsx', '.csv'].includes(`.${fileExt}`);
+    
+    if (!isValidType) {
+      setError('Invalid file type. Please upload an Excel (.xls, .xlsx) or CSV file.');
+      e.target.value = ''; // Reset file input
+      return;
+    }
+    
+    // Check file size (5MB limit)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      setError('File is too large. Maximum size is 5MB.');
+      e.target.value = ''; // Reset file input
+      return;
+    }
+    
+    setError('');
+    setSuccess('');
+    setLoading(true);
+    
+    try {
+      const result = await importAccountsFromExcel(file);
+      if (result.success) {
+        setSuccess('Accounts imported successfully');
+        if (result.data?.errors?.length > 0) {
+          setError(`Some accounts could not be imported: ${result.data.errors.join(', ')}`);
+        }
+        fetchAccounts();
+      } else {
+        setError(result.message || 'Import failed');
+      }
+    } catch (err) {
+      setError(err.message || 'Error importing accounts. Please check the file format and try again.');
+    } finally {
+      setLoading(false);
+      e.target.value = ''; // Reset file input
+    }
+  };
+
+  const handleExport = async () => {
+    setError('');
+    setSuccess('');
+    setLoading(true);
+    
+    try {
+      await exportAccountsToExcel();
+      setSuccess('Accounts exported successfully');
+    } catch (err) {
+      setError(err.message || 'Error exporting accounts');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDownloadTemplate = async () => {
+    setError('');
+    setSuccess('');
+    setLoading(true);
+    
+    try {
+      await downloadAccountTemplate();
+      setSuccess('Template downloaded successfully');
+    } catch (err) {
+      setError(err.message || 'Error downloading template');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filteredAccounts = accounts.filter(account =>
     account.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (account.bank && account.bank.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -169,6 +256,34 @@ const Account = ({ onBack }) => {
           >
             <Plus size={20} />
             Add New Account
+          </button>
+          <button
+            className={styles['action-btn']}
+            onClick={() => fileInputRef.current && fileInputRef.current.click()}
+            disabled={loading}
+          >
+            📥 Import Accounts
+          </button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImport}
+            accept=".xlsx,.xls"
+            style={{ display: 'none' }}
+          />
+          <button
+            className={styles['action-btn']}
+            onClick={handleExport}
+            disabled={loading || accounts.length === 0}
+          >
+            📤 Export Accounts
+          </button>
+          <button
+            className={styles['action-btn']}
+            onClick={handleDownloadTemplate}
+            disabled={loading}
+          >
+            📋 Download Template
           </button>
         </div>
         {error && <div className={styles.error}>{error}</div>}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styles from './Categories.module.css';
-import { Plus, Eye, Edit, Trash2, ArrowLeft, Search } from 'lucide-react';
+import { Plus, Eye, Edit, Trash2, ArrowLeft, Search, Download, Upload, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
   getDeposits,
@@ -25,6 +25,8 @@ const Deposit = ({ onBack }) => {
   const [editingDeposit, setEditingDeposit] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const fileInputRef = React.createRef(null);
 
   // Fetch deposits and accounts from backend
   const fetchDeposits = async () => {
@@ -159,6 +161,190 @@ const Deposit = ({ onBack }) => {
     );
   });
 
+  // Handle template download
+  const handleDownloadTemplate = async () => {
+    setError('');
+    setSuccess('');
+    setIsProcessing(true);
+    
+    try {
+      // Call the API to download the template
+      const response = await fetch('/api/deposits/import/template', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        },
+        credentials: 'include' // Ensure cookies are sent with the request
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to download template');
+      }
+      
+      // Get the filename from the content-disposition header or use a default name
+      const contentDisposition = response.headers.get('content-disposition');
+      let filename = 'deposit_import_template.xlsx';
+      
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/['"]/g, '');
+        }
+      }
+      
+      // Create a blob from the response
+      const blob = await response.blob();
+      
+      // Check if the blob is not empty
+      if (blob.size === 0) {
+        throw new Error('Received empty template file');
+      }
+      
+      // Create a download link and trigger the download
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      
+      // Clean up
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      setSuccess('Template downloaded successfully');
+    } catch (err) {
+      const errorMessage = err.message || 'Failed to download template';
+      setError(errorMessage);
+      console.error('Download error:', errorMessage, err);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleFileImport = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setIsProcessing(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      console.log('Starting import of file:', file.name, file);
+      
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      console.log('Sending import request...');
+      const response = await fetch('/api/deposits/import', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        credentials: 'include',
+        body: formData
+      });
+      
+      console.log('Received response, status:', response.status);
+      let result;
+      try {
+        result = await response.json();
+        console.log('Response data:', result);
+      } catch (jsonError) {
+        console.error('Failed to parse JSON response:', jsonError);
+        throw new Error('Invalid response from server');
+      }
+      
+      if (!response.ok) {
+        console.error('Import failed:', result);
+        throw new Error(result.message || `Server responded with status ${response.status}`);
+      }
+      
+      // First, check if we have a successful response with data
+      if (result.success === true && result.data) {
+        const importedCount = result.data.importedCount || 0;
+        const errorCount = result.data.errors?.length || 0;
+        
+        console.log(`Import result - Success: ${result.success}, Imported: ${importedCount}, Errors: ${errorCount}`);
+        
+        // Always refresh the deposits list to ensure UI is in sync with the server
+        await fetchDeposits();
+        
+        if (importedCount > 0) {
+          // Force a state update to ensure UI reflects the changes
+          setDeposits(prev => [...prev]);
+          setSuccess(`Successfully imported ${importedCount} deposit(s)`);
+          return; // Exit early on success
+        } else if (errorCount > 0) {
+          setError(`Import completed with ${errorCount} error(s). No valid deposits were imported.`);
+          if (result.data.errors) {
+            console.error('Detailed import errors:', result.data.errors);
+          }
+        } else {
+          // If we get here, the import was successful but no records were imported
+          console.warn('Import successful but no records were imported. Response:', result);
+          setError('No valid deposits found in the file. Please check the file format and try again.');
+        }
+      } else {
+        console.error('Unexpected response format:', result);
+        throw new Error(result.message || 'Invalid response format from server');
+      }
+    } catch (err) {
+      setError('Error importing file: ' + (err.message || 'Unknown error'));
+      console.error('Import error:', err);
+    } finally {
+      setIsProcessing(false);
+      // Reset file input to allow re-uploading the same file
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleExport = async () => {
+    setError('');
+    setSuccess('');
+    setIsProcessing(true);
+    
+    try {
+      const response = await fetch('/api/deposits/export', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to export deposits');
+      }
+      
+      // Create a blob from the response
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      
+      // Create a temporary link and trigger download
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `deposits_export_${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      
+      // Clean up
+      window.URL.revokeObjectURL(url);
+      a.remove();
+      
+      setSuccess(`Exported ${deposits.length} deposits successfully`);
+    } catch (err) {
+      setError('Failed to export deposits: ' + (err.message || 'Unknown error'));
+      console.error('Export error:', err);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return (
     <div className={styles.categories}>
       <div className={styles['categories-header']}>
@@ -171,20 +357,57 @@ const Deposit = ({ onBack }) => {
       </div>
       <div className={styles['categories-content']}>
         <div className={styles['action-buttons']}>
-          <button
-            className={`${styles['action-btn']} ${viewMode === 'table' ? styles.active : ''}`}
-            onClick={handleViewTable}
-          >
-            <Eye size={20} />
-            View Table
-          </button>
-          <button
-            className={`${styles['action-btn']} ${viewMode === 'form' ? styles.active : ''}`}
-            onClick={handleAddNew}
-          >
-            <Plus size={20} />
-            Add New Deposit
-          </button>
+          <div className={styles['left-buttons']}>
+            <button
+              className={`${styles['action-btn']} ${viewMode === 'table' ? styles.active : ''}`}
+              onClick={handleViewTable}
+            >
+              <Eye size={20} />
+              View Table
+            </button>
+            <button
+              className={`${styles['action-btn']} ${viewMode === 'form' ? styles.active : ''}`}
+              onClick={handleAddNew}
+            >
+              <Plus size={20} />
+              Add New Deposit
+            </button>
+          </div>
+          <div className={styles['import-export-buttons']}>
+            <button
+              className={styles['action-btn']}
+              onClick={handleDownloadTemplate}
+              disabled={isProcessing}
+            >
+              <FileText size={16} />
+              Template
+            </button>
+            <div className={styles.divider}></div>
+            <label className={styles['action-btn']}>
+              {isProcessing ? (
+                <span className={styles['loading-spinner']}></span>
+              ) : (
+                <Upload size={16} />
+              )}
+              Import
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileImport}
+                accept=".xlsx, .xls"
+                disabled={isProcessing}
+                style={{ display: 'none' }}
+              />
+            </label>
+            <button
+              className={styles['action-btn']}
+              onClick={handleExport}
+              disabled={isProcessing || deposits.length === 0}
+            >
+              <Download size={16} />
+              Export
+            </button>
+          </div>
         </div>
         {error && <div className={styles.error}>{error}</div>}
         {success && <div className={styles.success}>{success}</div>}
