@@ -205,7 +205,7 @@
 .action-icons {
   display: flex;
   gap: 0.5rem;
-  align-items: center;
+  justify-content: center;
 }
 
 .icon-btn {
@@ -288,6 +288,149 @@
   font-weight: 500;
   color: var(--text-primary);
   font-size: 0.9rem;
+}
+
+/* Import Results Styles */
+.importResults {
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  transition: all 0.3s ease;
+}
+
+.importSummary {
+  margin-bottom: 1.5rem;
+}
+
+.importSummary h4 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 1rem 0;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.importStats {
+  display: flex;
+  gap: 2rem;
+  margin: 1.25rem 0;
+  flex-wrap: wrap;
+}
+
+.statItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 80px;
+}
+
+.statValue {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 0.25rem;
+}
+
+.statLabel {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 500;
+}
+
+.importMessage {
+  background: rgba(66, 165, 245, 0.1);
+  border-left: 4px solid #42a5f5;
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  margin-top: 1rem;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.importErrors {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.importErrors h5 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 1rem 0;
+}
+
+.errorList {
+  max-height: 200px;
+  overflow-y: auto;
+  background: rgba(244, 67, 54, 0.05);
+  border-radius: 6px;
+  padding: 0.75rem;
+  border: 1px solid rgba(244, 67, 54, 0.2);
+}
+
+.errorItem {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+  color: #f44336;
+}
+
+.errorItem:last-child {
+  margin-bottom: 0;
+}
+
+.errorBullet {
+  margin-right: 0.5rem;
+  font-weight: bold;
+  line-height: 1.4;
+}
+
+.errorText {
+  flex: 1;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.importSuccess {
+  display: flex;
+  align-items: center;
+  margin-top: 1.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(76, 175, 80, 0.1);
+  border-radius: 6px;
+  color: #2e7d32;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.successIcon {
+  font-size: 1.25rem;
+  margin-right: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .importStats {
+    gap: 1.5rem;
+  }
+  
+  .statItem {
+    min-width: 70px;
+  }
+  
+  .statValue {
+    font-size: 1.5rem;
+  }
 }
 
 .form-input,

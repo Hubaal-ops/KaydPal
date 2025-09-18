@@ -1,17 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styles from './Stores.module.css';
-import { Plus, Eye, Edit, Trash2, ArrowLeft, Search } from 'lucide-react';
+import { Plus, Eye, Edit, Trash2, ArrowLeft, Search, Download, Upload } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
   getExpenseCategories,
   getExpenseCategoryById,
   createExpenseCategory,
   updateExpenseCategory,
-  deleteExpenseCategory
+  deleteExpenseCategory,
+  exportCategoriesToExcel,
+  importCategoriesFromExcel,
+  downloadImportTemplate
 } from '../services/expenseCategoryService';
 
 const ExpenseCategory = ({ onBack }) => {
   const navigate = useNavigate();
+  const fileInputRef = useRef(null);
   const [viewMode, setViewMode] = useState('table');
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -23,6 +27,7 @@ const ExpenseCategory = ({ onBack }) => {
   const [editingCategory, setEditingCategory] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [importResults, setImportResults] = useState(null);
 
   // Fetch categories from backend
   const fetchCategories = async () => {
@@ -131,6 +136,112 @@ const ExpenseCategory = ({ onBack }) => {
     }));
   };
 
+  const handleExport = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      setSuccess('');
+      setImportResults(null);
+      
+      console.log('Starting export...');
+      const result = await exportCategoriesToExcel();
+      
+      setSuccess(result.message || 'Export completed successfully');
+      console.log('Export successful:', result);
+    } catch (err) {
+      console.error('Export failed:', err);
+      
+      // Handle structured error objects
+      const errorMessage = err.errors && err.errors.length > 0
+        ? `${err.message}: ${err.errors.join(', ')}`
+        : err.message || 'Failed to export categories';
+      
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+      setLoading(true);
+      setError('');
+      setSuccess('');
+      setImportResults(null);
+      
+      console.log('Starting import...', file);
+      const result = await importCategoriesFromExcel(file);
+      
+      console.log('Import result:', result);
+      
+      // Update UI with import results
+      setImportResults(result);
+      setSuccess(result.message || 'Import completed successfully');
+      
+      // Refresh the categories list if any were imported
+      if (result.imported > 0) {
+        fetchCategories();
+      }
+    } catch (err) {
+      console.error('Import failed:', err);
+      
+      // Handle structured error objects
+      const errorMessage = err.errors && err.errors.length > 0
+        ? `${err.message}: ${JSON.stringify(err.errors)}`
+        : err.message || 'Failed to import categories';
+      
+      setError(errorMessage);
+      
+      // Still show partial results if available
+      if (err.imported !== undefined || err.skipped !== undefined) {
+        setImportResults({
+          imported: err.imported || 0,
+          skipped: err.skipped || 0,
+          errors: err.errors || []
+        });
+      }
+    } finally {
+      setLoading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleDownloadTemplate = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      setSuccess('');
+      
+      console.log('Downloading template...');
+      await downloadImportTemplate();
+      
+      setSuccess('Template downloaded successfully');
+      console.log('Template download successful');
+    } catch (err) {
+      console.error('Template download failed:', err);
+      
+      const errorMessage = err.message || 'Failed to download template';
+      setError(errorMessage);
+      
+      // Show more detailed error if available
+      if (err.response) {
+        console.error('Server response:', err.response);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filteredCategories = categories.filter(cat =>
     cat.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (cat.description || '').toLowerCase().includes(searchTerm.toLowerCase())
@@ -148,17 +259,119 @@ const ExpenseCategory = ({ onBack }) => {
       </div>
       <div className={styles['stores-content']}>
         <div className={styles['action-buttons']}>
-          <button className={`${styles['action-btn']} ${viewMode === 'table' ? styles.active : ''}`} onClick={handleViewTable}>
+          <button
+            className={`${styles['action-btn']} ${viewMode === 'table' ? styles.active : ''}`}
+            onClick={handleViewTable}
+          >
             <Eye size={20} />
             View Table
           </button>
-          <button className={`${styles['action-btn']} ${viewMode === 'form' ? styles.active : ''}`} onClick={handleAddNew}>
+          <button
+            className={styles['action-btn']}
+            onClick={handleExport}
+            disabled={loading}
+          >
+            <Download size={20} />
+            Export to Excel
+          </button>
+          <button
+            className={styles['action-btn']}
+            onClick={handleImportClick}
+            disabled={loading}
+          >
+            <Upload size={20} />
+            Import from Excel
+          </button>
+          <button
+            className={styles['action-btn']}
+            onClick={handleDownloadTemplate}
+          >
+            Download Template
+          </button>
+          <button
+            className={`${styles['action-btn']} ${viewMode === 'form' ? styles.active : ''}`}
+            onClick={handleAddNew}
+          >
             <Plus size={20} />
             Add New Category
           </button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept=".xlsx,.xls,.csv"
+            style={{ display: 'none' }}
+          />
         </div>
         {error && <div className={styles.error}>{error}</div>}
         {success && <div className={styles.success}>{success}</div>}
+        {importResults && (
+          <div className={styles.importResults}>
+            <div className={styles.importSummary}>
+              <h4>Import Results</h4>
+              <div className={styles.importStats}>
+                {importResults.imported > 0 && (
+                  <div className={styles.statItem}>
+                    <span className={styles.statValue} style={{ color: '#4caf50' }}>
+                      {importResults.imported}
+                    </span>
+                    <span className={styles.statLabel}>Imported</span>
+                  </div>
+                )}
+                {importResults.skipped > 0 && (
+                  <div className={styles.statItem}>
+                    <span className={styles.statValue} style={{ color: '#ff9800' }}>
+                      {importResults.skipped}
+                    </span>
+                    <span className={styles.statLabel}>Skipped</span>
+                  </div>
+                )}
+                {importResults.errors && importResults.errors.length > 0 && (
+                  <div className={styles.statItem}>
+                    <span className={styles.statValue} style={{ color: '#f44336' }}>
+                      {importResults.errors.length}
+                    </span>
+                    <span className={styles.statLabel}>Errors</span>
+                  </div>
+                )}
+              </div>
+              
+              {importResults.message && (
+                <div className={styles.importMessage}>
+                  {importResults.message}
+                </div>
+              )}
+            </div>
+
+            {importResults.errors && importResults.errors.length > 0 && (
+              <div className={styles.importErrors}>
+                <h5>Error Details:</h5>
+                <div className={styles.errorList}>
+                  {importResults.errors.map((error, index) => {
+                    // Handle both string errors and error objects
+                    const errorText = typeof error === 'string' 
+                      ? error 
+                      : error.message || JSON.stringify(error);
+                    
+                    return (
+                      <div key={index} className={styles.errorItem}>
+                        <span className={styles.errorBullet}>•</span>
+                        <span className={styles.errorText}>{errorText}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            
+            {importResults.imported > 0 && (
+              <div className={styles.importSuccess}>
+                <span className={styles.successIcon}>✓</span>
+                <span>Refresh the page to see the updated categories</span>
+              </div>
+            )}
+          </div>
+        )}
         {viewMode === 'table' && (
           <div className={styles['table-container']}>
             <div className={styles['table-header']}>
