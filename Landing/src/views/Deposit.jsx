@@ -356,58 +356,53 @@ const Deposit = ({ onBack }) => {
         <p>Manage account deposits</p>
       </div>
       <div className={styles['categories-content']}>
-        <div className={styles['action-buttons']}>
-          <div className={styles['left-buttons']}>
-            <button
-              className={`${styles['action-btn']} ${viewMode === 'table' ? styles.active : ''}`}
-              onClick={handleViewTable}
-            >
-              <Eye size={20} />
-              View Table
-            </button>
-            <button
-              className={`${styles['action-btn']} ${viewMode === 'form' ? styles.active : ''}`}
-              onClick={handleAddNew}
-            >
-              <Plus size={20} />
-              Add New Deposit
-            </button>
-          </div>
-          <div className={styles['import-export-buttons']}>
-            <button
-              className={styles['action-btn']}
-              onClick={handleDownloadTemplate}
-              disabled={isProcessing}
-            >
-              <FileText size={16} />
-              Template
-            </button>
-            <div className={styles.divider}></div>
-            <label className={styles['action-btn']}>
-              {isProcessing ? (
-                <span className={styles['loading-spinner']}></span>
-              ) : (
-                <Upload size={16} />
-              )}
-              Import
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileImport}
-                accept=".xlsx, .xls"
-                disabled={isProcessing}
-                style={{ display: 'none' }}
-              />
-            </label>
-            <button
-              className={styles['action-btn']}
-              onClick={handleExport}
-              disabled={isProcessing || deposits.length === 0}
-            >
-              <Download size={16} />
-              Export
-            </button>
-          </div>
+        <div className={styles['action-buttons']} style={{ marginTop: '1.5rem', justifyContent: 'center' }}>
+          <button
+            className={`${styles['action-btn']} ${viewMode === 'table' ? styles.active : ''}`}
+            onClick={handleViewTable}
+          >
+            <Eye size={20} />
+            View Table
+          </button>
+          <button
+            className={`${styles['action-btn']} ${viewMode === 'form' ? styles.active : ''}`}
+            onClick={handleAddNew}
+          >
+            <Plus size={20} />
+            Add New Deposit
+          </button>
+          <button
+            className={styles['action-btn']}
+            onClick={handleDownloadTemplate}
+            disabled={isProcessing}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download Template
+          </button>
+          <button
+            className={styles['action-btn']}
+            onClick={() => fileInputRef.current && fileInputRef.current.click()}
+            disabled={isProcessing}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 14 12 9 7 14"/><line x1="12" y1="9" x2="12" y2="21"/></svg>
+            Import from Excel
+          </button>
+          <button
+            className={styles['action-btn']}
+            onClick={handleExport}
+            disabled={isProcessing || deposits.length === 0}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export to Excel
+          </button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileImport}
+            accept=".xlsx,.xls"
+            disabled={isProcessing}
+            style={{ display: 'none' }}
+          />
         </div>
         {error && <div className={styles.error}>{error}</div>}
         {success && <div className={styles.success}>{success}</div>}

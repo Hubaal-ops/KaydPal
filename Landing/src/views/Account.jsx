@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import styles from './Categories.module.css';
+import styles from './Stores.module.css';
 import { Plus, Eye, Edit, Trash2, ArrowLeft, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -233,16 +233,16 @@ const Account = ({ onBack }) => {
 
   return (
     <div className={styles.categories}>
-      <div className={styles['categories-header']}>
+  <div className={styles['categories-header']} style={{ textAlign: 'center', marginTop: '2.5rem', marginBottom: '2.5rem', color: 'var(--text-primary)', position: 'relative', width: '100%', maxWidth: '1200px', marginLeft: 'auto', marginRight: 'auto' }}>
         <button className={styles['back-button']} onClick={handleBackClick}>
           <ArrowLeft size={20} />
           Back to Financial
         </button>
-        <h1>Accounts Management</h1>
-        <p>Manage business accounts</p>
+        <h1 style={{ fontSize: '2.5rem', fontWeight: 700, marginBottom: '0.5rem', textShadow: '0 2px 4px rgba(0, 0, 0, 0.05)' }}>Accounts Management</h1>
+        <p style={{ fontSize: '1rem', fontWeight: 400, opacity: 0.9 }}>Manage business accounts</p>
       </div>
       <div className={styles['categories-content']}>
-        <div className={styles['action-buttons']}>
+        <div className={styles['action-buttons']} style={{ marginTop: '1.5rem', justifyContent: 'center' }}>
           <button
             className={`${styles['action-btn']} ${viewMode === 'table' ? styles.active : ''}`}
             onClick={handleViewTable}
@@ -251,45 +251,47 @@ const Account = ({ onBack }) => {
             View Table
           </button>
           <button
-            className={`${styles['action-btn']} ${viewMode === 'form' ? styles.active : ''}`}
-            onClick={handleAddNew}
+            className={styles['action-btn']}
+            onClick={handleExport}
+            disabled={loading || accounts.length === 0}
           >
-            <Plus size={20} />
-            Add New Account
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export to Excel
           </button>
           <button
             className={styles['action-btn']}
             onClick={() => fileInputRef.current && fileInputRef.current.click()}
             disabled={loading}
           >
-            📥 Import Accounts
-          </button>
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleImport}
-            accept=".xlsx,.xls"
-            style={{ display: 'none' }}
-          />
-          <button
-            className={styles['action-btn']}
-            onClick={handleExport}
-            disabled={loading || accounts.length === 0}
-          >
-            📤 Export Accounts
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 14 12 9 7 14"/><line x1="12" y1="9" x2="12" y2="21"/></svg>
+            Import from Excel
           </button>
           <button
             className={styles['action-btn']}
             onClick={handleDownloadTemplate}
             disabled={loading}
           >
-            📋 Download Template
+            Download Template
           </button>
+          <button
+            className={`${styles['action-btn']} ${viewMode === 'form' ? styles.active : ''}`}
+            onClick={handleAddNew}
+          >
+            <Plus size={20} />
+            Add New Account
+          </button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImport}
+            accept=".xlsx,.xls,.csv"
+            style={{ display: 'none' }}
+          />
         </div>
         {error && <div className={styles.error}>{error}</div>}
         {success && <div className={styles.success}>{success}</div>}
         {viewMode === 'table' && (
-          <div className={styles['table-container']}>
+          <div className={styles['table-container']} style={{ paddingLeft: '2rem', paddingRight: '2rem' }}>
             <div className={styles['table-header']}>
               <div className={styles['search-container']}>
                 <Search size={20} />

@@ -214,35 +214,43 @@ const Categories = ({ onBack }) => {
 
       <div className={styles['categories-content']}>
         {/* Action Buttons */}
-        <div className={styles['action-buttons']}>
-          <button 
+        <div className={styles['action-buttons']} style={{ marginTop: '1.5rem', justifyContent: 'center' }}>
+          <button
             className={`${styles['action-btn']} ${viewMode === 'table' ? styles.active : ''}`}
             onClick={handleViewTable}
           >
             <Eye size={20} />
             View Table
           </button>
-          <button 
+          <button
+            className={styles['action-btn']}
+            onClick={() => {/* TODO: implement export logic */}}
+            disabled={loading}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export to Excel
+          </button>
+          <button
+            className={styles['action-btn']}
+            onClick={handleImportClick}
+            disabled={loading}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 14 12 9 7 14"/><line x1="12" y1="9" x2="12" y2="21"/></svg>
+            Import from Excel
+          </button>
+          <button
+            className={styles['action-btn']}
+            onClick={handleDownloadTemplate}
+            disabled={loading}
+          >
+            Download Template
+          </button>
+          <button
             className={`${styles['action-btn']} ${viewMode === 'form' ? styles.active : ''}`}
             onClick={handleAddNew}
           >
             <Plus size={20} />
             Add New Category
-          </button>
-          <button 
-            className={styles['action-btn']}
-            onClick={handleImportClick}
-            disabled={loading}
-          >
-            <Upload size={20} />
-            Import Excel
-          </button>
-          <button 
-            className={styles['action-btn']}
-            onClick={handleDownloadTemplate}
-          >
-            <Download size={20} />
-            Download Template
           </button>
           <input
             type="file"

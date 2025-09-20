@@ -67,30 +67,28 @@
   display: flex;
   gap: 1rem;
   margin-bottom: 2rem;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  align-items: center;
+  justify-content: center;
 }
 
 .action-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  background-color: #4a90e2;
-  color: white;
-  border: none;
-  border-radius: 4px;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-weight: 500;
   cursor: pointer;
-  font-size: 14px;
-  transition: background-color 0.2s;
-  white-space: nowrap;
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow);
 }
 
 .action-btn:hover {
-  background: #3a7bc8;
+  background: var(--surface-hover);
+  border-color: var(--border-hover);
   transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .action-btn:disabled {
