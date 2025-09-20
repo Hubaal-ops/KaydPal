@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import styles from './Stores.module.css';
-import { Plus, Eye, Edit, Trash2, ArrowLeft, Search } from 'lucide-react';
+import { Plus, Eye, Edit, Trash2, ArrowLeft, Search, Download, Upload, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
   getTransfers,
   getTransferById,
   createTransfer,
   updateTransfer,
-  deleteTransfer
+  deleteTransfer,
+  importTransfers,
+  exportTransfers,
+  downloadTransferTemplate
 } from '../services/transferService';
 import { getAccounts } from '../services/accountService';
 
@@ -27,6 +30,8 @@ const Transfer = ({ onBack }) => {
   const [editingTransfer, setEditingTransfer] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const fileInputRef = React.createRef(null);
 
   // Fetch transfers and accounts from backend
   const fetchTransfers = async () => {
@@ -162,18 +167,87 @@ const Transfer = ({ onBack }) => {
   };
 
   const filteredTransfers = transfers.filter(transfer => {
-    const fromName = transfer.from_account?.name || '';
-    const toName = transfer.to_account?.name || '';
-    const fromBank = transfer.from_account?.bank || '';
-    const toBank = transfer.to_account?.bank || '';
+    if (!searchTerm) return true;
+    
+    const searchLower = searchTerm.toLowerCase();
+    const fromName = transfer.from_account?.name?.toLowerCase() || '';
+    const toName = transfer.to_account?.name?.toLowerCase() || '';
+    const fromBank = transfer.from_account?.bank?.toLowerCase() || '';
+    const toBank = transfer.to_account?.bank?.toLowerCase() || '';
+    const description = (transfer.description || '').toLowerCase();
+    const amount = transfer.amount?.toString() || '';
+    const transferId = transfer.transfer_id?.toString().toLowerCase() || '';
+    
     return (
-      fromName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      toName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      fromBank.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      toBank.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (transfer.description || '').toLowerCase().includes(searchTerm.toLowerCase())
+      fromName.includes(searchLower) ||
+      toName.includes(searchLower) ||
+      fromBank.includes(searchLower) ||
+      toBank.includes(searchLower) ||
+      description.includes(searchLower) ||
+      amount.includes(searchLower) ||
+      transferId.includes(searchLower) ||
+      (transfer.transfer_date && new Date(transfer.transfer_date).toLocaleDateString().includes(searchLower))
     );
   });
+
+  // Handle template download
+  const handleDownloadTemplate = async () => {
+    setError('');
+    setSuccess('');
+    setIsProcessing(true);
+    
+    try {
+      await downloadTransferTemplate();
+      setSuccess('Template downloaded successfully');
+    } catch (err) {
+      setError('Error downloading template: ' + (err.message || 'Unknown error'));
+      console.error('Download error:', err);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Handle file import
+  const handleFileImport = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setIsProcessing(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      await importTransfers(file);
+      setSuccess('Transfers imported successfully');
+      fetchTransfers(); // Refresh the transfers list
+    } catch (err) {
+      setError('Error importing file: ' + (err.message || 'Unknown error'));
+      console.error('Import error:', err);
+    } finally {
+      setIsProcessing(false);
+      // Reset file input to allow re-uploading the same file
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  // Handle export
+  const handleExport = async (format = 'xlsx') => {
+    setError('');
+    setSuccess('');
+    setIsProcessing(true);
+    
+    try {
+      await exportTransfers(format);
+      setSuccess(`Transfers exported successfully as ${format.toUpperCase()}`);
+    } catch (err) {
+      setError('Error exporting transfers: ' + (err.message || 'Unknown error'));
+      console.error('Export error:', err);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   return (
     <div className={styles.stores}>
@@ -214,6 +288,47 @@ const Transfer = ({ onBack }) => {
               <div className={styles['table-info']}>
                 {filteredTransfers.length} transfers found
               </div>
+              <div className={styles.buttonGroup}>
+                <button 
+                  onClick={() => fileInputRef.current?.click()} 
+                  className={`${styles.iconButton} ${styles.importButton}`}
+                  disabled={isProcessing}
+                  title="Import transfers"
+                >
+                  <Upload size={16} />
+                  <span>Import</span>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    style={{ display: 'none' }}
+                    accept=".xlsx,.xls,.csv"
+                    onChange={handleFileImport}
+                  />
+                </button>
+                <button 
+                  onClick={handleDownloadTemplate} 
+                  className={`${styles.iconButton} ${styles.templateButton}`}
+                  disabled={isProcessing}
+                  title="Download import template"
+                >
+                  <FileText size={16} />
+                  <span>Template</span>
+                </button>
+                <div className={styles.dropdown}>
+                  <button 
+                    className={`${styles.iconButton} ${styles.exportButton}`}
+                    disabled={isProcessing}
+                    title="Export transfers"
+                  >
+                    <Download size={16} />
+                    <span>Export</span>
+                  </button>
+                  <div className={styles.dropdownContent}>
+                    <button onClick={() => handleExport('xlsx')}>Export as XLSX</button>
+                    <button onClick={() => handleExport('csv')}>Export as CSV</button>
+                  </div>
+                </div>
+              </div>
             </div>
             {loading ? (
               <div className={styles.loading}>Loading transfers...</div>
@@ -224,9 +339,7 @@ const Transfer = ({ onBack }) => {
                     <tr>
                       <th>ID</th>
                       <th>From Account</th>
-                      <th>From Bank</th>
                       <th>To Account</th>
-                      <th>To Bank</th>
                       <th>Amount</th>
                       <th>Description</th>
                       <th>Date</th>
@@ -237,20 +350,40 @@ const Transfer = ({ onBack }) => {
                     {filteredTransfers.map((transfer) => (
                       <tr key={transfer._id}>
                         <td>{transfer.transfer_id}</td>
-                        <td>{transfer.from_account?.name || ''}</td>
-                        <td>{transfer.from_account?.bank || ''}</td>
-                        <td>{transfer.to_account?.name || ''}</td>
-                        <td>{transfer.to_account?.bank || ''}</td>
-                        <td>{transfer.amount}</td>
-                        <td>{transfer.description}</td>
+                        <td>
+                          <div className={styles['account-cell']}>
+                            <div className={styles['account-name']}>{transfer.from_account?.name || 'N/A'}</div>
+                            {transfer.from_account?.bank && (
+                              <div className={styles['account-bank']}>{transfer.from_account.bank}</div>
+                            )}
+                          </div>
+                        </td>
+                        <td>
+                          <div className={styles['account-cell']}>
+                            <div className={styles['account-name']}>{transfer.to_account?.name || 'N/A'}</div>
+                            {transfer.to_account?.bank && (
+                              <div className={styles['account-bank']}>{transfer.to_account.bank}</div>
+                            )}
+                          </div>
+                        </td>
+                        <td>{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(transfer.amount)}</td>
+                        <td className={styles['description-cell']}>{transfer.description || '-'}</td>
                         <td>{transfer.transfer_date ? new Date(transfer.transfer_date).toLocaleDateString() : ''}</td>
                         <td>
                           <div className={styles['action-icons']}>
-                            <button className={styles['icon-btn']} onClick={() => handleEdit(transfer)}>
-                              <Edit size={18} />
+                            <button 
+                              className={styles['icon-btn']} 
+                              onClick={() => handleEdit(transfer)}
+                              title="Edit transfer"
+                            >
+                              <Edit size={16} />
                             </button>
-                            <button className={`${styles['icon-btn']} ${styles.delete}`} onClick={() => handleDelete(transfer._id)}>
-                              <Trash2 size={18} />
+                            <button 
+                              className={`${styles['icon-btn']} ${styles.delete}`} 
+                              onClick={() => handleDelete(transfer._id)}
+                              title="Delete transfer"
+                            >
+                              <Trash2 size={16} />
                             </button>
                           </div>
                         </td>

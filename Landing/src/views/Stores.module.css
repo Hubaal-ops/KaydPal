@@ -68,6 +68,7 @@
   gap: 1rem;
   margin-bottom: 2rem;
   justify-content: center;
+  flex-wrap: wrap;
 }
 
 .action-btn {
@@ -95,6 +96,173 @@
   background: var(--primary-color);
   border-color: var(--primary-color);
   color: white;
+}
+
+/* Button group for import/export actions */
+.buttonGroup {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+/* Base button style */
+.iconButton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+  background: var(--surface);
+  color: var(--text-primary);
+}
+
+.iconButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.iconButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+/* Import button */
+.importButton {
+  border-color: var(--success-color);
+  color: var(--success-color);
+}
+
+.importButton:hover:not(:disabled) {
+  background: rgba(var(--success-rgb), 0.1);
+}
+
+/* Template button */
+.templateButton {
+  border-color: var(--info-color);
+  color: var(--info-color);
+}
+
+.templateButton:hover:not(:disabled) {
+  background: rgba(var(--info-rgb), 0.1);
+}
+
+/* Export button */
+.exportButton {
+  border-color: var(--warning-color);
+  color: var(--warning-color);
+}
+
+.exportButton:hover:not(:disabled) {
+  background: rgba(var(--warning-rgb), 0.1);
+}
+
+/* Dropdown styles */
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.dropdownContent {
+  display: none;
+  position: absolute;
+  right: 0;
+  background-color: var(--surface);
+  min-width: 160px;
+  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+  z-index: 1;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.dropdown:hover .dropdownContent {
+  display: block;
+}
+
+.dropdownContent button {
+  width: 100%;
+  text-align: left;
+  padding: 0.75rem 1rem;
+  border: none;
+  background: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s;
+}
+
+.dropdownContent button:hover {
+  background-color: var(--surface-hover);
+}
+
+/* Table header adjustments */
+.table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+/* Search container */
+.search-container {
+  display: flex;
+  align-items: center;
+  background: var(--surface);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  flex: 1;
+  max-width: 300px;
+}
+
+.search-input {
+  border: none;
+  background: transparent;
+  margin-left: 0.5rem;
+  width: 100%;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.search-input:focus {
+  outline: none;
+}
+
+/* Table info text */
+.table-info {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin: 0 1rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .buttonGroup {
+    width: 100%;
+    justify-content: flex-start;
+    margin-top: 1rem;
+  }
+  
+  .search-container {
+    max-width: 100%;
+    order: -1;
+  }
+  
+  .table-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .table-info {
+    margin: 0.5rem 0;
+  }
 }
 
 .error {
@@ -190,16 +358,85 @@
   font-weight: 600;
   color: var(--text-primary);
   border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  position: relative;
+}
+
+.table th:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1px;
+  height: 60%;
+  background: var(--border);
 }
 
 .table td {
-  padding: 1rem;
+  padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--border);
   color: var(--text-primary);
+  vertical-align: middle;
 }
 
 .table tr:hover {
   background: var(--surface-hover);
+}
+
+/* Account cell styles */
+.account-cell {
+  display: flex;
+  flex-direction: column;
+  min-width: 150px;
+}
+
+.account-name {
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.account-bank {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  opacity: 0.8;
+}
+
+.description-cell {
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Make ID column more compact */
+.table td:first-child {
+  width: 80px;
+  font-family: 'Roboto Mono', monospace;
+  font-size: 0.85em;
+  color: var(--text-secondary);
+}
+
+/* Style amount column */
+.table td:nth-child(4) {
+  font-family: 'Roboto Mono', monospace;
+  font-weight: 500;
+  text-align: right;
+  padding-right: 1.5rem;
+}
+
+/* Style date column */
+.table td:nth-child(6) {
+  white-space: nowrap;
+  color: var(--text-secondary);
+  font-size: 0.9em;
+}
+
+/* Actions column */
+.table td:last-child {
+  width: 100px;
+  text-align: center;
 }
 
 .action-icons {
