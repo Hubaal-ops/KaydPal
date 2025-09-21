@@ -31,16 +31,29 @@ function generateProfitLossStatement(sales, purchases, expenses) {
     const amount = expense.amount || 0;
     totalOperatingExpenses += amount;
     
-    const category = (expense.category || '').toLowerCase();
-    if (category.includes('salary') || category.includes('wage')) {
+    // Ensure category is a string before calling toLowerCase
+    let category = '';
+    if (typeof expense.category === 'string') {
+      category = expense.category;
+    } else if (typeof expense.category === 'object' && expense.category !== null) {
+      // Handle case where category might be an object (e.g., { name: 'Salary' })
+      category = expense.category.name || expense.category.title || JSON.stringify(expense.category);
+    } else if (expense.category !== null && expense.category !== undefined) {
+      category = String(expense.category);
+    }
+    
+    // Convert to lowercase for comparison
+    const categoryLower = category.toLowerCase();
+    
+    if (categoryLower.includes('salary') || categoryLower.includes('wage')) {
       operatingExpenses.salaries += amount;
-    } else if (category.includes('rent') || category.includes('lease')) {
+    } else if (categoryLower.includes('rent') || categoryLower.includes('lease')) {
       operatingExpenses.rent += amount;
-    } else if (category.includes('utility') || category.includes('electric') || category.includes('water')) {
+    } else if (categoryLower.includes('utility') || categoryLower.includes('electric') || categoryLower.includes('water')) {
       operatingExpenses.utilities += amount;
-    } else if (category.includes('marketing') || category.includes('advertising')) {
+    } else if (categoryLower.includes('marketing') || categoryLower.includes('advertising')) {
       operatingExpenses.marketing += amount;
-    } else if (category.includes('admin') || category.includes('office')) {
+    } else if (categoryLower.includes('admin') || categoryLower.includes('office')) {
       operatingExpenses.administrative += amount;
     } else {
       operatingExpenses.other += amount;
@@ -462,11 +475,11 @@ function calculateFinancialSummary(sales, purchases, expenses, deposits, withdra
 }
 
 // Helper function to group financial data by time periods
-function groupFinancialDataByTime(sales, purchases, expenses, groupBy) {
+function groupFinancialDataByTime(sales, purchases, expenses, deposits = [], withdrawals = [], groupBy) {
   const groupedData = new Map();
   
   const processTransaction = (transaction, type, amount) => {
-    const date = new Date(transaction.sel_date || transaction.created_at || transaction.expense_date);
+    const date = new Date(transaction.sel_date || transaction.created_at || transaction.expense_date || transaction.deposit_date || transaction.withdrawal_date);
     let key;
     
     switch (groupBy) {
@@ -509,6 +522,10 @@ function groupFinancialDataByTime(sales, purchases, expenses, groupBy) {
   sales.forEach(sale => processTransaction(sale, 'revenue', sale.amount || 0));
   expenses.forEach(expense => processTransaction(expense, 'expenses', expense.amount || 0));
   purchases.forEach(purchase => processTransaction(purchase, 'purchases', purchase.amount || 0));
+  
+  // Add deposits and withdrawals to the grouping
+  deposits.forEach(deposit => processTransaction(deposit, 'revenue', deposit.amount || 0));
+  withdrawals.forEach(withdrawal => processTransaction(withdrawal, 'expenses', withdrawal.amount || 0));
 
   return Array.from(groupedData.values()).map(group => ({
     ...group,
@@ -523,7 +540,15 @@ function calculateCategoryBreakdown(sales, purchases, expenses) {
   const expensesByCategory = new Map();
 
   sales.forEach(sale => {
-    const category = sale.category || 'Sales';
+    let category = 'Sales';
+    if (typeof sale.category === 'string') {
+      category = sale.category;
+    } else if (typeof sale.category === 'object' && sale.category !== null) {
+      category = sale.category.name || sale.category.title || JSON.stringify(sale.category);
+    } else if (sale.category !== null && sale.category !== undefined) {
+      category = String(sale.category);
+    }
+    
     if (!revenueByCategory.has(category)) {
       revenueByCategory.set(category, 0);
     }
@@ -531,7 +556,15 @@ function calculateCategoryBreakdown(sales, purchases, expenses) {
   });
 
   expenses.forEach(expense => {
-    const category = expense.category || 'General';
+    let category = 'General';
+    if (typeof expense.category === 'string') {
+      category = expense.category;
+    } else if (typeof expense.category === 'object' && expense.category !== null) {
+      category = expense.category.name || expense.category.title || JSON.stringify(expense.category);
+    } else if (expense.category !== null && expense.category !== undefined) {
+      category = String(expense.category);
+    }
+    
     if (!expensesByCategory.has(category)) {
       expensesByCategory.set(category, 0);
     }
@@ -614,15 +647,23 @@ async function calculateFinancialComparisonMetrics(baseFilter, currentStart, cur
   const previousStart = new Date(currentStart.getTime() - timeDiff);
   const previousEnd = new Date(currentEnd.getTime() - timeDiff);
   
+  // Add userId filter to both current and previous filters
+  const currentFilter = { ...baseFilter };
   const previousFilter = {
     ...baseFilter,
     created_at: { $gte: previousStart, $lte: previousEnd }
   };
 
+  // Ensure userId is included in filters
+  if (userId) {
+    currentFilter.userId = userId;
+    previousFilter.userId = userId;
+  }
+
   const [currentSales, previousSales, currentExpenses, previousExpenses] = await Promise.all([
-    Sale.find(baseFilter).lean(),
+    Sale.find(currentFilter).lean(),
     Sale.find(previousFilter).lean(),
-    Expense.find(baseFilter).lean(),
+    Expense.find(currentFilter).lean(),
     Expense.find(previousFilter).lean()
   ]);
 
@@ -683,24 +724,24 @@ function compileAllTransactions(sales, purchases, expenses, deposits, withdrawal
 
   deposits.forEach(deposit => {
     transactions.push({
-      date: deposit.created_at,
+      date: deposit.deposit_date || deposit.created_at,
       type: 'income',
       category: 'Deposits',
-      description: `Deposit #${deposit._id}`,
+      description: `Deposit #${deposit.deposit_id || deposit._id}`,
       amount: deposit.amount || 0,
-      account: deposit.account_id || 'Default',
+      account: deposit.account || 'Default',
       running_balance: 0
     });
   });
 
   withdrawals.forEach(withdrawal => {
     transactions.push({
-      date: withdrawal.created_at,
+      date: withdrawal.withdrawal_date || withdrawal.created_at,
       type: 'expense',
       category: 'Withdrawals',
-      description: `Withdrawal #${withdrawal._id}`,
+      description: `Withdrawal #${withdrawal.withdrawal_id || withdrawal._id}`,
       amount: withdrawal.amount || 0,
-      account: withdrawal.account_id || 'Default',
+      account: withdrawal.account || 'Default',
       running_balance: 0
     });
   });

@@ -9,6 +9,11 @@ const Expense = require('../models/Expense');
 const Account = require('../models/Account');
 const StoreProduct = require('../models/StoreProduct');
 const SystemSetting = require('../models/SystemSetting');
+const Deposit = require('../models/Deposit');
+const Withdrawal = require('../models/Withdrawal');
+const Payment = require('../models/Payment');
+const PaymentOut = require('../models/PaymentOut');
+const Invoice = require('../models/Invoice');
 const { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subDays, subWeeks, subMonths, subYears, startOfDay, endOfDay } = require('date-fns');
 const {
   generateProfitLossStatement,
@@ -238,6 +243,7 @@ exports.generateAdvancedFinancialReport = async (req, res) => {
     const PaymentOut = require('../models/PaymentOut');
     const StoreProduct = require('../models/StoreProduct');
     const Product = require('../models/Product');
+    const Customer = require('../models/Customer');
     const SystemSetting = require('../models/SystemSetting');
 
     // Build filters for each data type
@@ -253,6 +259,15 @@ exports.generateAdvancedFinancialReport = async (req, res) => {
     if (start && end) expenseFilter.expense_date = { $gte: start, $lte: end };
     if (userId) expenseFilter.userId = userId;
 
+    // Add date filtering for deposits and withdrawals
+    const depositFilter = {};
+    if (start && end) depositFilter.deposit_date = { $gte: start, $lte: end };
+    if (userId) depositFilter.userId = userId;
+
+    const withdrawalFilter = {};
+    if (start && end) withdrawalFilter.withdrawal_date = { $gte: start, $lte: end };
+    if (userId) withdrawalFilter.userId = userId;
+
     const accountFilter = {};
     if (userId) accountFilter.userId = userId;
 
@@ -262,15 +277,15 @@ exports.generateAdvancedFinancialReport = async (req, res) => {
       Purchase.find(purchaseFilter).lean(),
       Expense.find(expenseFilter).lean(),
       Account.find(accountFilter).lean(),
-      Deposit.find({ userId }).lean(),
-      Withdrawal.find({ userId }).lean(),
+      Deposit.find(depositFilter).lean(),
+      Withdrawal.find(withdrawalFilter).lean(),
       Supplier.find({ userId }).lean(),
       Payment.find({ userId }).lean(),
       PaymentOut.find({ userId }).lean(),
       StoreProduct.find({ userId }).lean(),
       Product.find({ userId }).lean(),
       Customer.find({ userId }).lean(),
-      require('../models/Invoice').find({ userId }).lean().catch(() => []),
+      Invoice.find({ userId }).lean().catch(() => []),
       SystemSetting.find({ key: { $in: ['starting_cash', 'fixed_assets_total', 'long_term_debt', 'owner_initial_capital'] } }).lean()
     ]);
 
@@ -312,7 +327,7 @@ exports.generateAdvancedFinancialReport = async (req, res) => {
     const summary = calculateFinancialSummary(sales, purchases, expenses, deposits, withdrawals);
     
     // Group data for time series analysis
-    const timeSeriesData = groupFinancialDataByTime(sales, purchases, expenses, groupBy);
+    const timeSeriesData = groupFinancialDataByTime(sales, purchases, expenses, deposits, withdrawals, groupBy);
     
     // Calculate financial ratios
     const financialRatios = calculateFinancialRatios(summary, sales, purchases, expenses);
@@ -325,7 +340,7 @@ exports.generateAdvancedFinancialReport = async (req, res) => {
     if (includeComparisons && start && end) {
       try {
         comparisonData = await calculateFinancialComparisonMetrics(
-          { userId },
+          saleFilter,
           start,
           end,
           userId
@@ -2328,202 +2343,7 @@ exports.exportInventoryReport = async (req, res) => {
   }
 };
 
-// Advanced Financial Report with Enterprise Features
-exports.generateAdvancedFinancialReport = async (req, res) => {
-  try {
-    // Get userId from JWT token - check both userId and id fields
-    const userId = req.user.userId || req.user.id;
-    console.log('🔍 JWT payload:', req.user);
-    console.log('🔍 Extracted userId:', userId);
-    
-    const { start, end } = parseDateRange(req.query);
-    const {
-      account_type,
-      category,
-      min_amount,
-      max_amount,
-      groupBy = 'month',
-      includeComparisons = true,
-      includeForecasting = true,
-      reportType = 'comprehensive',
-      sortBy = 'date',
-      sortOrder = 'desc'
-    } = req.query;
-
-    // Build base filter
-    const baseFilter = {};
-    if (userId) baseFilter.userId = userId;
-    if (start && end) baseFilter.created_at = { $gte: start, $lte: end };
-
-    // Get all financial data
-    const [sales, purchases, expenses, accounts, deposits, withdrawals, suppliers, payments, paymentOuts, storeProducts, products, customers, invoices, settingsDocs] = await Promise.all([
-      Sale.find(baseFilter).lean(),
-      Purchase.find(baseFilter).lean(),
-      Expense.find(baseFilter).lean(),
-      Account.find(userId ? { userId } : {}).lean(),
-      require('../models/Deposit').find(baseFilter).lean().catch(() => []),
-      require('../models/Withdrawal').find(baseFilter).lean().catch(() => []),
-      require('../models/Supplier').find(userId ? { userId } : {}).lean().catch(() => []),
-      require('../models/Payment').find(baseFilter).lean().catch(() => []),
-      require('../models/PaymentOut').find(baseFilter).lean().catch(() => []),
-      require('../models/StoreProduct').find(userId ? { userId } : {}).lean().catch(() => []),
-      require('../models/Product').find(userId ? { userId } : {}).lean().catch(() => []),
-      require('../models/Customer').find(userId ? { userId } : {}).lean().catch(() => []),
-      require('../models/Invoice').find(userId ? { userId } : {}).lean().catch(() => []),
-      SystemSetting.find({ key: { $in: ['starting_cash', 'fixed_assets_total', 'long_term_debt', 'owner_initial_capital'] } }).lean()
-    ]);
-
-    const settings = settingsDocs?.reduce((acc, s) => {
-      acc[s.key] = s.value;
-      return acc;
-    }, {}) || {};
-
-    // For inventory, always use all historical purchases/sales up to end date
-    const historicalFilter = { ...(userId ? { userId } : {}), created_at: { $lte: end } };
-    const [allPurchasesToDate, allSalesToDate] = await Promise.all([
-      require('../models/Purchase').find(historicalFilter).lean().catch(() => []),
-      require('../models/Sale').find({ ...(userId ? { userId } : {}), sel_date: { $lte: end } }).lean().catch(() => [])
-    ]);
-
-    // Generate different financial statements based on report type
-    let response = {};
-    
-    if (reportType === 'profit_loss') {
-      const profitLoss = generateProfitLossStatement(sales, purchases, expenses);
-      const balanceSheet = generateBalanceSheet(accounts, sales, purchases, expenses, deposits, withdrawals, suppliers, payments, paymentOuts, storeProducts, products, allPurchasesToDate, allSalesToDate, settings, customers, invoices);
-      const cashFlow = generateCashFlowStatement(sales, purchases, expenses, deposits, withdrawals);
-      const timeSeries = groupFinancialDataByTime(sales, purchases, expenses, groupBy);
-      const summary = calculateFinancialSummary(sales, purchases, expenses, deposits, withdrawals);
-      const financialRatios = calculateFinancialRatios(summary, sales, purchases, expenses);
-      
-      response = {
-        statement_type: 'profit_loss',
-        profit_loss: profitLoss,
-        balance_sheet: balanceSheet,
-        cash_flow: cashFlow,
-        summary,
-        financial_ratios: financialRatios,
-        time_series: timeSeries,
-        metadata: {
-          report_type: reportType,
-          period: { start, end },
-          group_by: groupBy,
-          generated_at: new Date()
-        }
-      };
-    } else if (reportType === 'balance_sheet') {
-      const profitLoss = generateProfitLossStatement(sales, purchases, expenses);
-      const balanceSheet = generateBalanceSheet(accounts, sales, purchases, expenses, deposits, withdrawals, suppliers, payments, paymentOuts, storeProducts, products, allPurchasesToDate, allSalesToDate, settings, customers, invoices);
-      const cashFlow = generateCashFlowStatement(sales, purchases, expenses, deposits, withdrawals);
-      const timeSeries = groupFinancialDataByTime(sales, purchases, expenses, groupBy);
-      const summary = calculateFinancialSummary(sales, purchases, expenses, deposits, withdrawals);
-      const financialRatios = calculateFinancialRatios(summary, sales, purchases, expenses);
-      
-      response = {
-        statement_type: 'balance_sheet',
-        profit_loss: profitLoss,
-        balance_sheet: balanceSheet,
-        cash_flow: cashFlow,
-        summary,
-        financial_ratios: financialRatios,
-        time_series: timeSeries,
-        metadata: {
-          report_type: reportType,
-          period: { start, end },
-          group_by: groupBy,
-          generated_at: new Date()
-        }
-      };
-    } else if (reportType === 'cash_flow') {
-      const profitLoss = generateProfitLossStatement(sales, purchases, expenses);
-      const balanceSheet = generateBalanceSheet(accounts, sales, purchases, expenses, deposits, withdrawals, suppliers, payments, paymentOuts, storeProducts, products, allPurchasesToDate, allSalesToDate, settings, customers, invoices);
-      const cashFlow = generateCashFlowStatement(sales, purchases, expenses, deposits, withdrawals);
-      const timeSeries = groupFinancialDataByTime(sales, purchases, expenses, groupBy);
-      const summary = calculateFinancialSummary(sales, purchases, expenses, deposits, withdrawals);
-      const financialRatios = calculateFinancialRatios(summary, sales, purchases, expenses);
-      
-      response = {
-        statement_type: 'cash_flow',
-        profit_loss: profitLoss,
-        balance_sheet: balanceSheet,
-        cash_flow: cashFlow,
-        summary,
-        financial_ratios: financialRatios,
-        time_series: timeSeries,
-        metadata: {
-          report_type: reportType,
-          period: { start, end },
-          group_by: groupBy,
-          generated_at: new Date()
-        }
-      };
-    } else {
-      // Comprehensive report (default)
-      const profitLoss = generateProfitLossStatement(sales, purchases, expenses);
-      const balanceSheet = generateBalanceSheet(accounts, sales, purchases, expenses, deposits, withdrawals, suppliers, payments, paymentOuts, storeProducts, products, allPurchasesToDate, allSalesToDate, settings, customers, invoices);
-      const cashFlow = generateCashFlowStatement(sales, purchases, expenses, deposits, withdrawals);
-      const timeSeries = groupFinancialDataByTime(sales, purchases, expenses, groupBy);
-      const categoryBreakdown = calculateCategoryBreakdown(sales, purchases, expenses);
-      
-      // Calculate summary first before using it
-      const summary = calculateFinancialSummary(sales, purchases, expenses, deposits, withdrawals);
-      const financialRatios = calculateFinancialRatios(summary, sales, purchases, expenses);
-      
-      let forecasting = null;
-      if (includeForecasting) {
-        forecasting = generateFinancialForecasting(timeSeries);
-      }
-      
-      let comparisons = null;
-      if (includeComparisons && start && end) {
-        comparisons = await calculateFinancialComparisonMetrics(baseFilter, start, end, userId);
-      }
-
-      const transactions = compileAllTransactions(sales, purchases, expenses, deposits, withdrawals);
-
-      response = {
-        statement_type: 'comprehensive',
-        profit_loss: profitLoss,
-        balance_sheet: balanceSheet,
-        cash_flow: cashFlow,
-        summary: {
-          ...summary,
-          revenue_growth: comparisons?.growth?.revenue || 0,
-          expense_growth: comparisons?.growth?.expenses || 0,
-          profit_growth: comparisons?.growth?.profit || 0,
-          cash_flow_growth: comparisons?.growth?.cash_flow || 0
-        },
-        time_series: timeSeries,
-        category_breakdown: categoryBreakdown,
-        financial_ratios: financialRatios,
-        forecasting,
-        transactions: transactions.slice(0, 1000),
-        comparisons,
-        metadata: {
-          report_type: reportType,
-          period: { start, end },
-          group_by: groupBy,
-          generated_at: new Date(),
-          total_transactions: transactions.length
-        }
-      };
-    }
-
-    console.log('✅ Advanced financial report generated successfully');
-    res.json({
-      success: true,
-      data: response
-    });
-
-  } catch (err) {
-    console.error('❌ Error generating advanced financial report:', err);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to generate financial report',
-      error: err.message
-    });
-  }
-};
+// This function has been removed to avoid duplication. The correct implementation is at the beginning of the file.
 
 // Sales Forecasting Endpoint (Simple prediction based on historical data)
 exports.getSalesForecasting = async (req, res) => {
