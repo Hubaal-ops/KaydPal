@@ -39,3 +39,46 @@ export const getStockTransfers = async () => {
     handleApiError(err);
   }
 };
+
+// Export stock transfers to Excel
+export const exportStockTransfers = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/export`, {
+      headers: getAuthHeaders(),
+      responseType: 'blob'
+    });
+    return response.data;
+  } catch (err) {
+    handleApiError(err);
+  }
+};
+
+// Import stock transfers from Excel
+export const importStockTransfers = async (file) => {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await axios.post(`${API_URL}/import`, formData, {
+      headers: {
+        ...getAuthHeaders(),
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+    return response.data;
+  } catch (err) {
+    handleApiError(err);
+  }
+};
+
+// Download template for stock transfers
+export const downloadTemplate = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/template`, {
+      headers: getAuthHeaders(),
+      responseType: 'blob'
+    });
+    return response.data;
+  } catch (err) {
+    handleApiError(err);
+  }
+};

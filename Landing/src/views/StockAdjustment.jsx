@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styles from './Stores.module.css';
-import { Plus, Eye, Edit, Trash2, ArrowLeft, Search } from 'lucide-react';
+import { Plus, Eye, Edit, Trash2, ArrowLeft, Search, Upload, Download, FileSpreadsheet } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { getAllStockAdjustments, addStockAdjustment } from '../services/stockAdjustmentService';
+import { getAllStockAdjustments, addStockAdjustment, exportStockAdjustments, importStockAdjustments, downloadTemplate } from '../services/stockAdjustmentService';
 import { getProducts } from '../services/productService';
 import { getStores } from '../services/storeService';
 
@@ -24,6 +24,8 @@ const StockAdjustment = ({ onBack }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const fileInputRef = useRef(null);
+  const [importResult, setImportResult] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -133,6 +135,74 @@ const StockAdjustment = ({ onBack }) => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // Export stock adjustments to Excel
+  const handleExport = async () => {
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    try {
+      await exportStockAdjustments();
+      setSuccess('Stock adjustments exported successfully!');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Download import template
+  const handleDownloadTemplate = async () => {
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    try {
+      await downloadTemplate();
+      setSuccess('Template downloaded successfully!');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle file selection for import
+  const handleImportClick = () => {
+    fileInputRef.current.click();
+  };
+
+  // Handle file import
+  const handleFileImport = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    setImportResult(null);
+
+    try {
+      const result = await importStockAdjustments(file);
+      setImportResult(result);
+      
+      if (result.success) {
+        setSuccess(`Import completed: ${result.imported} imported, ${result.skipped} skipped`);
+        // Refresh adjustments list
+        const adjs = await getAllStockAdjustments();
+        setAdjustments(adjs);
+      } else {
+        setError(result.error || 'Import failed');
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   // Map product/store numbers to names for display
   const getProductName = (product_no) => {
     const prod = products.find(p => p.product_no === product_no);
@@ -182,9 +252,54 @@ const StockAdjustment = ({ onBack }) => {
             <Plus size={20} />
             Add New Adjustment
           </button>
+          {viewMode === 'table' && (
+            <>
+              <button
+                className={styles['action-btn']}
+                onClick={handleExport}
+                disabled={loading}
+              >
+                <Download size={20} />
+                Export
+              </button>
+              <button
+                className={styles['action-btn']}
+                onClick={handleImportClick}
+                disabled={loading}
+              >
+                <Upload size={20} />
+                Import
+              </button>
+              <button
+                className={styles['action-btn']}
+                onClick={handleDownloadTemplate}
+                disabled={loading}
+              >
+                <FileSpreadsheet size={20} />
+                Template
+              </button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileImport}
+                accept=".xlsx,.xls,.csv"
+                style={{ display: 'none' }}
+              />
+            </>
+          )}
         </div>
         {error && <div className={styles.error}>{error}</div>}
         {success && <div className={styles.success}>{success}</div>}
+        {importResult && importResult.errors && importResult.errors.length > 0 && (
+          <div className={styles['import-errors']}>
+            <h4>Import Errors:</h4>
+            <ul>
+              {importResult.errors.map((err, index) => (
+                <li key={index}>Row {err.row}: {err.message}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         {loading && <div className={styles.loading}>Loading...</div>}
         {viewMode === 'table' && !loading && (
           <div className={styles['table-container']}>
@@ -341,4 +456,4 @@ const StockAdjustment = ({ onBack }) => {
   );
 };
 
-export default StockAdjustment; 
+export default StockAdjustment;

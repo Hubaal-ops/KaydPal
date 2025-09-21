@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styles from './Stores.module.css';
-import { Plus, Eye, Edit, Trash2, ArrowLeft, Search } from 'lucide-react';
+import { Plus, Eye, Edit, Trash2, ArrowLeft, Search, Download, Upload, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getProducts } from '../services/productService';
 import { getStores } from '../services/storeService';
-import { createStockTransfer, getStockTransfers } from '../services/stockTransferService';
+import { createStockTransfer, getStockTransfers, exportStockTransfers, importStockTransfers, downloadTemplate } from '../services/stockTransferService';
 
 const StockTransfer = ({ onBack }) => {
   const navigate = useNavigate();
@@ -24,6 +24,7 @@ const StockTransfer = ({ onBack }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -133,6 +134,71 @@ const StockTransfer = ({ onBack }) => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // Export functionality
+  const handleExport = async () => {
+    try {
+      setLoading(true);
+      const blob = await exportStockTransfers();
+      const url = window.URL.createObjectURL(new Blob([blob]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'stock_transfers.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setSuccess('Stock transfers exported successfully');
+    } catch (err) {
+      setError('Failed to export stock transfers');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Import functionality
+  const handleImportClick = () => {
+    fileInputRef.current.click();
+  };
+
+  const handleImport = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+      setLoading(true);
+      const result = await importStockTransfers(file);
+      setSuccess(`Imported ${result.importedCount} stock transfers successfully. ${result.errors.length > 0 ? `${result.errors.length} errors occurred.` : ''}`);
+      // Refresh the transfers list
+      const transfersData = await getStockTransfers();
+      setTransfers(transfersData);
+    } catch (err) {
+      setError('Failed to import stock transfers: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setLoading(false);
+      // Reset file input
+      e.target.value = '';
+    }
+  };
+
+  // Template download functionality
+  const handleDownloadTemplate = async () => {
+    try {
+      setLoading(true);
+      const blob = await downloadTemplate();
+      const url = window.URL.createObjectURL(new Blob([blob]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'stock_transfer_template.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setSuccess('Template downloaded successfully');
+    } catch (err) {
+      setError('Failed to download template');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Map product/store numbers to names for display
   const getProductName = (product_no) => {
     const prod = products.find(p => p.product_no === product_no);
@@ -171,6 +237,25 @@ const StockTransfer = ({ onBack }) => {
             <Plus size={20} />
             Add New Transfer
           </button>
+          <button className={styles['action-btn']} onClick={handleExport} disabled={loading}>
+            <Download size={20} />
+            Export
+          </button>
+          <button className={styles['action-btn']} onClick={handleImportClick} disabled={loading}>
+            <Upload size={20} />
+            Import
+          </button>
+          <button className={styles['action-btn']} onClick={handleDownloadTemplate} disabled={loading}>
+            <FileText size={20} />
+            Template
+          </button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImport}
+            accept=".xlsx,.xls"
+            style={{ display: 'none' }}
+          />
         </div>
         {error && <div className={styles.error}>{error}</div>}
         {success && <div className={styles.success}>{success}</div>}
@@ -330,4 +415,4 @@ const StockTransfer = ({ onBack }) => {
   );
 };
 
-export default StockTransfer; 
+export default StockTransfer;

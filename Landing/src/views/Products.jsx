@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styles from './Products.module.css';
 import { 
   Plus, 
@@ -7,7 +7,10 @@ import {
   Trash2, 
   ArrowLeft,
   Search,
-  Loader2
+  Loader2,
+  Download,
+  Upload,
+  FileSpreadsheet
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import productService from '../services/productService';
@@ -28,6 +31,8 @@ const Products = ({ onBack }) => {
   const [editingProduct, setEditingProduct] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const fileInputRef = useRef(null);
+  const [importResult, setImportResult] = useState(null);
 
   // Fetch products from API
   const fetchProducts = async () => {
@@ -163,6 +168,73 @@ const Products = ({ onBack }) => {
     }));
   };
 
+  // Export products to Excel
+  const handleExport = async () => {
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    try {
+      await productService.exportProducts();
+      setSuccess('Products exported successfully!');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Download import template
+  const handleDownloadTemplate = async () => {
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    try {
+      await productService.downloadTemplate();
+      setSuccess('Template downloaded successfully!');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle file selection for import
+  const handleImportClick = () => {
+    fileInputRef.current.click();
+  };
+
+  // Handle file import
+  const handleFileImport = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    setImportResult(null);
+
+    try {
+      const result = await productService.importProducts(file);
+      setImportResult(result);
+      
+      if (result.success) {
+        setSuccess(`Import completed: ${result.imported} imported, ${result.skipped} skipped`);
+        // Refresh products list
+        await fetchProducts();
+      } else {
+        setError(result.error || 'Import failed');
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   const filteredProducts = products.filter(product =>
     product.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     product.category.toLowerCase().includes(searchTerm.toLowerCase())
@@ -202,11 +274,56 @@ const Products = ({ onBack }) => {
             <Plus size={20} />
             Add New Product
           </button>
+          {viewMode === 'table' && (
+            <>
+              <button
+                className={styles['action-btn']}
+                onClick={handleExport}
+                disabled={loading}
+              >
+                <Download size={20} />
+                Export
+              </button>
+              <button
+                className={styles['action-btn']}
+                onClick={handleImportClick}
+                disabled={loading}
+              >
+                <Upload size={20} />
+                Import
+              </button>
+              <button
+                className={styles['action-btn']}
+                onClick={handleDownloadTemplate}
+                disabled={loading}
+              >
+                <FileSpreadsheet size={20} />
+                Template
+              </button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileImport}
+                accept=".xlsx,.xls"
+                style={{ display: 'none' }}
+              />
+            </>
+          )}
         </div>
 
         {/* Error and Success Messages */}
         {error && <div className={styles.error}>{error}</div>}
         {success && <div className={styles.success}>{success}</div>}
+        {importResult && importResult.errors && importResult.errors.length > 0 && (
+          <div className={styles['import-errors']}>
+            <h4>Import Errors:</h4>
+            <ul>
+              {importResult.errors.map((err, index) => (
+                <li key={index}>Row {err.row}: {err.message}</li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {/* Table View */}
         {viewMode === 'table' && (
