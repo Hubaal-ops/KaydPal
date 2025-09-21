@@ -7,52 +7,12 @@
   align-items: center;
 }
 
-.header {
-  text-align: center;
-  margin-bottom: 2.5rem;
-  color: var(--text-primary);
-  position: relative;
-  width: 100%;
-  max-width: 900px;
-}
-
-.back-button {
-  position: absolute;
-  left: 0;
-  top: 0;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 0.75rem 1rem;
-  color: var(--text-primary);
-  font-size: 0.9rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: var(--shadow);
-}
-
-.back-button:hover {
-  background: var(--surface-hover);
-  border-color: var(--border-hover);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-lg);
-}
-
-.content {
-  width: 100%;
-  max-width: 900px;
-  margin: 0 auto;
-}
-
-.action-buttons {
+.center-actions {
   display: flex;
   gap: 1rem;
   margin-bottom: 2rem;
-  justify-content: flex-end;
+  justify-content: center;
+  flex-wrap: wrap;
 }
 
 .action-btn {
@@ -68,12 +28,31 @@
   cursor: pointer;
   transition: all 0.2s ease;
   box-shadow: var(--shadow);
+  min-width: 120px;
+  justify-content: center;
 }
 
 .action-btn.active {
   background: var(--primary-color);
   border-color: var(--primary-color);
   color: white;
+}
+
+.action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.content {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.loading {
+  text-align: center;
+  padding: 1rem;
+  color: var(--text-secondary);
 }
 
 .error {
@@ -94,6 +73,30 @@
   border-radius: 8px;
   margin-bottom: 1rem;
   font-weight: 500;
+}
+
+.import-errors {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #ca8a04;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-weight: 500;
+}
+
+.import-errors h4 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+}
+
+.import-errors ul {
+  margin: 0;
+  padding-left: 1.5rem;
+}
+
+.import-errors li {
+  margin-bottom: 0.25rem;
 }
 
 .table-container {
@@ -198,21 +201,21 @@
   height: 32px;
 }
 
-.icon-btn svg {
-  width: 16px;
-  height: 16px;
+.icon-btn:hover {
+  background: rgba(59, 130, 246, 0.1);
 }
 
 .icon-btn.delete {
-  color: #f43f5e;
-}
-
-.icon-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
+  color: #ef4444;
 }
 
 .icon-btn.delete:hover {
-  background: rgba(244, 63, 94, 0.1);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.icon-btn svg {
+  width: 16px;
+  height: 16px;
 }
 
 .no-data {
@@ -231,20 +234,24 @@
   max-width: 900px;
   width: 100%;
   margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
 }
 
-.form-grid {
+.main-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.form {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 1.5rem;
-  width: 100%;
 }
 
 @media (max-width: 768px) {
-  .form-grid {
+  .form {
     grid-template-columns: 1fr;
   }
 }
@@ -285,81 +292,4 @@
   justify-content: flex-end;
   margin-top: 1rem;
   grid-column: 1 / -1;
-  width: 100%;
 }
-
-.top-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  width: 100%;
-  max-width: 1200px;
-  margin: 0 auto 2rem auto;
-  position: relative;
-}
-
-.back-to-main {
-  position: absolute;
-  left: 0;
-  top: 0;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 1rem 1.5rem;
-  color: var(--text-primary);
-  font-size: 1.1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: var(--shadow);
-  z-index: 2;
-}
-
-.back-to-main:hover {
-  background: var(--surface-hover);
-  border-color: var(--border-hover);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-lg);
-}
-
-.title-section {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  margin-top: 0.5rem;
-}
-
-.main-title {
-  font-size: 2.7rem;
-  font-weight: 800;
-  color: var(--text-primary);
-  margin-bottom: 0.5rem;
-  letter-spacing: -1px;
-}
-
-.subtitle {
-  font-size: 1.2rem;
-  color: var(--text-secondary);
-  margin-bottom: 1.5rem;
-  font-weight: 400;
-}
-
-.center-actions {
-  display: flex;
-  justify-content: center;
-  gap: 1.5rem;
-  margin-bottom: 2.5rem;
-}
-
-/* Remove grid from form for single column */
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  width: 100%;
-} 

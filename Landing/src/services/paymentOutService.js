@@ -55,4 +55,86 @@ export async function deletePaymentOut(id) {
   });
   if (!res.ok) throw new Error('Failed to delete payment out');
   return res.json();
-} 
+}
+
+// Export payments out to Excel
+export async function exportPaymentsOut() {
+  try {
+    const res = await fetch(`${API_URL}/export/excel`, {
+      headers: getAuthHeaders()
+    });
+    
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.error || 'Failed to export payments out');
+    }
+    
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `payments_out_export_${new Date().toISOString().split('T')[0]}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    
+    return { success: true, message: 'Payments out exported successfully' };
+  } catch (error) {
+    throw new Error('Export failed: ' + error.message);
+  }
+}
+
+// Import payments out from Excel
+export async function importPaymentsOut(file) {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const res = await fetch(`${API_URL}/import/excel`, {
+      method: 'POST',
+      headers: {
+        'Authorization': getAuthHeaders().Authorization
+        // Note: Don't set Content-Type when sending FormData
+      },
+      body: formData
+    });
+    
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.error || 'Failed to import payments out');
+    }
+    
+    return await res.json();
+  } catch (error) {
+    throw new Error('Import failed: ' + error.message);
+  }
+}
+
+// Download payment out import template
+export async function downloadPaymentOutTemplate() {
+  try {
+    const res = await fetch(`${API_URL}/template/download`, {
+      headers: getAuthHeaders()
+    });
+    
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.error || 'Failed to download template');
+    }
+    
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'payment_out_import_template.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    
+    return { success: true, message: 'Template downloaded successfully' };
+  } catch (error) {
+    throw new Error('Template download failed: ' + error.message);
+  }
+}

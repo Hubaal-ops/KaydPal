@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styles from './payment_out.module.css';
-import { Plus, Eye, Edit, Trash2, ArrowLeft, Search } from 'lucide-react';
-import { getPaymentsOut, createPaymentOut, updatePaymentOut, deletePaymentOut } from '../services/paymentOutService';
+import { Plus, Eye, Edit, Trash2, ArrowLeft, Search, Upload, Download, FileSpreadsheet } from 'lucide-react';
+import { getPaymentsOut, createPaymentOut, updatePaymentOut, deletePaymentOut, exportPaymentsOut, importPaymentsOut, downloadPaymentOutTemplate } from '../services/paymentOutService';
 import { getSuppliers } from '../services/supplierService';
 import { getAccounts } from '../services/accountService';
 
@@ -16,6 +16,8 @@ const PaymentOut = ({ onBack }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const fileInputRef = useRef(null);
+  const [importResult, setImportResult] = useState(null);
 
   // Fetch suppliers, accounts, and payments on mount
   useEffect(() => {
@@ -108,6 +110,74 @@ const PaymentOut = ({ onBack }) => {
     }
   };
 
+  // Export payments out to Excel
+  const handleExport = async () => {
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    try {
+      await exportPaymentsOut();
+      setSuccess('Payments out exported successfully!');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Download import template
+  const handleDownloadTemplate = async () => {
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    try {
+      await downloadPaymentOutTemplate();
+      setSuccess('Template downloaded successfully!');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle file selection for import
+  const handleImportClick = () => {
+    fileInputRef.current.click();
+  };
+
+  // Handle file import
+  const handleFileImport = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    setImportResult(null);
+
+    try {
+      const result = await importPaymentsOut(file);
+      setImportResult(result);
+      
+      if (result.success) {
+        setSuccess(`Import completed: ${result.imported} imported, ${result.skipped} skipped`);
+        // Refresh payments list
+        const pays = await getPaymentsOut();
+        setPayments(pays);
+      } else {
+        setError(result.error || 'Import failed');
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   const filtered = payments.filter(p => {
     const supplier = suppliers.find(s => s.supplier_no === p.supplier_no);
     return supplier && supplier.name && supplier.name.toLowerCase().includes(search.toLowerCase());
@@ -130,11 +200,56 @@ const PaymentOut = ({ onBack }) => {
           <Plus size={20} />
           Add New Payment Out
         </button>
+        {viewMode === 'table' && (
+          <>
+            <button
+              className={styles['action-btn']}
+              onClick={handleExport}
+              disabled={loading}
+            >
+              <Download size={20} />
+              Export
+            </button>
+            <button
+              className={styles['action-btn']}
+              onClick={handleImportClick}
+              disabled={loading}
+            >
+              <Upload size={20} />
+              Import
+            </button>
+            <button
+              className={styles['action-btn']}
+              onClick={handleDownloadTemplate}
+              disabled={loading}
+            >
+              <FileSpreadsheet size={20} />
+              Template
+            </button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileImport}
+              accept=".xlsx,.xls,.csv"
+              style={{ display: 'none' }}
+            />
+          </>
+        )}
       </div>
       <div className={styles['content']}>
         {loading && <div className={styles.loading}>Loading...</div>}
         {error && <div className={styles.error}>{error}</div>}
         {success && <div className={styles.success}>{success}</div>}
+        {importResult && importResult.errors && importResult.errors.length > 0 && (
+          <div className={styles['import-errors']}>
+            <h4>Import Errors:</h4>
+            <ul>
+              {importResult.errors.map((err, index) => (
+                <li key={index}>Row {err.row}: {err.message}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         {viewMode === 'table' && !loading && (
           <div className={styles['table-container']}>
             <div className={styles['table-header']}>
@@ -234,4 +349,4 @@ const PaymentOut = ({ onBack }) => {
   );
 };
 
-export default PaymentOut; 
+export default PaymentOut;
