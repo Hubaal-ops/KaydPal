@@ -1,19 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styles from './Stores.module.css';
-import { Plus, Eye, Edit, Trash2, ArrowLeft, Search } from 'lucide-react';
+import { Plus, Eye, Edit, Trash2, ArrowLeft, Search, Download, Upload } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
   getExpenses,
   getExpenseById,
   createExpense,
   updateExpense,
-  deleteExpense
+  deleteExpense,
+  exportExpensesToExcel,
+  importExpensesFromExcel,
+  downloadExpenseTemplate
 } from '../services/expenseService';
 import { getExpenseCategories } from '../services/expenseCategoryService';
 import { getAccounts } from '../services/accountService';
 
 const Expenses = ({ onBack }) => {
   const navigate = useNavigate();
+  const fileInputRef = useRef(null);
   const [viewMode, setViewMode] = useState('table');
   const [expenses, setExpenses] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -30,6 +34,7 @@ const Expenses = ({ onBack }) => {
   const [editingExpense, setEditingExpense] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [importResults, setImportResults] = useState(null);
 
   // Fetch expenses, categories, and accounts from backend
   const fetchExpenses = async () => {
@@ -167,6 +172,131 @@ const Expenses = ({ onBack }) => {
     }));
   };
 
+  // Export handler
+  const handleExport = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      setSuccess('');
+      setImportResults(null);
+      
+      // Check if there are expenses to export
+      if (expenses.length === 0) {
+        setError('No expenses available to export. Please add some expenses first.');
+        return;
+      }
+      
+      console.log('Starting export...');
+      const result = await exportExpensesToExcel();
+      
+      setSuccess(result.message || 'Export completed successfully');
+      console.log('Export successful:', result);
+    } catch (err) {
+      console.error('Export failed:', err);
+      
+      // Handle structured error objects
+      const errorMessage = err.errors && err.errors.length > 0
+        ? `${err.message}: ${err.errors.join(', ')}`
+        : err.message || 'Failed to export expenses';
+      
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Import handler
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Check if file is Excel
+    const validTypes = [
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/csv'
+    ];
+    
+    if (!validTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls|csv)$/i)) {
+      setError('Please upload a valid Excel file (.xlsx, .xls) or CSV file.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    setImportResults(null);
+
+    try {
+      const result = await importExpensesFromExcel(file);
+      setSuccess(result.message);
+      
+      // Show import results if available
+      if (result.imported !== undefined || result.skipped !== undefined) {
+        setImportResults({
+          imported: result.imported || 0,
+          skipped: result.skipped || 0,
+          errors: result.errors || []
+        });
+        
+        // Show a more detailed success message if some records were imported
+        if (result.imported > 0) {
+          setSuccess(`Successfully imported ${result.imported} expense(s). ${result.skipped > 0 ? `${result.skipped} record(s) were skipped.` : ''}`);
+        }
+      }
+      
+      // Refresh the expenses list
+      await fetchExpenses();
+    } catch (error) {
+      console.error('Import error:', error);
+      
+      // Handle structured error objects
+      const errorMessage = error.errors && error.errors.length > 0
+        ? `${error.message}: ${error.errors.join(', ')}`
+        : error.message || 'Error importing expenses';
+      
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+      
+      // Reset file input to allow re-uploading the same file
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  // Template download handler
+  const handleDownloadTemplate = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      setSuccess('');
+      setImportResults(null);
+      
+      console.log('Downloading template...');
+      const result = await downloadExpenseTemplate();
+      
+      setSuccess(result.message || 'Template downloaded successfully');
+      console.log('Template download successful:', result);
+    } catch (err) {
+      console.error('Template download failed:', err);
+      
+      const errorMessage = err.errors && err.errors.length > 0
+        ? `${err.message}: ${err.errors.join(', ')}`
+        : err.message || 'Failed to download template';
+      
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Import click handler
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
   const filteredExpenses = expenses.filter(exp => {
     const catName = exp.category?.name || '';
     const accName = exp.account?.name || '';
@@ -195,13 +325,88 @@ const Expenses = ({ onBack }) => {
             <Eye size={20} />
             View Table
           </button>
+          <button
+            className={styles['action-btn']}
+            onClick={handleExport}
+            disabled={loading}
+          >
+            <Download size={20} />
+            Export to Excel
+          </button>
+          <button
+            className={styles['action-btn']}
+            onClick={handleImportClick}
+            disabled={loading}
+          >
+            <Upload size={20} />
+            Import from Excel
+          </button>
+          <button
+            className={styles['action-btn']}
+            onClick={handleDownloadTemplate}
+            disabled={loading}
+          >
+            Download Template
+          </button>
           <button className={`${styles['action-btn']} ${viewMode === 'form' ? styles.active : ''}`} onClick={handleAddNew}>
             <Plus size={20} />
             Add New Expense
           </button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept=".xlsx,.xls,.csv"
+            style={{ display: 'none' }}
+          />
         </div>
         {error && <div className={styles.error}>{error}</div>}
         {success && <div className={styles.success}>{success}</div>}
+        {importResults && (
+          <div className={styles.importResults}>
+            <div className={styles.importSummary}>
+              <h4>Import Results</h4>
+              <div className={styles.importStats}>
+                {importResults.imported > 0 && (
+                  <div className={styles.statItem}>
+                    <span className={styles.statValue} style={{ color: '#4caf50' }}>
+                      {importResults.imported}
+                    </span>
+                    <span className={styles.statLabel}>Imported</span>
+                  </div>
+                )}
+                {importResults.skipped > 0 && (
+                  <div className={styles.statItem}>
+                    <span className={styles.statValue} style={{ color: '#ff9800' }}>
+                      {importResults.skipped}
+                    </span>
+                    <span className={styles.statLabel}>Skipped</span>
+                  </div>
+                )}
+                {importResults.errors && importResults.errors.length > 0 && (
+                  <div className={styles.statItem}>
+                    <span className={styles.statValue} style={{ color: '#f44336' }}>
+                      {importResults.errors.length}
+                    </span>
+                    <span className={styles.statLabel}>Errors</span>
+                  </div>
+                )}
+              </div>
+              {importResults.errors && importResults.errors.length > 0 && (
+                <div className={styles.importErrors}>
+                  <h5>Errors:</h5>
+                  <ul>
+                    {importResults.errors.map((error, index) => (
+                      <li key={index}>
+                        {error.row ? `Row ${error.row}: ` : ''}{error.message}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         {viewMode === 'table' && (
           <div className={styles['table-container']}>
             <div className={styles['table-header']}>
@@ -358,4 +563,4 @@ const Expenses = ({ onBack }) => {
   );
 };
 
-export default Expenses; 
+export default Expenses;
