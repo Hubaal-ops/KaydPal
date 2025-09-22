@@ -24,8 +24,16 @@
   margin-bottom: 2rem;
 }
 
-/* Tabs */
-.tabs {
+/* Main Tabs */
+.tabs:first-child {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 1.5rem;
+  gap: 1.5rem;
+}
+
+/* Sub Tabs */
+.tabs:not(:first-child) {
   display: flex;
   border-bottom: 1px solid var(--border);
   margin-bottom: 1.5rem;
@@ -39,6 +47,9 @@
   color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .tab.active {
