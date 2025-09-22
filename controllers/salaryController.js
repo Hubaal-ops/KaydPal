@@ -3,6 +3,7 @@ const Account = require('../models/Account');
 const Employee = require('../models/Employee');
 const getNextSequence = require('../getNextSequence');
 const XLSX = require('xlsx');
+const { createNotification } = require('../utils/notificationHelpers');
 
 // Get all salaries
 exports.getAllSalaries = async (req, res) => {
@@ -52,6 +53,22 @@ exports.createSalary = async (req, res) => {
     // Update account balance
     accountDoc.balance -= amount;
     await accountDoc.save();
+    
+    // Create notification for the user
+    try {
+      const employeeName = employeeDoc?.name || 'an employee';
+      await createNotification(
+        userId,
+        'Salary Payment Processed',
+        `A salary payment of $${amount.toFixed(2)} has been processed for ${employeeName}.`,
+        'success',
+        'employees'
+      );
+    } catch (notificationError) {
+      console.error('Failed to create notification:', notificationError);
+      // Don't fail the request if notification creation fails
+    }
+    
     res.status(201).json(salary);
   } catch (err) {
     res.status(400).json({ error: err.message });

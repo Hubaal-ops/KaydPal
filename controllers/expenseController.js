@@ -3,6 +3,7 @@ const Account = require('../models/Account');
 const ExpenseCategory = require('../models/ExpenseCategory');
 const getNextSequence = require('../getNextSequence');
 const XLSX = require('xlsx');
+const { createNotification } = require('../utils/notificationHelpers');
 
 // Get all expenses (user-specific)
 exports.getAllExpenses = async (req, res) => {
@@ -48,6 +49,21 @@ exports.createExpense = async (req, res) => {
     // Update account balance
     accountDoc.balance -= amount;
     await accountDoc.save();
+    
+    // Create notification for the user
+    try {
+      await createNotification(
+        req.user.id,
+        'New Expense Added',
+        `A new expense of $${amount.toFixed(2)} has been added to your account.`,
+        'info',
+        'financial'
+      );
+    } catch (notificationError) {
+      console.error('Failed to create notification:', notificationError);
+      // Don't fail the request if notification creation fails
+    }
+    
     res.status(201).json(expense);
   } catch (err) {
     res.status(400).json({ error: err.message });

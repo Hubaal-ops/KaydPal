@@ -2,6 +2,7 @@ const Withdrawal = require('../models/Withdrawal');
 const Account = require('../models/Account');
 const getNextSequence = require('../getNextSequence');
 const XLSX = require('xlsx');
+const { createNotification } = require('../utils/notificationHelpers');
 // Download withdrawal import template
 exports.downloadWithdrawalTemplate = async (req, res) => {
   try {
@@ -137,6 +138,21 @@ exports.importWithdrawals = async (file, options) => {
         errors.push(`Row ${index + 2}: ${error.message}`);
       }
     }
+    
+    // Create notification for the user
+    try {
+      await createNotification(
+        userId,
+        'Withdrawals Imported',
+        `${importedCount} withdrawals have been successfully imported.`,
+        'success',
+        'financial'
+      );
+    } catch (notificationError) {
+      console.error('Failed to create notification:', notificationError);
+      // Don't fail the request if notification creation fails
+    }
+    
     return {
       success: true,
       message: importedCount > 0 ? `Successfully imported ${importedCount} withdrawal(s)` : 'No new withdrawals were imported',
@@ -237,6 +253,21 @@ exports.createWithdrawal = async (req, res) => {
     // Update account balance
     accountDoc.balance -= amount;
     await accountDoc.save();
+    
+    // Create notification for the user
+    try {
+      await createNotification(
+        req.user.id,
+        'Withdrawal Completed',
+        `A withdrawal of $${amount.toFixed(2)} has been processed from your account.`,
+        'success',
+        'financial'
+      );
+    } catch (notificationError) {
+      console.error('Failed to create notification:', notificationError);
+      // Don't fail the request if notification creation fails
+    }
+    
     res.status(201).json(withdrawal);
   } catch (err) {
     res.status(400).json({ error: err.message });

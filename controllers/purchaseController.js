@@ -9,6 +9,7 @@ const Account = require('../models/Account');
 const recalculateProductBalance = require('./storeProductController').recalculateProductBalance;
 const recalculateStoreTotal = require('./storeProductController').recalculateStoreTotal;
 const getNextSequence = require('../getNextSequence');
+const { createNotification } = require('../utils/notificationHelpers');
 
 // Helper function to calculate totals from items
 function calculateTotals(items) {
@@ -277,6 +278,20 @@ async function insertPurchase(purchaseData, userId) {
     
     // Save purchase order first
     const savedPurchase = await newPurchase.save(session ? { session } : {});
+    
+    // Create notification for the user
+    try {
+      await createNotification(
+        userId,
+        'New Purchase Order Created',
+        `A new purchase order ${purchase_no} has been created for ${supplier.name}.`,
+        'info',
+        'purchases'
+      );
+    } catch (notificationError) {
+      console.error('Failed to create notification:', notificationError);
+      // Don't fail the request if notification creation fails
+    }
     
     // Only apply inventory and financial effects if status is approved or received
     const shouldApplyEffects = ['approved', 'received'].includes(newPurchase.status);

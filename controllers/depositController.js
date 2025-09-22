@@ -4,6 +4,57 @@ const Account = require('../models/Account');
 const getNextSequence = require('../getNextSequence');
 const XLSX = require('xlsx');
 const path = require('path');
+const { createNotification } = require('../utils/notificationHelpers');
+
+// Download deposit import template
+exports.downloadDepositTemplate = async (req, res) => {
+  try {
+    const wb = XLSX.utils.book_new();
+    // Instructions sheet
+    const instructions = [
+      ['DEPOSIT IMPORT TEMPLATE - INSTRUCTIONS'],
+      ['', '', ''],
+      ['1. Do not modify the column headers in row 1'],
+      ['2. Fill in the data starting from row 2'],
+      ['3. Required fields: Account, Bank, and Amount'],
+      ['4. Amount must be a positive number'],
+      ['5. Account and Bank must match existing records'],
+      ['6. Delete the example rows before adding your data'],
+      ['', '', ''],
+      ['For support, contact your system administrator'],
+      ['', '', ''],
+    ];
+    // Data sheet
+    const templateData = [
+      ['Account', 'Bank', 'Amount'],
+      ['Main Account', 'Bank of America', '1000.00'],
+      ['Savings', 'Chase', '500.50']
+    ];
+    const wsInstructions = XLSX.utils.aoa_to_sheet(instructions);
+    const wsData = XLSX.utils.aoa_to_sheet(templateData);
+    wsData['!cols'] = [
+      { wch: 30 },
+      { wch: 25 },
+      { wch: 15 }
+    ];
+    XLSX.utils.book_append_sheet(wb, wsInstructions, 'Instructions', true);
+    XLSX.utils.book_append_sheet(wb, wsData, 'Deposits', false);
+    wb.Workbook = wb.Workbook || {};
+    wb.Workbook.Views = [{ activeTab: 1 }];
+    const buffer = XLSX.write(wb, {
+      type: 'buffer',
+      bookType: 'xlsx',
+      bookSST: true,
+      cellDates: true,
+      cellStyles: true
+    });
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=deposit_import_template.xlsx');
+    res.send(buffer);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to generate template: ' + error.message });
+  }
+};
 
 // Get all deposits (user-specific)
 exports.getAllDeposits = async (req, res) => {
@@ -42,6 +93,21 @@ exports.createDeposit = async (req, res) => {
     // Update account balance
     accountDoc.balance += amount;
     await accountDoc.save();
+    
+    // Create notification for the user
+    try {
+      await createNotification(
+        req.user.id,
+        'Deposit Completed',
+        `A deposit of $${amount.toFixed(2)} has been added to your account.`,
+        'success',
+        'financial'
+      );
+    } catch (notificationError) {
+      console.error('Failed to create notification:', notificationError);
+      // Don't fail the request if notification creation fails
+    }
+    
     res.status(201).json(deposit);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -198,13 +264,13 @@ exports.importDeposits = async (file, options) => {
         
         // Find the account
         const account = await Account.findOne({
-          name: accountName.trim(),
-          bank: bankName.trim(),
-          userId
+          userId,
+          name: { $regex: new RegExp(`^${accountName.trim()}$`, 'i') },
+          bank: { $regex: new RegExp(`^${bankName.trim()}$`, 'i') }
         });
         
         if (!account) {
-          throw new Error(`Account '${accountName}' at bank '${bankName}' not found`);
+          throw new Error(`Account "${accountName}" at "${bankName}" not found`);
         }
         
         // Generate deposit ID
@@ -218,190 +284,51 @@ exports.importDeposits = async (file, options) => {
           deposit_id,
           account: account._id,
           amount,
-          deposit_date: new Date(),
           userId
         });
         
         await deposit.save();
-        console.log(`Created deposit ${deposit_id} for account ${accountName} (${bankName}): $${amount}`);
         
         // Update account balance
         account.balance += amount;
         await account.save();
-        console.log(`Updated account ${accountName} balance to $${account.balance}`);
         
         importedCount++;
-      } catch (error) {
+        
+      } catch (rowError) {
+        console.error(`Error processing row ${rowNumber}:`, rowError.message);
         skippedCount++;
-        errors.push(`Row ${index + 2}: ${error.message}`);
+        errors.push({
+          row: rowNumber,
+          error: rowError.message
+        });
       }
     }
     
-    // Log final import results
-    console.log('Import completed:', {
-      importedCount,
-      skippedCount,
-      totalProcessed: importedCount + skippedCount,
-      errorCount: errors.length
-    });
+    // Create notification for the user
+    try {
+      await createNotification(
+        userId,
+        'Deposits Imported',
+        `${importedCount} deposits have been successfully imported.`,
+        'success',
+        'financial'
+      );
+    } catch (notificationError) {
+      console.error('Failed to create notification:', notificationError);
+      // Don't fail the request if notification creation fails
+    }
     
-    // Prepare response
-    const response = {
+    return {
       success: true,
-      message: importedCount > 0 
-        ? `Successfully imported ${importedCount} deposit(s)`
-        : 'No new deposits were imported',
-      importedCount,
-      skippedCount,
-      totalCount: importedCount + skippedCount,
-      ...(errors.length > 0 && { errors })
+      message: `Import completed: ${importedCount} imported, ${skippedCount} skipped`,
+      imported: importedCount,
+      skipped: skippedCount,
+      errors: errors
     };
     
-    console.log('Sending response:', response);
-    return response;
   } catch (error) {
     console.error('Import error:', error);
-    throw new Error(`Failed to process file: ${error.message}`);
-  }
-};
-
-// Export deposits to Excel/CSV
-exports.exportDeposits = async (userId, format = 'xlsx') => {
-  try {
-    const deposits = await Deposit.find({ userId })
-      .populate('account', 'name bank')
-      .sort({ deposit_date: -1 })
-      .lean();
-    
-    if (!deposits || deposits.length === 0) {
-      throw new Error('No deposits found to export');
-    }
-    
-    // Prepare data for export
-    const exportData = deposits.map(deposit => ({
-      'Deposit ID': deposit.deposit_id,
-      'Account Name': deposit.account?.name || '',
-      'Bank': deposit.account?.bank || '',
-      'Amount': deposit.amount,
-      'Date': deposit.deposit_date ? new Date(deposit.deposit_date).toISOString().split('T')[0] : '',
-      'Created At': new Date(deposit.createdAt).toISOString()
-    }));
-    
-    // Create workbook and worksheet
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    
-    // Set column widths
-    ws['!cols'] = [
-      { wch: 10 }, // Deposit ID
-      { wch: 25 }, // Account Name
-      { wch: 20 }, // Bank
-      { wch: 15 }, // Amount
-      { wch: 15 }, // Date
-      { wch: 25 }  // Created At
-    ];
-    
-    // Add worksheet to workbook
-    XLSX.utils.book_append_sheet(wb, ws, 'Deposits');
-    
-    // Generate buffer based on format
-    let buffer;
-    let mimeType;
-    let fileExtension;
-    
-    if (format === 'csv') {
-      buffer = XLSX.write(wb, { type: 'buffer', bookType: 'csv' });
-      mimeType = 'text/csv';
-      fileExtension = 'csv';
-    } else {
-      buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-      mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-      fileExtension = 'xlsx';
-    }
-    
-    return { buffer, mimeType, fileExtension };
-  } catch (error) {
-    console.error('Export error:', error);
-    throw new Error(`Failed to export deposits: ${error.message}`);
-  }
-};
-
-// Download deposit import template
-exports.downloadDepositTemplate = async (req, res) => {
-  try {
-    const wb = XLSX.utils.book_new();
-    
-    // Instructions sheet
-    const instructions = [
-      ['DEPOSIT IMPORT TEMPLATE - INSTRUCTIONS'],
-      ['', '', ''],
-      ['1. Do not modify the column headers in row 1'],
-      ['2. Fill in the data starting from row 2'],
-      ['3. Required fields: Account, Bank, and Amount'],
-      ['4. Amount must be a positive number'],
-      ['5. Account and Bank must match existing records'],
-      ['6. Delete the example rows before adding your data'],
-      ['', '', ''],
-      ['For support, contact your system administrator'],
-      ['', '', ''],
-    ];
-    
-    // Data sheet
-    const templateData = [
-      // Headers
-      ['Account', 'Bank', 'Amount'],
-      // Example data
-      ['Main Account', 'Bank of America', '1000.00'],
-      ['Savings', 'Chase', '500.50']
-    ];
-    
-    // Create instructions sheet
-    const wsInstructions = XLSX.utils.aoa_to_sheet(instructions);
-    
-    // Create data sheet
-    const wsData = XLSX.utils.aoa_to_sheet(templateData);
-    
-    // Format data sheet
-    wsData['!cols'] = [
-      { wch: 30 }, // Account
-      { wch: 25 }, // Bank
-      { wch: 15 }  // Amount
-    ];
-    
-    // Add data validation for amount (must be positive number)
-    const amountCol = XLSX.utils.decode_col('C'); // Column C for amount
-    wsData['!dataValidations'] = [{
-      ref: XLSX.utils.encode_range({
-        s: { r: 1, c: amountCol },
-        e: { r: 1000, c: amountCol }
-      }),
-      t: 'custom',
-      formulae: ['=C2>0'],
-      error: 'Amount must be greater than zero',
-      errorStyle: 'warning'
-    }];
-    
-    // Add sheets to workbook
-    XLSX.utils.book_append_sheet(wb, wsInstructions, 'Instructions', true);
-    XLSX.utils.book_append_sheet(wb, wsData, 'Deposits', false);
-    
-    // Set the active sheet to the data sheet
-    wb.Workbook = wb.Workbook || {};
-    wb.Workbook.Views = [{ activeTab: 1 }];
-    
-    const buffer = XLSX.write(wb, { 
-      type: 'buffer', 
-      bookType: 'xlsx',
-      bookSST: true,
-      cellDates: true,
-      cellStyles: true
-    });
-    
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename=deposit_import_template.xlsx');
-    res.send(buffer);
-  } catch (error) {
-    console.error('Failed to generate template:', error);
-    res.status(500).json({ error: 'Failed to generate template: ' + error.message });
+    throw error;
   }
 };

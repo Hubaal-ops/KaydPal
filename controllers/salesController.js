@@ -9,6 +9,7 @@ const { recalculateProductBalance, recalculateStoreTotal } = require('./storePro
 const Invoice = require('../models/Invoice');
 const getNextSequence = require('../getNextSequence');
 const connectDB = require('../db');
+const { createNotification } = require('../utils/notificationHelpers');
 
 // Helper function to calculate totals from items
 function calculateTotals(items) {
@@ -289,6 +290,20 @@ async function insertSale(saleData, userId) {
     
     // Save sale order first
     const savedSale = await newSale.save(session ? { session } : {});
+    
+    // Create notification for the user
+    try {
+      await createNotification(
+        userId,
+        'New Sale Order Created',
+        `A new sale order ${sale_no} has been created for ${customer.name || customer.customer_name || 'a customer'}.`,
+        'success',
+        'sales'
+      );
+    } catch (notificationError) {
+      console.error('Failed to create notification:', notificationError);
+      // Don't fail the request if notification creation fails
+    }
     
     // Only apply inventory and financial effects if status requires it
     if (willHaveEffects) {

@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Product = require('../models/Product');
 const getNextSequence = require('../getNextSequence');
 const XLSX = require('xlsx');
+const { createNotification } = require('../utils/notificationHelpers');
 
 // Create a new product
 async function insertProduct(productData) {
@@ -44,6 +45,20 @@ async function insertProduct(productData) {
     });
 
     await newProduct.save();
+    
+    // Create notification for the user
+    try {
+      await createNotification(
+        userId,
+        'New Product Added',
+        `A new product "${productData.product_name}" has been added to your inventory.`,
+        'success',
+        'inventory'
+      );
+    } catch (notificationError) {
+      console.error('Failed to create notification:', notificationError);
+      // Don't fail the request if notification creation fails
+    }
 
     return {
       message: "✅ Product created successfully.",

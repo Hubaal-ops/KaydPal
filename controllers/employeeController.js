@@ -2,6 +2,7 @@ const Employee = require('../models/Employee');
 const Store = require('../models/Store');
 const getNextSequence = require('../getNextSequence');
 const XLSX = require('xlsx');
+const { createNotification } = require('../utils/notificationHelpers');
 
 // Get all employees
 exports.getAllEmployees = async (req, res) => {
@@ -34,6 +35,21 @@ exports.createEmployee = async (req, res) => {
     }
     const newEmployee = new Employee({ employee_id, name, position, store, contact, date_hired, userId: req.user.id });
     const savedEmployee = await newEmployee.save();
+    
+    // Create notification for the user
+    try {
+      await createNotification(
+        req.user.id,
+        'New Employee Added',
+        `A new employee "${name}" has been added to your team.`,
+        'success',
+        'employees'
+      );
+    } catch (notificationError) {
+      console.error('Failed to create notification:', notificationError);
+      // Don't fail the request if notification creation fails
+    }
+    
     res.status(201).json(savedEmployee);
   } catch (err) {
     res.status(400).json({ error: err.message });

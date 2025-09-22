@@ -3,6 +3,7 @@ const Account = require('../models/Account');
 const getNextSequence = require('../getNextSequence');
 const XLSX = require('xlsx');
 const path = require('path');
+const { createNotification } = require('../utils/notificationHelpers');
 
 // Get all transfers
 exports.getAllTransfers = async (req, res) => {
@@ -52,6 +53,21 @@ exports.createTransfer = async (req, res) => {
     toAcc.balance += amount;
     await fromAcc.save();
     await toAcc.save();
+    
+    // Create notification for the user
+    try {
+      await createNotification(
+        req.user.id,
+        'Transfer Completed',
+        `A transfer of $${amount.toFixed(2)} has been completed from ${fromAcc.name} to ${toAcc.name}.`,
+        'success',
+        'financial'
+      );
+    } catch (notificationError) {
+      console.error('Failed to create notification:', notificationError);
+      // Don't fail the request if notification creation fails
+    }
+    
     res.status(201).json(transfer);
   } catch (err) {
     res.status(400).json({ error: err.message });

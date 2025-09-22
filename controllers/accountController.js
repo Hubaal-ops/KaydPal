@@ -3,6 +3,7 @@ const getNextSequence = require('../getNextSequence');
 const XLSX = require('xlsx');
 const path = require('path');
 const fs = require('fs');
+const { createNotification } = require('../utils/notificationHelpers');
 
 // Get all accounts (user-specific)
 exports.getAllAccounts = async (req, res) => {
@@ -78,6 +79,20 @@ exports.createAccount = async (req, res) => {
     
     const savedAccount = await newAccount.save();
     
+    // Create notification for the user
+    try {
+      await createNotification(
+        req.user.id,
+        'New Account Created',
+        `A new account "${name}" has been created at ${bank}.`,
+        'success',
+        'financial'
+      );
+    } catch (notificationError) {
+      console.error('Failed to create notification:', notificationError);
+      // Don't fail the request if notification creation fails
+    }
+    
     res.status(201).json({
       success: true,
       message: 'Account created successfully',
@@ -142,6 +157,22 @@ exports.updateAccount = async (req, res) => {
     
     if (!updatedAccount) {
       return res.status(404).json({ error: 'Account not found' });
+    }
+    
+    // Create notification if balance is low
+    try {
+      if (numericBalance < 100) { // Threshold for low balance
+        await createNotification(
+          req.user.id,
+          'Low Account Balance',
+          `Your account "${name}" at ${bank} has a low balance of $${numericBalance.toFixed(2)}.`,
+          'warning',
+          'financial'
+        );
+      }
+    } catch (notificationError) {
+      console.error('Failed to create notification:', notificationError);
+      // Don't fail the request if notification creation fails
     }
     
     res.json({

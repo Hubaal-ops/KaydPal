@@ -149,6 +149,9 @@ app.use('/api/ai', aiRoutes);
 const notificationsRoutes = require('./routes/notifications');
 app.use('/api/protected/admin/notifications', notificationsRoutes);
 
+// User notifications route
+const userNotificationsRoutes = require('./routes/userNotifications');
+app.use('/api/protected/user/notifications', userNotificationsRoutes);
 // Apply multer middleware specifically to the categories import route
 app.use('/api/categories/import', upload.single('file'));
 app.use('/api/categories', categoryRoutes);

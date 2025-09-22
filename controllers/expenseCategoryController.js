@@ -1,5 +1,6 @@
 const ExpenseCategory = require('../models/ExpenseCategory');
 const XLSX = require('xlsx');
+const { createNotification } = require('../utils/notificationHelpers');
 
 // Get all expense categories
 exports.getAllExpenseCategories = async (req, res) => {
@@ -46,6 +47,21 @@ exports.createExpenseCategory = async (req, res) => {
     });
     
     const savedCategory = await newCategory.save();
+    
+    // Create notification for the user
+    try {
+      await createNotification(
+        req.user.id,
+        'New Expense Category Created',
+        `A new expense category "${name}" has been created.`,
+        'success',
+        'financial'
+      );
+    } catch (notificationError) {
+      console.error('Failed to create notification:', notificationError);
+      // Don't fail the request if notification creation fails
+    }
+    
     res.status(201).json(savedCategory);
   } catch (err) {
     res.status(400).json({ 

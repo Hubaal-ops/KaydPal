@@ -2,6 +2,7 @@ const Store = require('../models/Store');
 const getNextSequence = require('../getNextSequence');
 const XLSX = require('xlsx');
 const path = require('path');
+const { createNotification } = require('../utils/notificationHelpers');
 
 // Get all stores
 exports.getAllStores = async (req, res) => {
@@ -35,6 +36,21 @@ exports.createStore = async (req, res) => {
       userId: req.user.id
     });
     await newStore.save();
+    
+    // Create notification for the user
+    try {
+      await createNotification(
+        req.user.id,
+        'New Store Created',
+        `A new store "${req.body.store_name}" has been created.`,
+        'success',
+        'inventory'
+      );
+    } catch (notificationError) {
+      console.error('Failed to create notification:', notificationError);
+      // Don't fail the request if notification creation fails
+    }
+    
     res.status(201).json(newStore);
   } catch (err) {
     res.status(400).json({ error: 'Failed to create store' });
