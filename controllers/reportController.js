@@ -41,7 +41,7 @@ exports.expiryReport = async (req, res) => {
       product_name: p.name,
       expiryDate: p.expiryDate,
       daysToExpire: p.expiryDate ? Math.ceil((p.expiryDate - now) / (1000 * 60 * 60 * 24)) : null,
-      stock: p.storing_balance || 0,
+      stock: p.quantity || 0,
     }));
     res.json({ success: true, data: { rows } });
   } catch (err) {
@@ -63,7 +63,7 @@ exports.stockValuationReport = async (req, res) => {
       // Get all purchases and sales for this product by name
       const purchases = await Purchase.find({ product_name: productName, ...(userId ? { userId } : {}) }).sort({ created_at: 1 });
       const sales = await Sale.find({ 'items.product_name': productName, ...(userId ? { userId } : {}) }).sort({ created_at: 1 });
-      let stock = product.storing_balance || 0;
+      let stock = product.quantity || 0;
       let valuation = 0;
       if (method === 'fifo' || method === 'lifo') {
         // Build purchase lots
@@ -984,23 +984,23 @@ exports.generateReport = async (req, res) => {
         product_no: p.product_no,
         product_name: p.product_name,
         category: p.category,
-        stock: p.storing_balance,
+        stock: p.quantity,
         price: p.price,
-        status: (p.storing_balance === 0) ? 'Out of Stock' : (p.storing_balance < 10 ? 'Low Stock' : 'In Stock'),
+        status: (p.quantity === 0) ? 'Out of Stock' : (p.quantity < 10 ? 'Low Stock' : 'In Stock'),
       }));
       // Card value
-      const totalStock = products.reduce((sum, p) => sum + (p.storing_balance || 0), 0);
+      const totalStock = products.reduce((sum, p) => sum + (p.quantity || 0), 0);
       // Graph data (product name and stock)
       data.graphData = products.map(p => ({
         product_name: p.product_name,
-        stock: p.storing_balance
+        stock: p.quantity
       }));
       // Summary for cards
       data.summary = {
         totalProducts: products.length,
         totalStock,
-        outOfStock: products.filter(p => (p.storing_balance || 0) === 0).length,
-        lowStock: products.filter(p => (p.storing_balance || 0) < 10 && (p.storing_balance || 0) > 0).length,
+        outOfStock: products.filter(p => (p.quantity || 0) === 0).length,
+        lowStock: products.filter(p => (p.quantity || 0) < 10 && (p.quantity || 0) > 0).length,
       };
     } else if (type === 'low-stock') {
       // Low Stock/Out-of-Stock Report
@@ -1599,7 +1599,7 @@ function calculateInventorySummary(inventory, metricsLevel, allStores = []) {
   let productsWithMargin = 0;
 
   inventory.forEach(item => {
-    summary.total_stock_units += item.storing_balance || 0;
+    summary.total_stock_units += item.quantity || 0;
     summary.total_cost_value += item.total_cost_value || 0;
     summary.total_retail_value += item.total_retail_value || 0;
     summary.total_potential_profit += item.potential_profit || 0;
@@ -1689,7 +1689,7 @@ function groupInventoryData(inventory, groupBy) {
     
     const group = groupedData.get(key);
     group.product_count++;
-    group.total_stock_units += item.storing_balance || 0;
+    group.total_stock_units += item.quantity || 0;
     group.total_cost_value += item.total_cost_value || 0;
     group.total_retail_value += item.total_retail_value || 0;
     group.total_potential_profit += item.potential_profit || 0;
@@ -1713,7 +1713,7 @@ function calculateInventoryTopPerformers(inventory) {
         product_no: item.product_no,
         product_name: item.product_name,
         category: item.category,
-        stock_units: item.storing_balance,
+        stock_units: item.quantity,
         retail_value: item.total_retail_value,
         margin_percentage: item.margin_percentage
       })),
@@ -1730,13 +1730,13 @@ function calculateInventoryTopPerformers(inventory) {
       })),
     low_stock_alerts: inventory
       .filter(item => item.stock_status === 'low_stock' || item.stock_status === 'out_of_stock')
-      .sort((a, b) => (a.storing_balance || 0) - (b.storing_balance || 0))
+      .sort((a, b) => (a.quantity || 0) - (b.quantity || 0))
       .slice(0, 10)
       .map(item => ({
         product_no: item.product_no,
         product_name: item.product_name,
         category: item.category,
-        current_stock: item.storing_balance,
+        current_stock: item.quantity,
         stock_status: item.stock_status
       }))
   };
@@ -2567,7 +2567,7 @@ exports.generateAdvancedPurchaseReport = async (req, res) => {
             ...item,
             product_name: product?.product_name || '',
             category: product?.category || '',
-            current_stock: product?.storing_balance || 0,
+            current_stock: product?.quantity || 0,
             total_cost: (item.price || 0) * (item.qty || 0)
           };
         });
@@ -2677,7 +2677,7 @@ exports.generateAdvancedInventoryReport = async (req, res) => {
       includeValuation = true,
       page = 1,
       limit = 50,
-      sortBy = 'storing_balance',
+      sortBy = 'quantity',
       sortOrder = 'desc'
     } = req.query;
 
@@ -2689,27 +2689,75 @@ exports.generateAdvancedInventoryReport = async (req, res) => {
     const filter = {};
     if (userId) filter.userId = userId;
     if (category) filter.category = category;
-    if (min_stock || max_stock) {
-      filter.storing_balance = {};
-      if (min_stock) filter.storing_balance.$gte = Number(min_stock);
-      if (max_stock) filter.storing_balance.$lte = Number(max_stock);
-    }
+    
+    // Handle store-specific filtering
+    let storeFilteredProductNos = null;
+    if (store_no) {
+      // When filtering by store, we need to get product numbers from StoreProduct first
+      const storeProductFilter = { userId, store_no: Number(store_no) };
+      
+      // Apply stock filters to StoreProduct
+      if (stock_status) {
+        switch (stock_status) {
+          case 'out_of_stock':
+            storeProductFilter.qty = { $lte: 0 };
+            break;
+          case 'low_stock':
+            storeProductFilter.qty = { $gt: 0, $lte: 10 }; // Configurable threshold
+            break;
+          case 'in_stock':
+            storeProductFilter.qty = { $gt: 10, $lte: 100 }; // Normal range
+            break;
+          case 'overstocked':
+            storeProductFilter.qty = { $gt: 100 }; // High stock
+            break;
+        }
+      } else {
+        if (min_stock) {
+          storeProductFilter.qty = storeProductFilter.qty || {};
+          storeProductFilter.qty.$gte = Number(min_stock);
+        }
+        if (max_stock) {
+          storeProductFilter.qty = storeProductFilter.qty || {};
+          storeProductFilter.qty.$lte = Number(max_stock);
+        }
+      }
+      
+      // Get product numbers from StoreProduct collection
+      const storeProductsForFiltering = await StoreProduct.find(storeProductFilter).lean();
+      storeFilteredProductNos = storeProductsForFiltering.map(sp => sp.product_no);
+      
+      // Filter products by these product numbers
+      if (storeFilteredProductNos.length > 0) {
+        filter.product_no = { $in: storeFilteredProductNos };
+      } else {
+        // No products match store + stock filters, return empty result
+        filter.product_no = { $in: [] };
+      }
+    } else {
+      // Not filtering by store, apply filters directly to Product collection
+      if (min_stock || max_stock) {
+        filter.quantity = {};
+        if (min_stock) filter.quantity.$gte = Number(min_stock);
+        if (max_stock) filter.quantity.$lte = Number(max_stock);
+      }
 
-    // Stock status filter
-    if (stock_status) {
-      switch (stock_status) {
-        case 'out_of_stock':
-          filter.storing_balance = { $lte: 0 };
-          break;
-        case 'low_stock':
-          filter.storing_balance = { $gt: 0, $lte: 10 }; // Configurable threshold
-          break;
-        case 'in_stock':
-          filter.storing_balance = { $gt: 10, $lte: 100 }; // Normal range
-          break;
-        case 'overstocked':
-          filter.storing_balance = { $gt: 100 }; // High stock
-          break;
+      // Stock status filter
+      if (stock_status) {
+        switch (stock_status) {
+          case 'out_of_stock':
+            filter.quantity = { $lte: 0 };
+            break;
+          case 'low_stock':
+            filter.quantity = { $gt: 0, $lte: 10 }; // Configurable threshold
+            break;
+          case 'in_stock':
+            filter.quantity = { $gt: 10, $lte: 100 }; // Normal range
+            break;
+          case 'overstocked':
+            filter.quantity = { $gt: 100 }; // High stock
+            break;
+        }
       }
     }
 
@@ -2731,16 +2779,20 @@ exports.generateAdvancedInventoryReport = async (req, res) => {
     console.log(`📊 Found ${products.length} products out of ${totalCount} total`);
 
     // Get store products for detailed store-wise inventory
-    const StoreProduct = require('../models/StoreProduct');
-    // Always fetch store products to ensure store information is available
-    // Only filter by specific store if store_no is provided
-    const storeFilter = { userId };
-    if (store_no) storeFilter.store_no = Number(store_no);
-    
-    const storeProducts = await StoreProduct.find(storeFilter).lean();
+    // If we already fetched store products for filtering, use those results
+    let storeProducts = [];
+    if (store_no) {
+      // When filtering by store, get all store products for this specific store
+      const storeFilter = userId ? { userId, store_no: Number(store_no) } : { store_no: Number(store_no) };
+      storeProducts = await StoreProduct.find(storeFilter).lean();
+    } else {
+      // Fetch all store products for enrichment when no store filter is applied
+      const storeFilter = userId ? { userId } : {};
+      storeProducts = await StoreProduct.find(storeFilter).lean();
+    }
 
     // Get related data for enrichment
-    const stores = await Store.find({ userId }).lean();
+    const stores = await Store.find(userId ? { userId } : {}).lean();
     const storeMap = new Map();
     stores.forEach(s => {
       storeMap.set(s.store_no, s);
@@ -2759,7 +2811,7 @@ exports.generateAdvancedInventoryReport = async (req, res) => {
     const allStoreProductsMap = new Map();
     if (!store_no) {
       // If no specific store filter, get all store products for accurate store information
-      const allStoreProducts = await StoreProduct.find({ userId }).lean();
+      const allStoreProducts = await StoreProduct.find(userId ? { userId } : {}).lean();
       allStoreProducts.forEach(sp => {
         if (!allStoreProductsMap.has(sp.product_no)) {
           allStoreProductsMap.set(sp.product_no, []);
@@ -2771,7 +2823,7 @@ exports.generateAdvancedInventoryReport = async (req, res) => {
     // Enrich inventory data
     const enrichedInventory = products.map(product => {
       // Calculate stock status
-      const stock = product.storing_balance || 0;
+      const stock = product.quantity || 0;
       let stockStatus = 'in_stock';
       if (stock <= 0) stockStatus = 'out_of_stock';
       else if (stock <= 10) stockStatus = 'low_stock';
@@ -2881,10 +2933,10 @@ exports.generateAdvancedInventoryReport = async (req, res) => {
     res.json(response);
     
   } catch (err) {
-    console.error('❌ Error generating advanced sales report:', err);
+    console.error('❌ Error generating advanced inventory report:', err);
     res.status(500).json({
       success: false,
-      message: 'Failed to generate advanced sales report',
+      message: 'Failed to generate advanced inventory report',
       error: err.message
     });
   }

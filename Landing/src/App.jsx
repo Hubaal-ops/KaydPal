@@ -30,6 +30,7 @@ import Reports from './views/Reports';
 import SalesReports from './views/SalesReports';
 import PurchaseReports from './views/PurchaseReports';
 import InventoryReports from './views/InventoryReports';
+import AdvancedInventoryReports from './views/AdvancedInventoryReports';
 import FinancialReports from './views/FinancialReports';
 import BusinessManagement from './views/BusinessManagement';
 import UserManagement from './views/admin/UserManagement';
@@ -260,6 +261,14 @@ function App() {
             element={
               user && user.role === 'user'
                 ? <InventoryReports />
+                : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
+            }
+          />
+          <Route
+            path="/reports/inventory-advanced-new"
+            element={
+              user && user.role === 'user'
+                ? <AdvancedInventoryReports />
                 : <Navigate to={user && user.role === 'admin' ? "/admin-dashboard" : "/login"} />
             }
           />

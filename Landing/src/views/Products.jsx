@@ -26,7 +26,9 @@ const Products = ({ onBack }) => {
   const [formData, setFormData] = useState({
     product_name: '',
     category: '',
-    quantity: 0
+    quantity: 0,
+    cost_price: 0,
+    selling_price: 0
   });
   const [editingProduct, setEditingProduct] = useState(null);
   const [error, setError] = useState('');
@@ -84,7 +86,13 @@ const Products = ({ onBack }) => {
   const handleAddNew = () => {
     setViewMode('form');
     setEditingProduct(null);
-    setFormData({ product_name: '', category: '', storing_balance: 0 });
+    setFormData({ 
+      product_name: '', 
+      category: '', 
+      quantity: 0,
+      cost_price: 0,
+      selling_price: 0 
+    });
     setError('');
     setSuccess('');
   };
@@ -94,7 +102,9 @@ const Products = ({ onBack }) => {
     setFormData({
       product_name: product.product_name,
       category: product.category || '',
-      quantity: product.quantity || 0
+      quantity: product.quantity || 0,
+      cost_price: product.cost_price || 0,
+      selling_price: product.selling_price || 0
     });
     setViewMode('form');
     setError('');
@@ -144,7 +154,9 @@ const Products = ({ onBack }) => {
       setFormData({
         product_name: '',
         category: '',
-        quantity: 0
+        quantity: 0,
+        cost_price: 0,
+        selling_price: 0
       });
       setEditingProduct(null);
       
@@ -358,7 +370,9 @@ const Products = ({ onBack }) => {
                       <th>ID</th>
                       <th>Product Name</th>
                       <th>Category</th>
-                      <th>Storing Balance</th>
+                      <th>Quantity</th>
+                      <th>Cost Price</th>
+                      <th>Selling Price</th>
                       <th>Date</th>
                       <th>Actions</th>
                     </tr>
@@ -386,7 +400,9 @@ const Products = ({ onBack }) => {
                             </div>
                           </td>
                           <td>{product.category || '-'}</td>
-                          <td>{product.storing_balance ?? 0}</td>
+                          <td>{product.quantity ?? 0}</td>
+                          <td>${parseFloat(product.cost_price || 0).toFixed(2)}</td>
+                          <td>${parseFloat(product.selling_price || 0).toFixed(2)}</td>
                           <td>{formattedDate}</td>
                           <td>
                             <div className={styles['action-icons']}>
@@ -460,17 +476,50 @@ const Products = ({ onBack }) => {
               </div>
 
               <div className={styles['form-group']}>
-                <label htmlFor="storing_balance">Storing Balance *</label>
+                <label htmlFor="quantity">Quantity *</label>
                 <input
                   type="number"
-                  id="storing_balance"
-                  name="storing_balance"
-                  value={formData.storing_balance ?? ''}
+                  id="quantity"
+                  name="quantity"
+                  value={formData.quantity ?? 0}
                   onChange={handleInputChange}
                   min="0"
+                  step="1"
                   required
                   disabled={loading}
-                  placeholder="Enter storing balance"
+                  placeholder="Enter quantity"
+                />
+              </div>
+
+              <div className={styles['form-group']}>
+                <label htmlFor="cost_price">Cost Price *</label>
+                <input
+                  type="number"
+                  id="cost_price"
+                  name="cost_price"
+                  value={formData.cost_price ?? 0}
+                  onChange={handleInputChange}
+                  min="0"
+                  step="0.01"
+                  required
+                  disabled={loading}
+                  placeholder="Enter cost price"
+                />
+              </div>
+
+              <div className={styles['form-group']}>
+                <label htmlFor="selling_price">Selling Price *</label>
+                <input
+                  type="number"
+                  id="selling_price"
+                  name="selling_price"
+                  value={formData.selling_price ?? 0}
+                  onChange={handleInputChange}
+                  min="0"
+                  step="0.01"
+                  required
+                  disabled={loading}
+                  placeholder="Enter selling price"
                 />
               </div>
 

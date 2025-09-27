@@ -36,7 +36,8 @@ import {
   Clipboard,
   FileText,
   Calendar,
-  ArrowLeft
+  ArrowLeft,
+  Database
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -193,13 +194,14 @@ const Reports = () => {
       color: '#f43f5e',
       gradient: 'linear-gradient(135deg, #f43f5e 0%, #be123c 100%)'
     },
+    
     { 
-      id: 'inventory-advanced',
+      id: 'inventory-advanced-new',
       title: 'Advanced Inventory Analytics', 
-      description: 'In-depth analysis of inventory levels, movement patterns, and optimization opportunities',
-      icon: Package,
-      color: '#f59e0b',
-      gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
+      description: 'Advanced inventory analytics with deeper insights, predictive analysis, and optimization recommendations',
+      icon: Database,
+      color: '#8b5cf6',
+      gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)'
     },
     { 
       id: 'financial-advanced',

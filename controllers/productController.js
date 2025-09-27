@@ -33,12 +33,9 @@ async function insertProduct(productData) {
       product_name: productData.product_name.trim(),
       description: productData.description || '',
       category: productData.category || null,
-      price: Number(productData.price) || 0,
-      cost: Number(productData.cost) || 0,
+      selling_price: Number(productData.selling_price) || 0,
+      cost_price: Number(productData.cost_price) || 0,
       quantity: Number(productData.quantity) || 0,
-      sku: productData.sku || '',
-      barcode: productData.barcode || '',
-      storing_balance: productData.storing_balance !== undefined ? Number(productData.storing_balance) : 0,
       userId: productData.userId,
       created_at: new Date(),
       updated_at: new Date()
@@ -136,12 +133,17 @@ async function updateProduct(product_no, updatedData, userId) {
     if (updatedData.product_name) updateFields.product_name = updatedData.product_name.trim();
     if (updatedData.description !== undefined) updateFields.description = updatedData.description;
     if (updatedData.category !== undefined) updateFields.category = updatedData.category;
-    if (updatedData.price !== undefined) updateFields.price = Number(updatedData.price);
-    if (updatedData.cost !== undefined) updateFields.cost = Number(updatedData.cost);
+    
+    // Handle price fields
+    if (updatedData.selling_price !== undefined) {
+      updateFields.selling_price = Number(updatedData.selling_price);
+    }
+    
+    if (updatedData.cost_price !== undefined) {
+      updateFields.cost_price = Number(updatedData.cost_price);
+    }
+    
     if (updatedData.quantity !== undefined) updateFields.quantity = Number(updatedData.quantity);
-    if (updatedData.sku !== undefined) updateFields.sku = updatedData.sku;
-    if (updatedData.barcode !== undefined) updateFields.barcode = updatedData.barcode;
-    if (updatedData.storing_balance !== undefined) updateFields.storing_balance = Number(updatedData.storing_balance);
 
     await Product.updateOne(
       { product_no: Number(product_no), userId },
@@ -204,12 +206,9 @@ async function exportProducts(req, res) {
         'Product Name': product.product_name || '',
         'Description': product.description || '',
         'Category': product.category || '',
-        'Price': product.price || 0,
-        'Cost': product.cost || 0,
-        'Quantity': product.quantity || 0,
-        'SKU': product.sku || '',
-        'Barcode': product.barcode || '',
-        'Storing Balance': product.storing_balance || 0
+        'Selling Price': product.selling_price || 0,
+        'Cost Price': product.cost_price || 0,
+        'Quantity': product.quantity || 0
       }));
       
       // Create workbook and worksheet
@@ -223,12 +222,9 @@ async function exportProducts(req, res) {
         { wch: 25 },  // Product Name
         { wch: 30 },  // Description
         { wch: 15 },  // Category
-        { wch: 12 },  // Price
-        { wch: 12 },  // Cost
-        { wch: 12 },  // Quantity
-        { wch: 15 },  // SKU
-        { wch: 15 },  // Barcode
-        { wch: 15 }   // Storing Balance
+        { wch: 15 },  // Selling Price
+        { wch: 12 },  // Cost Price
+        { wch: 10 }   // Quantity
       ];
       ws['!cols'] = wscols;
       
@@ -238,7 +234,7 @@ async function exportProducts(req, res) {
       // Add summary sheet
       const totalProducts = products.length;
       const totalQuantity = products.reduce((sum, product) => sum + (product.quantity || 0), 0);
-      const totalValue = products.reduce((sum, product) => sum + (product.quantity || 0) * (product.price || 0), 0);
+      const totalValue = products.reduce((sum, product) => sum + (product.quantity || 0) * (product.selling_price || 0), 0);
       
       const summaryData = [
         ['Products Summary'],
